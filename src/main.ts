@@ -214,6 +214,63 @@ class HypixelCache {
     const ws = bw.winstreak ?? 0;
     const bblr = (bw.beds_broken_bedwars ?? 0) / Math.max(1, bw.beds_lost_bedwars ?? 1);
 
+    // Determine rank/prefix and a display color
+    const getRankInfo = (p: any) => {
+      // Priority: prefix (custom), then package/rank fields
+      const prefix = p?.prefix; // sometimes contains formatted prefix with § codes
+      const displayname = p?.displayname;
+
+      const stripColor = (s: string) => s ? s.replace(/§[0-9a-fk-or]/gi, '').trim() : s;
+
+      // If displayname itself contains a bracketed tag, prefer that (after stripping color codes)
+      if (displayname) {
+        const dn = stripColor(displayname);
+        const match = dn.match(/^\s*\[(.+?)\]/);
+        if (match) return { tag: `[${match[1]}]`, color: '#FFFFFF' };
+      }
+      const rankField = p?.newPackageRank || p?.monthlyPackageRank || p?.packageRank || p?.rank || null;
+
+      // stripColor already defined above
+      if (prefix) {
+        const raw = stripColor(prefix);
+        // If prefix contains a bracketed tag like [MVP++], extract that
+        const m = raw.match(/\[(.+?)\]/);
+        if (m) return { tag: `[${m[1]}]`, color: '#FFFFFF' };
+        return { tag: raw, color: '#FFFFFF' };
+      }
+
+      if (!rankField) return { tag: null, color: null };
+
+      const r = String(rankField).toUpperCase();
+      const map: Record<string, { tag: string; color: string }> = {
+        VIP: { tag: '[VIP]', color: '#55FF55' },
+        VIP_PLUS: { tag: '[VIP+]', color: '#55FF55' },
+        MVP: { tag: '[MVP]', color: '#55FFFF' },
+        MVP_PLUS: { tag: '[MVP+]', color: '#55FFFF' },
+        MVP_PLUS_PLUS: { tag: '[MVP++]', color: '#FFAA00' },
+        SUPERSTAR: { tag: '[MVP++]', color: '#FFAA00' },
+        YT: { tag: '[YOUTUBE]', color: '#FF5555' },
+        YOUTUBER: { tag: '[YOUTUBE]', color: '#FF5555' },
+        ADMIN: { tag: '[ADMIN]', color: '#FF5555' },
+        OWNER: { tag: '[OWNER]', color: '#FF5555' },
+        MOD: { tag: '[MOD]', color: '#55AAFF' },
+        HELPER: { tag: '[HELPER]', color: '#55AAFF' }
+      };
+
+      if (map[r]) return map[r];
+
+      // Handle common patterns
+      if (r.includes('VIP')) return map['VIP'];
+      if (r.includes('SUPERSTAR') || r.includes('MVP_PLUS_PLUS') || r.includes('PLUS_PLUS')) return map['MVP_PLUS_PLUS'];
+      if (r.includes('MVP') && r.includes('PLUS')) return map['MVP_PLUS'];
+      if (r.includes('MVP')) return map['MVP'];
+
+      // Fallback: present the raw rank
+      return { tag: `[${r}]`, color: '#FFFFFF' };
+    };
+
+    const rankInfo = getRankInfo(player ?? {});
+
     return {
       name: player.displayname ?? requestedName,
       level: stars,
@@ -223,6 +280,8 @@ class HypixelCache {
       bblr: +bblr.toFixed(2),
       fk,
       wins,
+      rankTag: rankInfo.tag,
+      rankColor: rankInfo.color,
     };
   }
 
