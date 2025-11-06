@@ -1,125 +1,573 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Nebula Overlay</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self'">
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nebula</title>
+
   <style>
-    :root{
-      --bg: rgba(20,20,28,0.78);
-      --panel: rgba(255,255,255,0.06);
-      --text:#e9e9f1; --muted:#9aa0aa; --accent:#6ee7ff;
-      --good:#43d17f; --warn:#e0c14d; --bad:#e05a5a;
-      --row: rgba(255,255,255,0.03); --row-hover: rgba(255,255,255,0.06);
-      --menu:#1f2230; --shadow:0 12px 30px rgba(0,0,0,.35);
+    :root {
+      --bg: rgba(20, 20, 28, 0.78);
+      --panel: rgba(255, 255, 255, 0.06);
+      --text: #e9e9f1;
+      --muted: #9aa0aa;
+      --accent: #6ee7ff;
+      --good: #43d17f;
+      --warn: #e0c14d;
+      --bad: #e05a5a;
+      --row: rgba(255, 255, 255, 0.03);
+      --row-hover: rgba(255, 255, 255, 0.06);
+      --menu: #1f2230;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
       --grip: 8px;
     }
-    html,body{margin:0;height:100%}
-    body{
-      background:var(--bg); color:var(--text);
-      font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
-      -webkit-font-smoothing:antialiased; user-select:none;
+
+    html, body {
+      margin: 0;
+      height: 100%;
     }
 
-    .topbar{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);-webkit-app-region:drag}
-    .brand{font-weight:700;letter-spacing:.2px;color:var(--accent)}
-    .spacer{flex:1}
-    .icon-btn,.search{-webkit-app-region:no-drag}
-    .icon-btn{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:0;background:transparent;color:var(--text);cursor:pointer}
-    .icon-btn:hover{background:var(--row-hover)}
-    .search{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--row);border-radius:10px}
-    .search input{background:transparent;border:0;outline:0;color:var(--text);width:320px;font-size:14px}
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
 
-    .content{padding:10px 12px}
+    /* --- Topbar --- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--panel);
+      -webkit-app-region: drag;
+    }
 
-    /* Table layout */
-    .table-wrap{padding:8px}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}
-    colgroup col.c-lvl{width:60px}
-    colgroup col.c-name{width:180px}
-    colgroup col.c-ws{width:60px}
-    colgroup col.c-fkdr,colgroup col.c-wlr,colgroup col.c-bblr{width:80px}
-    colgroup col.c-fk,colgroup col.c-wins{width:90px}
-    colgroup col.c-actions{width:60px}
+    .brand {
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      color: var(--accent);
+    }
 
-    thead th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:6px 8px;cursor:pointer;-webkit-app-region:no-drag}
-    tbody td{padding:10px 8px;border-top:1px solid rgba(255,255,255,0.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    tbody tr:hover{background:var(--row-hover)}
-    .lvl{font-weight:600}
-    .name{font-weight:600;color:#6bd3ff}
-    .metric{text-align:right}
-    .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-    .actions{text-align:right;position:relative}
+    .spacer { flex: 1; }
 
-    /* Dropdown menu */
-    .menu{position:absolute;right:8px;top:28px;background:var(--menu);border-radius:8px;box-shadow:var(--shadow);padding:6px;min-width:120px;z-index:50;display:none}
-    .menu.open{display:block}
-    .menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:8px 10px;border-radius:6px;cursor:pointer}
-    .menu button:hover{background:var(--row-hover)}
+    .icon-btn, .search { -webkit-app-region: no-drag; }
 
-    .svg{width:16px;height:16px;display:block}
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
 
-    /* Resize grips */
-    .grip{position:fixed;z-index:1000;-webkit-app-region:no-drag}
-    .g-top{top:0;left:0;right:0;height:var(--grip);cursor:n-resize}
-    .g-bottom{bottom:0;left:0;right:0;height:var(--grip);cursor:s-resize}
-    .g-left{top:0;bottom:0;left:0;width:var(--grip);cursor:w-resize}
-    .g-right{top:0;bottom:0;right:0;width:var(--grip);cursor:e-resize}
-    .g-tl{top:0;left:0;width:var(--grip);height:var(--grip);cursor:nw-resize}
-    .g-tr{top:0;right:0;width:var(--grip);height:var(--grip);cursor:ne-resize}
-    .g-bl{bottom:0;left:0;width:var(--grip);height:var(--grip);cursor:sw-resize}
-    .g-br{bottom:0;right:0;width:var(--grip);height:var(--grip);cursor:se-resize}
+    .icon-btn:hover { background: var(--row-hover); }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      background: var(--row);
+      border-radius: 10px;
+    }
+
+    .search input {
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--text);
+      width: 320px;
+      font-size: 14px;
+    }
+
+    .content { padding: 10px 12px; }
+
+    /* --- Table --- */
+    .table-wrap { padding: 8px; overflow: visible; }
+    table, thead, tbody, th, td { box-sizing: border-box; overflow: visible; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+    colgroup col.c-lvl { width: 60px; }
+    colgroup col.c-name { width: 180px; }
+    colgroup col.c-ws { width: 60px; }
+    colgroup col.c-fkdr,
+    colgroup col.c-wlr,
+    colgroup col.c-bblr { width: 88px; }
+    colgroup col.c-fk,
+    colgroup col.c-wins { width: 96px; }
+    colgroup col.c-actions { width: 60px; }
+
+    thead th {
+      text-align: left;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 6px 8px;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+    }
+
+    th.metric-h, td.metric {
+      text-align: right;
+      font-variant-numeric: tabular-nums lining-nums;
+      font-feature-settings: "tnum" 1, "lnum" 1;
+    }
+
+    tbody td {
+      padding: 10px 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    tbody tr:hover { background: var(--row-hover); }
+
+    .lvl { font-weight: 600; }
+    .name { font-weight: 600; color: #6bd3ff; }
+    .metric { text-align: right; }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    .actions { text-align: right; position: relative; overflow: visible; }
+
+    /* --- Dropdown menu --- */
+    .menu {
+      position: absolute;
+      right: 8px;
+      top: 28px;
+      background: var(--menu);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 6px;
+      min-width: 120px;
+      display: none;
+      z-index: 10000;
+    }
+
+    .menu.open { display: block; }
+
+    .menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .menu button:hover { background: var(--row-hover); }
+
+    .svg { width: 16px; height: 16px; display: block; }
+
+    /* --- Resize grips --- */
+    .grip {
+      position: fixed;
+      z-index: 1000;
+      -webkit-app-region: no-drag;
+    }
+    .g-top { top: 0; left: 0; right: 0; height: var(--grip); cursor: n-resize; }
+    .g-bottom { bottom: 0; left: 0; right: 0; height: var(--grip); cursor: s-resize; }
+    .g-left { top: 0; bottom: 0; left: 0; width: var(--grip); cursor: w-resize; }
+    .g-right { top: 0; bottom: 0; right: 0; width: var(--grip); cursor: e-resize; }
+    .g-tl { top: 0; left: 0; width: var(--grip); height: var(--grip); cursor: nw-resize; }
+    .g-tr { top: 0; right: 0; width: var(--grip); height: var(--grip); cursor: ne-resize; }
+    .g-bl { bottom: 0; left: 0; width: var(--grip); height: var(--grip); cursor: sw-resize; }
+    .g-br { bottom: 0; right: 0; width: var(--grip); height: var(--grip); cursor: se-resize; }
+
+    /* compact, light icons like in your first screenshot */
+    .icon-btn .svg { width: 16px; height: 16px; opacity: 0.85; }
+    .icon-btn:hover .svg { opacity: 1; }
+
+    .search { gap: 6px; padding: 6px 10px; border-radius: 12px; }
+    .search .svg { width: 14px; height: 14px; opacity: 0.6; }
+    .search input { width: 280px; font-size: 13px; }
+
+    .icon-btn--danger:hover {
+      background: rgba(224, 90, 90, 0.22);
+      color: #ff6b6b;
+    }
+
+    /* Sidebar / Toolbar */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 260px;
+      transform: translateX(-100%);
+      transition: transform .22s cubic-bezier(.2,.9,.2,1);
+      background: rgba(30,30,36,0.96);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      z-index: 2000;
+      -webkit-app-region: no-drag;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar.open { transform: translateX(0); }
+
+    .sidebar-inner { display:flex; flex-direction:column; height:100%; padding:14px; }
+
+    .nav { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+
+    .nav-item {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:8px;
+      background: transparent;
+      color: var(--text);
+      border: 0;
+      text-align: left;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      font-weight: 500;
+    }
+    .nav-item:hover { background: var(--row-hover); }
+    .nav-item.active { background: rgba(255,255,255,0.04); font-weight: 700; }
+
+    .nav-icon { width:22px; display:inline-block; text-align:center; }
+    .nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .nav-sep { height:1px; background: rgba(255,255,255,0.03); margin:10px 0; border-radius:2px; }
+
+    .sidebar-footer { margin-top:auto; display:flex; flex-direction:column; gap:8px; padding-bottom:12px; }
+
+    .btn { border:0; padding:9px 10px; border-radius:6px; background:transparent; color:var(--text); cursor:pointer; -webkit-app-region: no-drag; }
+    .btn.primary { background: #ffb400; color:#111; font-weight:700; }
+    .btn.community { border:1px solid rgba(255,255,255,0.06); color:var(--accent); }
+
+    .user-row { display:flex; align-items:center; gap:8px; margin-top:8px; color:var(--muted); padding-top:8px; border-top:1px solid rgba(255,255,255,0.02); }
+    .user-icon { width:20px; display:inline-block; text-align:center; }
+
+    /* Panels */
+    .panel { display: none; padding: 14px; }
+    .panel.active { display: block; }
+
+    /* Nicks Panel */
+    .nicks-list {
+      background: var(--panel);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .nick-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .nick-row:last-child { border: 0; }
+
+    .nick-name {
+      flex: 1;
+      margin-right: 14px;
+      font-weight: 500;
+    }
+
+    .nick-real {
+      color: var(--muted);
+      margin-right: 14px;
+    }
+
+    .delete-btn {
+      opacity: 0.5;
+      padding: 6px;
+      cursor: pointer;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+    }
+    .delete-btn:hover { opacity: 1; }
+
+    .add-nick-btn {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 24px;
+      background: #00e676;
+      color: #111;
+      border: 0;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,230,118,0.4);
+    }
+
+    .add-nick-btn:hover {
+      transform: scale(1.05);
+    }
+
+        /* Panels */
+    .panel {
+      display: none;
+      height: calc(100vh - 50px); /* Höhe minus Topbar */
+      overflow-y: auto;
+    }
+    .panel.active {
+      display: block;
+    }
+
+    /* Nicks Panel */
+    .nicks-list {
+      background: var(--panel);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .nick-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .nick-row:last-child { border: 0; }
+
+    .nick-name {
+      flex: 1;
+      margin-right: 14px;
+      font-weight: 500;
+    }
+
+    .nick-real {
+      color: var(--muted);
+      margin-right: 14px;
+    }
+
+    .add-btn {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 24px;
+      background: #00e676;
+      color: #111;
+      border: 0;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,230,118,0.4);
+    }
+
+    .nick-indicator {
+      font-size: 12px;
+      margin-left: 6px;
+      opacity: 0.7;
+      cursor: help;
+    }
+
+    /* Add Nick Form */
+    .add-nick-form {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .add-nick-form h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .form-row {
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.2);
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+
+    .form-label .icon {
+      opacity: 0.7;
+    }
+
+    .form-label input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--text);
+      font-size: 14px;
+      padding: 4px 0;
+    }
+
+    .form-submit {
+      width: 100%;
+      background: #00e676;
+      color: #111;
+      border: 0;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    .form-submit:hover {
+      opacity: 0.9;
+    }
   </style>
 </head>
 
 <body>
   <div class="topbar">
+    <button id="menuBtn" class="icon-btn" aria-label="Menu" title="Menu">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+      </svg>
+    </button>
     <div class="brand">Nebula</div>
     <div class="spacer"></div>
 
-    <button id="clearAll" class="icon-btn" title="Clear all players">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
-    </button>
-    <button id="refresh" class="icon-btn" title="Refresh">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.64 0 3.13.66 4.22 1.73L13 11h7V4l-2.35 2.35z"/></svg>
+    <!-- Refresh -->
+    <button id="refresh" class="icon-btn" aria-label="Refresh" title="Refresh">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.64 0 3.13.66 4.22 1.73L13 11h7V4l-2.35 2.35z"/>
+      </svg>
     </button>
 
+    <!-- Clear all -->
+    <button id="clearAll" class="icon-btn" aria-label="Clear all players" title="Clear all players">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M9 3h6v2h5v2H4V5h5V3zm1 6h2v9h-2V9zm4 0h2v9h-2V9z"/>
+      </svg>
+    </button>
+
+    <!-- Search -->
     <div class="search">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20 15.5 14zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20 15.5 14zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/>
+      </svg>
       <input id="playerInput" placeholder="Search player(s), comma-separated" />
     </div>
 
-    <button id="minBtn" class="icon-btn" title="Minimize">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+    <!-- Minimize -->
+    <button id="minBtn" class="icon-btn" aria-label="Minimize" title="Minimize">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 13H5v-2h14v2z"/>
+      </svg>
     </button>
-    <button id="closeBtn" class="icon-btn" title="Close">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3 10.59 10.59 16.89 4.3z"/></svg>
+
+    <!-- Close -->
+    <button id="closeBtn" class="icon-btn icon-btn--danger" aria-label="Close" title="Close">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3 10.59 10.59 16.89 4.3z"/>
+      </svg>
     </button>
   </div>
 
+  <aside id="sidebar" class="sidebar" aria-hidden="true">
+    <div class="sidebar-inner">
+      <nav class="nav">
+        <button class="nav-item active" data-panel="home">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Home</span>
+        </button>
+
+        <button class="nav-item" data-panel="nicks">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Nicks</span>
+        </button>
+
+        <div class="nav-sep"></div>
+
+        <button class="nav-item" data-panel="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-row">
+          <span class="user-icon">👤</span>
+          <span class="user-name">username</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <div class="content">
-    <div class="table-wrap">
-      <table id="table">
-        <colgroup>
-          <col class="c-lvl"><col class="c-name"><col class="c-ws">
-          <col class="c-fkdr"><col class="c-wlr"><col class="c-bblr">
-          <col class="c-fk"><col class="c-wins"><col class="c-actions">
-        </colgroup>
-        <thead>
-          <tr>
-            <th data-key="level">Lvl</th>
-            <th data-key="name">Name</th>
-            <th data-key="ws">WS</th>
-            <th data-key="fkdr">FKDR</th>
-            <th data-key="wlr">WLR</th>
-            <th data-key="bblr">BBLR</th>
-            <th data-key="fk">F. Kills</th>
-            <th data-key="wins">Wins</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
+    <!-- Home Panel -->
+    <div class="panel" id="panel-home">
+      <div class="table-wrap">
+        <table id="table">
+          <colgroup>
+            <col class="c-lvl"><col class="c-name"><col class="c-ws">
+            <col class="c-fkdr"><col class="c-wlr"><col class="c-bblr">
+            <col class="c-fk"><col class="c-wins"><col class="c-actions">
+          </colgroup>
+          <thead>
+            <tr>
+              <th data-key="level">Lvl</th>
+              <th data-key="name">Name</th>
+              <th class="metric-h">WS</th>
+              <th class="metric-h">FKDR</th>
+              <th class="metric-h">WLR</th>
+              <th class="metric-h">BBLR</th>
+              <th class="metric-h">F. Kills</th>
+              <th class="metric-h">Wins</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Nicks Panel -->
+    <div class="panel" id="panel-nicks">
+      <!-- Add Nick Form -->
+      <div class="add-nick-form" id="addNickForm" style="display: none;">
+        <h2>Add Nick</h2>
+        <div class="form-row">
+          <label class="form-label">
+            <span class="icon">👤</span>
+            <input type="text" id="nickInput" placeholder="Nick" />
+          </label>
+        </div>
+        <div class="form-row">
+          <label class="form-label">
+            <span class="icon">🎯</span>
+            <input type="text" id="realNameInput" placeholder="Name" />
+          </label>
+        </div>
+        <button class="form-submit" id="saveNickBtn">ADD</button>
+      </div>
+
+      <!-- Nicks List -->
+      <div class="nicks-list" id="nicksList">
+        <!-- Nicks werden hier per JS eingefügt -->
+      </div>
+      <button class="add-btn" id="addNickBtn" title="Add nick">+</button>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="panel" id="panel-settings">
+      <!-- Settings-Inhalt kommt später -->
     </div>
   </div>
 
@@ -134,150 +582,292 @@
   <div class="grip g-br" data-edge="bottom-right"></div>
 
   <script>
-    const { ipcRenderer } = window.require('electron');
-
-    const input = document.getElementById('playerInput');
-    const refreshBtn = document.getElementById('refresh');
-    const clearAllBtn = document.getElementById('clearAll');
-    const rows = document.getElementById('rows');
-    const headers = Array.from(document.querySelectorAll('thead th[data-key]'));
-    const minBtn = document.getElementById('minBtn');
-    const closeBtn = document.getElementById('closeBtn');
-
+    const { ipcRenderer } = require("electron");
+    const rows = document.getElementById("rows");
+    const input = document.getElementById("playerInput");
     let queue = [];
-    let currentSort = { key: 'level', dir: -1 };
 
-    minBtn.addEventListener('click', () => ipcRenderer.send('window:minimize'));
-    closeBtn.addEventListener('click', () => ipcRenderer.send('window:close'));
+    function esc(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+    function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
+    function fmt(n) { return (n == null || isNaN(n)) ? "—" : n; }
+    
+    // Nick management
+    let nicks = JSON.parse(localStorage.getItem('nicks') || '[]');
 
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter'){
-        const names = input.value.split(',').map(s => s.trim()).filter(Boolean);
-        names.forEach(n => { if (!queue.includes(n)) queue.push(n); });
-        input.value = '';
-        fetchAll();
+    function saveNicks() {
+      localStorage.setItem('nicks', JSON.stringify(nicks));
+    }
+
+    function getRealName(name) {
+      const nick = nicks.find(n => n.nick.toLowerCase() === name.toLowerCase());
+      return nick ? nick.real : name;
+    }
+
+    function isNick(name) {
+      return nicks.some(n => n.nick.toLowerCase() === name.toLowerCase());
+    }
+
+    // Nicks Panel UI
+    function renderNicks() {
+      const list = document.getElementById('nicksList');
+      if (!list) return;
+
+      list.innerHTML = nicks.map(({nick, real}) => `
+        <div class="nick-row" data-nick="${escAttr(nick)}">
+          <span class="nick-name">${esc(nick)}</span>
+          <span class="nick-real">${esc(real)}</span>
+          <button class="delete-btn" title="Remove nick">✕</button>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const row = e.target.closest('.nick-row');
+          const nick = row.getAttribute('data-nick');
+          nicks = nicks.filter(n => n.nick !== nick);
+          saveNicks();
+          renderNicks();
+        });
+      });
+    }
+
+    // Nick form handling
+    const addNickBtn = document.getElementById('addNickBtn');
+    const addNickForm = document.getElementById('addNickForm');
+    const nickInput = document.getElementById('nickInput');
+    const realNameInput = document.getElementById('realNameInput');
+    const saveNickBtn = document.getElementById('saveNickBtn');
+
+    // Show/hide form when + button is clicked
+    addNickBtn?.addEventListener('click', () => {
+      addNickForm.style.display = 'block';
+      nickInput.focus();
+    });
+
+    // Save nick when form is submitted
+    saveNickBtn?.addEventListener('click', () => {
+      const nick = nickInput.value.trim();
+      const real = realNameInput.value.trim();
+      
+      if (nick && real) {
+        if (!nicks.some(n => n.nick.toLowerCase() === nick.toLowerCase())) {
+          nicks.push({nick, real});
+          saveNicks();
+          renderNicks();
+          
+          // Reset form
+          nickInput.value = '';
+          realNameInput.value = '';
+          addNickForm.style.display = 'none';
+        }
       }
     });
 
-    clearAllBtn.addEventListener('click', () => { queue = []; rows.innerHTML = ''; });
-    refreshBtn.addEventListener('click', fetchAll);
-
-    headers.forEach(th=>{
-      th.addEventListener('click', ()=>{
-        const key = th.getAttribute('data-key');
-        if (currentSort.key === key) currentSort.dir *= -1;
-        else currentSort = { key, dir: key === 'name' ? 1 : -1 };
-        fetchAll();
-      });
+    // Enter in second input also submits
+    realNameInput?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        saveNickBtn.click();
+      }
     });
 
-    async function fetchOne(name){
-      try{
-        const r = await ipcRenderer.invoke('bedwars:stats', name);
-        if (r?.error) return { name, error: r.error };
-        return r;
-      }catch(e){ return { name, error: String(e) }; }
-    }
-
-    async function fetchAll(){
-      if (!queue.length){ rows.innerHTML=''; return; }
-      const out = [];
-      for (let i=0;i<queue.length;i+=5){
-        const part = await Promise.all(queue.slice(i,i+5).map(fetchOne));
-        out.push(...part.filter(x => !x.error));
-        await new Promise(r=>setTimeout(r,250));
+    // Escape closes form
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && addNickForm.style.display === 'block') {
+        addNickForm.style.display = 'none';
+        nickInput.value = '';
+        realNameInput.value = '';
       }
-      renderTable(out);
-    }
+    });
 
-    function fmt(n, d=2){ return (n===null||n===undefined||isNaN(n)) ? '—' : Number(n).toFixed(d).replace('.', ','); }
-    const cls = {
-      ratio(v){ if (v>=3) return 'good'; if (v>=1) return 'warn'; return 'bad'; },
-      level(v){ if (v>=300) return 'good'; if (v>=100) return 'warn'; return 'bad'; }
-    };
-    function esc(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
-    function escAttr(s){ return s.replace(/['"]/g, ''); }
+    async function fetchAll() {
+      rows.innerHTML = "";
+      for (const inputName of queue) {
+        // Check if it's a nick and get real name
+        const realName = getRealName(inputName);
+        const wasNick = isNick(inputName);
+        
+        const res = await ipcRenderer.invoke("bedwars:stats", realName);
+        if (res.error) continue;
 
-    function renderTable(list){
-      list.sort((a,b)=>{
-        const { key, dir } = currentSort;
-        const av = a[key] ?? 0, bv = b[key] ?? 0;
-        if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv)*dir;
-        return (av - bv)*dir;
-      });
+        const fkdrC = res.fkdr > 3 ? "good" : res.fkdr > 1 ? "warn" : "bad";
+        const wlrC = res.wlr > 3 ? "good" : res.wlr > 1 ? "warn" : "bad";
+        const lvlC = res.level > 300 ? "good" : res.level > 100 ? "warn" : "bad";
 
-      rows.innerHTML = list.map(p => {
-        const fkdrC = cls.ratio(p.fkdr);
-        const wlrC = cls.ratio(p.wlr);
-        const lvlC = cls.level(p.level);
-        return `
-          <tr data-name="${escAttr(p.name)}">
-            <td class="lvl ${lvlC}">${p.level ?? 0}</td>
-            <td class="name">${esc(p.name)}</td>
-            <td class="metric">${p.ws ?? '—'}</td>
-            <td class="metric ${fkdrC}">${fmt(p.fkdr)}</td>
-            <td class="metric ${wlrC}">${fmt(p.wlr)}</td>
-            <td class="metric">${fmt(p.bblr)}</td>
-            <td class="metric">${p.fk ?? 0}</td>
-            <td class="metric">${p.wins ?? 0}</td>
+        rows.insertAdjacentHTML("beforeend", `
+          <tr data-name="${escAttr(res.name)}">
+            <td class="lvl ${lvlC}">${res.level ?? 0}</td>
+            <td class="name">
+              ${esc(res.name)}
+              ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(inputName)}">👻</span>` : ''}
+            </td>
+            <td class="metric">${fmt(res.ws)}</td>
+            <td class="metric ${fkdrC}">${fmt(res.fkdr)}</td>
+            <td class="metric ${wlrC}">${fmt(res.wlr)}</td>
+            <td class="metric">${fmt(res.bblr)}</td>
+            <td class="metric">${fmt(res.fk)}</td>
+            <td class="metric">${fmt(res.wins)}</td>
             <td class="actions">
-              <button class="icon-btn row-menu-btn" title="Actions">…</button>
+              <button class="icon-btn row-menu-btn">⋮</button>
               <div class="menu">
                 <button class="remove-btn">Remove</button>
               </div>
             </td>
           </tr>
-        `;
-      }).join('');
+        `);
+      }
+      bindMenus();
+    }
 
-      const btns = Array.from(document.querySelectorAll('.row-menu-btn'));
+    function bindMenus() {
+      const btns = Array.from(document.querySelectorAll(".row-menu-btn"));
+      const removes = Array.from(document.querySelectorAll(".remove-btn"));
+
       btns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener("click", e => {
           e.stopPropagation();
           closeAllMenus();
           const menu = btn.nextElementSibling;
-          menu.classList.add('open');
+          menu.classList.add("open");
         });
       });
-      const removes = Array.from(document.querySelectorAll('.remove-btn'));
+
       removes.forEach(b => {
-        b.addEventListener('click', (e) => {
+        b.addEventListener("click", e => {
           e.stopPropagation();
-          const tr = b.closest('tr');
-          const name = tr.getAttribute('data-name');
+          const tr = b.closest("tr");
+          const name = tr.getAttribute("data-name");
           queue = queue.filter(n => n.toLowerCase() !== name.toLowerCase());
           fetchAll();
         });
       });
-      document.addEventListener('click', closeAllMenus, { once: true });
+
+      document.addEventListener("click", closeAllMenus);
     }
 
-    function closeAllMenus(){
-      document.querySelectorAll('.menu.open').forEach(el => el.classList.remove('open'));
+    function closeAllMenus() {
+      document.querySelectorAll(".menu.open").forEach(m => m.classList.remove("open"));
     }
 
-    // frameless window resize
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const names = input.value.split(",").map(s => s.trim()).filter(Boolean);
+        queue.push(...names);
+        input.value = "";
+        fetchAll();
+      }
+    });
+
+    document.getElementById("clearAll").addEventListener("click", () => {
+      queue = [];
+      rows.innerHTML = "";
+    });
+
+    document.getElementById("refresh").addEventListener("click", fetchAll);
+    document.getElementById("minBtn").addEventListener("click", () => ipcRenderer.send("window:minimize"));
+    document.getElementById("closeBtn").addEventListener("click", () => ipcRenderer.send("window:close"));
+
+    // --- resize grips
     let resizing = null;
-    function onDown(e){
-      const edge = e.target.getAttribute('data-edge');
+    function onDown(e) {
+      const edge = e.target.getAttribute("data-edge");
       if (!edge) return;
       resizing = { edge, startX: e.screenX, startY: e.screenY };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp, { once: true });
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp, { once: true });
     }
-    function onMove(e){
+    function onMove(e) {
       if (!resizing) return;
       const dx = e.screenX - resizing.startX;
       const dy = e.screenY - resizing.startY;
-      ipcRenderer.invoke('window:resize', { edge: resizing.edge, dx, dy });
+      ipcRenderer.invoke("window:resize", { edge: resizing.edge, dx, dy });
       resizing.startX = e.screenX;
       resizing.startY = e.screenY;
     }
-    function onUp(){
+    function onUp() {
       resizing = null;
-      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener("mousemove", onMove);
     }
-    document.querySelectorAll('.grip').forEach(g => g.addEventListener('mousedown', onDown));
+
+    // Sidebar toggle + interactions
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar = document.getElementById('sidebar');
+
+    if (menuBtn && sidebar) {
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const opened = sidebar.classList.toggle('open');
+        sidebar.setAttribute('aria-hidden', String(!opened));
+      });
+
+      // Close sidebar when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!sidebar.classList.contains('open')) return;
+        if (e.target.closest && (e.target.closest('#sidebar') || e.target.closest('#menuBtn'))) return;
+        sidebar.classList.remove('open');
+        sidebar.setAttribute('aria-hidden', 'true');
+      });
+
+      // Close with Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+          sidebar.classList.remove('open');
+          sidebar.setAttribute('aria-hidden', 'true');
+        }
+      });
+
+      // Nav item activation (no panel switching implemented yet)
+      document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          // Optionally: toggle content panels here based on data-panel attribute
+        });
+      });
+    }
+
+    document.querySelectorAll(".grip").forEach(g => g.addEventListener("mousedown", onDown));
+    
+    // --- Panel switching
+    function showPanel(id) {
+      document.querySelectorAll('.panel').forEach(p => {
+        p.classList.toggle('active', p.id === `panel-${id}`);
+      });
+      localStorage.setItem('activePanel', id);
+
+      // Update nav items
+      document.querySelectorAll('.nav-item').forEach(b => 
+        b.classList.toggle('active', b.getAttribute('data-panel') === id)
+      );
+    }
+
+    // Update nav item click handler
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const panel = btn.getAttribute('data-panel');
+        showPanel(panel);
+      });
+    });
+
+    // Immer mit Home starten
+    showPanel('home');
+
+    // Add new nick
+    document.getElementById('addNickBtn')?.addEventListener('click', () => {
+      const nick = prompt('Enter nick:');
+      if (!nick) return;
+      const real = prompt('Enter real name:');
+      if (!real) return;
+
+      if (!nicks.some(n => n.nick === nick)) {
+        nicks.push({nick, real});
+        saveNicks();
+        renderNicks();
+      }
+    });
+
+    // Initial render
+    renderNicks();
+
   </script>
 </body>
 </html>

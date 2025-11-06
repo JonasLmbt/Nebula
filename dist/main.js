@@ -40,6 +40,7 @@ const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 require("dotenv/config");
+let nicksWin = null;
 let win = null;
 function createWindow() {
     electron_1.app.setName('Nebula');
@@ -129,6 +130,27 @@ electron_1.ipcMain.handle('window:resize', (_e, payload) => {
     }
     win.setBounds({ x: nx, y: ny, width: nw, height: nh }, false);
 });
+function createNicksWindow() {
+    nicksWin = new electron_1.BrowserWindow({
+        width: 400,
+        height: 500,
+        transparent: true,
+        frame: false,
+        resizable: true,
+        minimizable: true,
+        maximizable: false,
+        alwaysOnTop: true,
+        title: 'Nebula - Nicks',
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+    nicksWin.loadFile(path.join(__dirname, '../src/renderer/nicks.html'));
+    nicksWin.on('closed', () => {
+        nicksWin = null;
+    });
+}
 // --- API: Name → UUID
 async function uuidFor(name) {
     const res = await (0, node_fetch_1.default)(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);

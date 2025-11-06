@@ -3,6 +3,7 @@ import * as path from 'path';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 
+let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
 
 function createWindow() {
@@ -115,6 +116,29 @@ ipcMain.handle('window:resize', (_e, payload: { edge: ResizeEdge; dx: number; dy
   win.setBounds({ x: nx, y: ny, width: nw, height: nh }, false);
 });
 
+function createNicksWindow() {
+  nicksWin = new BrowserWindow({
+    width: 400,
+    height: 500,
+    transparent: true,
+    frame: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    alwaysOnTop: true,
+    title: 'Nebula - Nicks',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  nicksWin.loadFile(path.join(__dirname, '../src/renderer/nicks.html'));
+
+  nicksWin.on('closed', () => {
+    nicksWin = null;
+  });
+}
 
 // --- API: Name → UUID
 async function uuidFor(name: string): Promise<string | null> {
