@@ -24,3 +24,7 @@ Thumbs.db
 # === Electron Packaging / Cache ===
 *.asar
 .cache/
+node_modules/
+dist/
+build/
+*.log
