@@ -478,22 +478,22 @@
 
     // Hypixel color constants (used for level/star coloring)
     const HypixelColors = {
-      AQUA: '#55FFFF',
-      BLACK: '#000000',
-      BLUE: '#5555FF',
-      DARK_AQUA: '#00AAAA',
-      DARK_BLUE: '#0000AA',
-      DARK_GRAY: '#555555',
-      DARK_GREEN: '#00AA00',
-      DARK_PURPLE: '#AA00AA',
-      DARK_RED: '#AA0000',
-      GOLD: '#FFAA00',
-      GRAY: '#AAAAAA',
-      GREEN: '#55FF55',
-      LIGHT_PURPLE: '#FF55FF',
-      RED: '#FF5555',
-      WHITE: '#FFFFFF',
-      YELLOW: '#FFFF55'
+        "AQUA": "#55FFFF",
+        "BLACK": "#000000",
+        "BLUE": "#5555FF",
+        "DARK_AQUA": "#00AAAA",
+        "DARK_BLUE": "#0000AA",
+        "DARK_GRAY": "#555555",
+        "DARK_GREEN": "#00AA00",
+        "DARK_PURPLE": "#AA00AA",
+        "DARK_RED": "#AA0000",
+        "GOLD": "#FFAA00",
+        "GRAY": "#AAAAAA",
+        "GREEN": "#55FF55",
+        "LIGHT_PURPLE": "#FF55FF",
+        "RED": "#FF5555",
+        "WHITE": "#FFFFFF",
+        "YELLOW": "#FFFF55"
     };
 
     function formatStars(level, star, ...colors) {
@@ -565,6 +565,17 @@
       return level + exp / 5000;
     }
 
+    // Update player level display. Accepts either a player object with stats or a stats-like object
+    function updatePlayerLevel(player) {
+      const exp = player?.stats?.Bedwars?.Experience ?? player?.experience;
+      if (exp != null && !isNaN(Number(exp))) {
+        const level = Math.floor(getBedWarsLevel(Number(exp)));
+        return starColor(level);
+      }
+      const levelNum = player?.level ?? 0;
+      return `[${fmt(levelNum)}✫]`;
+    }
+
     // Fetch stats for a single player and update UI
     async function fetchPlayerStats(name) {
       if (displayedPlayers.has(name.toLowerCase())) return; // Skip if already displayed
@@ -580,7 +591,7 @@
       // Use the same ordered cells logic as before
       const orderedCells = [
   // Use formatted, colored stars for Bedwars level if experience is available
-  `<td class="lvl">${res.experience ? starColor(Math.floor(getBedWarsLevel(res.experience))) : fmt(res.level)}</td>`,
+  `<td class="lvl">${updatePlayerLevel(res)}</td>`,
         `<td class="name">
           ${res.rankTag ? `<span class="rank-tag" style="color:${esc(res.rankColor || '#ffffff')};font-weight:700;margin-right:6px">${esc(res.rankTag)}</span>` : ''}
           ${esc(res.name)}
