@@ -1,0 +1,31 @@
+<body>
+  <div id="titlebar">Bedwars Overlay läuft 🛠️</div>
+  <div class="content">
+    <p>Fenster ist transparent & always-on-top.</p>
+    <input id="name" placeholder="Minecraft-Name" class="no-drag" />
+    <button id="fetch" class="no-drag">Stats holen</button>
+    <pre id="out"></pre>
+  </div>
+
+  <style>
+    body{margin:0;font-family:system-ui;background:rgba(30,30,30,.75);color:#fff}
+    #titlebar{padding:8px 12px;font-weight:700;background:rgba(255,255,255,.06);
+      -webkit-app-region: drag; cursor: move; user-select:none}
+    .content{padding:12px}
+    .no-drag{-webkit-app-region: no-drag}
+    input{padding:6px 8px;border:0;border-radius:6px;margin-right:6px}
+    button{padding:6px 10px;border:0;border-radius:6px}
+    pre{white-space:pre-wrap}
+  </style>
+
+  <script>
+    const out = document.getElementById('out');
+    document.getElementById('fetch').addEventListener('click', async () => {
+      const name = (document.getElementById('name')).value.trim();
+      if(!name){ out.textContent = 'Bitte Namen eingeben.'; return; }
+      out.textContent = 'Lade...';
+      const res = await window.require('electron').ipcRenderer.invoke('bedwars:stats', name);
+      out.textContent = JSON.stringify(res, null, 2);
+    });
+  </script>
+</body>
