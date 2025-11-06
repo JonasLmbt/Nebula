@@ -3,24 +3,281 @@
 <head>
   <meta charset="utf-8" />
   <title>Nebula Overlay</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self'">
   <style>
-    html, body { margin: 0; }
-    body {
-      background: rgba(20,20,28,0.75);
-      color: #fff;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      padding: 0;
+    :root{
+      --bg: rgba(20,20,28,0.78);
+      --panel: rgba(255,255,255,0.06);
+      --text:#e9e9f1; --muted:#9aa0aa; --accent:#6ee7ff;
+      --good:#43d17f; --warn:#e0c14d; --bad:#e05a5a;
+      --row: rgba(255,255,255,0.03); --row-hover: rgba(255,255,255,0.06);
+      --menu:#1f2230; --shadow:0 12px 30px rgba(0,0,0,.35);
+      --grip: 8px;
     }
-    #titlebar { padding: 8px 12px; font-weight: 700; background: rgba(255,255,255,.06);
-      -webkit-app-region: drag; cursor: move; user-select: none; }
-    .content { padding: 12px; }
-    .no-drag { -webkit-app-region: no-drag; }
+    html,body{margin:0;height:100%}
+    body{
+      background:var(--bg); color:var(--text);
+      font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased; user-select:none;
+    }
+
+    .topbar{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);-webkit-app-region:drag}
+    .brand{font-weight:700;letter-spacing:.2px;color:var(--accent)}
+    .spacer{flex:1}
+    .icon-btn,.search{-webkit-app-region:no-drag}
+    .icon-btn{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:0;background:transparent;color:var(--text);cursor:pointer}
+    .icon-btn:hover{background:var(--row-hover)}
+    .search{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--row);border-radius:10px}
+    .search input{background:transparent;border:0;outline:0;color:var(--text);width:320px;font-size:14px}
+
+    .content{padding:10px 12px}
+
+    /* Table layout */
+    .table-wrap{padding:8px}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    colgroup col.c-lvl{width:60px}
+    colgroup col.c-name{width:180px}
+    colgroup col.c-ws{width:60px}
+    colgroup col.c-fkdr,colgroup col.c-wlr,colgroup col.c-bblr{width:80px}
+    colgroup col.c-fk,colgroup col.c-wins{width:90px}
+    colgroup col.c-actions{width:60px}
+
+    thead th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:6px 8px;cursor:pointer;-webkit-app-region:no-drag}
+    tbody td{padding:10px 8px;border-top:1px solid rgba(255,255,255,0.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    tbody tr:hover{background:var(--row-hover)}
+    .lvl{font-weight:600}
+    .name{font-weight:600;color:#6bd3ff}
+    .metric{text-align:right}
+    .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    .actions{text-align:right;position:relative}
+
+    /* Dropdown menu */
+    .menu{position:absolute;right:8px;top:28px;background:var(--menu);border-radius:8px;box-shadow:var(--shadow);padding:6px;min-width:120px;z-index:50;display:none}
+    .menu.open{display:block}
+    .menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:8px 10px;border-radius:6px;cursor:pointer}
+    .menu button:hover{background:var(--row-hover)}
+
+    .svg{width:16px;height:16px;display:block}
+
+    /* Resize grips */
+    .grip{position:fixed;z-index:1000;-webkit-app-region:no-drag}
+    .g-top{top:0;left:0;right:0;height:var(--grip);cursor:n-resize}
+    .g-bottom{bottom:0;left:0;right:0;height:var(--grip);cursor:s-resize}
+    .g-left{top:0;bottom:0;left:0;width:var(--grip);cursor:w-resize}
+    .g-right{top:0;bottom:0;right:0;width:var(--grip);cursor:e-resize}
+    .g-tl{top:0;left:0;width:var(--grip);height:var(--grip);cursor:nw-resize}
+    .g-tr{top:0;right:0;width:var(--grip);height:var(--grip);cursor:ne-resize}
+    .g-bl{bottom:0;left:0;width:var(--grip);height:var(--grip);cursor:sw-resize}
+    .g-br{bottom:0;right:0;width:var(--grip);height:var(--grip);cursor:se-resize}
   </style>
 </head>
+
 <body>
-  <div id="titlebar">Nebula</div>
-  <div class="content">
-    <p>Transparent, always-on-top overlay. More features coming soon.</p>
+  <div class="topbar">
+    <div class="brand">Nebula</div>
+    <div class="spacer"></div>
+
+    <button id="clearAll" class="icon-btn" title="Clear all players">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+    </button>
+    <button id="refresh" class="icon-btn" title="Refresh">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.64 0 3.13.66 4.22 1.73L13 11h7V4l-2.35 2.35z"/></svg>
+    </button>
+
+    <div class="search">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20 15.5 14zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+      <input id="playerInput" placeholder="Search player(s), comma-separated" />
+    </div>
+
+    <button id="minBtn" class="icon-btn" title="Minimize">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+    </button>
+    <button id="closeBtn" class="icon-btn" title="Close">
+      <svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3 10.59 10.59 16.89 4.3z"/></svg>
+    </button>
   </div>
+
+  <div class="content">
+    <div class="table-wrap">
+      <table id="table">
+        <colgroup>
+          <col class="c-lvl"><col class="c-name"><col class="c-ws">
+          <col class="c-fkdr"><col class="c-wlr"><col class="c-bblr">
+          <col class="c-fk"><col class="c-wins"><col class="c-actions">
+        </colgroup>
+        <thead>
+          <tr>
+            <th data-key="level">Lvl</th>
+            <th data-key="name">Name</th>
+            <th data-key="ws">WS</th>
+            <th data-key="fkdr">FKDR</th>
+            <th data-key="wlr">WLR</th>
+            <th data-key="bblr">BBLR</th>
+            <th data-key="fk">F. Kills</th>
+            <th data-key="wins">Wins</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- invisible grips -->
+  <div class="grip g-top" data-edge="top"></div>
+  <div class="grip g-bottom" data-edge="bottom"></div>
+  <div class="grip g-left" data-edge="left"></div>
+  <div class="grip g-right" data-edge="right"></div>
+  <div class="grip g-tl" data-edge="top-left"></div>
+  <div class="grip g-tr" data-edge="top-right"></div>
+  <div class="grip g-bl" data-edge="bottom-left"></div>
+  <div class="grip g-br" data-edge="bottom-right"></div>
+
+  <script>
+    const { ipcRenderer } = window.require('electron');
+
+    const input = document.getElementById('playerInput');
+    const refreshBtn = document.getElementById('refresh');
+    const clearAllBtn = document.getElementById('clearAll');
+    const rows = document.getElementById('rows');
+    const headers = Array.from(document.querySelectorAll('thead th[data-key]'));
+    const minBtn = document.getElementById('minBtn');
+    const closeBtn = document.getElementById('closeBtn');
+
+    let queue = [];
+    let currentSort = { key: 'level', dir: -1 };
+
+    minBtn.addEventListener('click', () => ipcRenderer.send('window:minimize'));
+    closeBtn.addEventListener('click', () => ipcRenderer.send('window:close'));
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter'){
+        const names = input.value.split(',').map(s => s.trim()).filter(Boolean);
+        names.forEach(n => { if (!queue.includes(n)) queue.push(n); });
+        input.value = '';
+        fetchAll();
+      }
+    });
+
+    clearAllBtn.addEventListener('click', () => { queue = []; rows.innerHTML = ''; });
+    refreshBtn.addEventListener('click', fetchAll);
+
+    headers.forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const key = th.getAttribute('data-key');
+        if (currentSort.key === key) currentSort.dir *= -1;
+        else currentSort = { key, dir: key === 'name' ? 1 : -1 };
+        fetchAll();
+      });
+    });
+
+    async function fetchOne(name){
+      try{
+        const r = await ipcRenderer.invoke('bedwars:stats', name);
+        if (r?.error) return { name, error: r.error };
+        return r;
+      }catch(e){ return { name, error: String(e) }; }
+    }
+
+    async function fetchAll(){
+      if (!queue.length){ rows.innerHTML=''; return; }
+      const out = [];
+      for (let i=0;i<queue.length;i+=5){
+        const part = await Promise.all(queue.slice(i,i+5).map(fetchOne));
+        out.push(...part.filter(x => !x.error));
+        await new Promise(r=>setTimeout(r,250));
+      }
+      renderTable(out);
+    }
+
+    function fmt(n, d=2){ return (n===null||n===undefined||isNaN(n)) ? '—' : Number(n).toFixed(d).replace('.', ','); }
+    const cls = {
+      ratio(v){ if (v>=3) return 'good'; if (v>=1) return 'warn'; return 'bad'; },
+      level(v){ if (v>=300) return 'good'; if (v>=100) return 'warn'; return 'bad'; }
+    };
+    function esc(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+    function escAttr(s){ return s.replace(/['"]/g, ''); }
+
+    function renderTable(list){
+      list.sort((a,b)=>{
+        const { key, dir } = currentSort;
+        const av = a[key] ?? 0, bv = b[key] ?? 0;
+        if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv)*dir;
+        return (av - bv)*dir;
+      });
+
+      rows.innerHTML = list.map(p => {
+        const fkdrC = cls.ratio(p.fkdr);
+        const wlrC = cls.ratio(p.wlr);
+        const lvlC = cls.level(p.level);
+        return `
+          <tr data-name="${escAttr(p.name)}">
+            <td class="lvl ${lvlC}">${p.level ?? 0}</td>
+            <td class="name">${esc(p.name)}</td>
+            <td class="metric">${p.ws ?? '—'}</td>
+            <td class="metric ${fkdrC}">${fmt(p.fkdr)}</td>
+            <td class="metric ${wlrC}">${fmt(p.wlr)}</td>
+            <td class="metric">${fmt(p.bblr)}</td>
+            <td class="metric">${p.fk ?? 0}</td>
+            <td class="metric">${p.wins ?? 0}</td>
+            <td class="actions">
+              <button class="icon-btn row-menu-btn" title="Actions">…</button>
+              <div class="menu">
+                <button class="remove-btn">Remove</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const btns = Array.from(document.querySelectorAll('.row-menu-btn'));
+      btns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllMenus();
+          const menu = btn.nextElementSibling;
+          menu.classList.add('open');
+        });
+      });
+      const removes = Array.from(document.querySelectorAll('.remove-btn'));
+      removes.forEach(b => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tr = b.closest('tr');
+          const name = tr.getAttribute('data-name');
+          queue = queue.filter(n => n.toLowerCase() !== name.toLowerCase());
+          fetchAll();
+        });
+      });
+      document.addEventListener('click', closeAllMenus, { once: true });
+    }
+
+    function closeAllMenus(){
+      document.querySelectorAll('.menu.open').forEach(el => el.classList.remove('open'));
+    }
+
+    // frameless window resize
+    let resizing = null;
+    function onDown(e){
+      const edge = e.target.getAttribute('data-edge');
+      if (!edge) return;
+      resizing = { edge, startX: e.screenX, startY: e.screenY };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp, { once: true });
+    }
+    function onMove(e){
+      if (!resizing) return;
+      const dx = e.screenX - resizing.startX;
+      const dy = e.screenY - resizing.startY;
+      ipcRenderer.invoke('window:resize', { edge: resizing.edge, dx, dy });
+      resizing.startX = e.screenX;
+      resizing.startY = e.screenY;
+    }
+    function onUp(){
+      resizing = null;
+      window.removeEventListener('mousemove', onMove);
+    }
+    document.querySelectorAll('.grip').forEach(g => g.addEventListener('mousedown', onDown));
+  </script>
 </body>
 </html>
