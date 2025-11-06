@@ -472,6 +472,100 @@
     const input = document.getElementById("playerInput");
     let queue = [];
 
+    // Track currently displayed players to avoid duplicate fetches
+    const displayedPlayers = new Set();
+
+    // Fetch stats for a single player and update UI
+    async function fetchPlayerStats(name) {
+      if (displayedPlayers.has(name.toLowerCase())) return; // Skip if already displayed
+      
+      const realName = getRealName(name);
+      const wasNick = isNick(name);
+      
+      const res = await ipcRenderer.invoke("bedwars:stats", realName);
+      if (res.error) return;
+
+      displayedPlayers.add(name.toLowerCase());
+      
+      // Use the same ordered cells logic as before
+      const orderedCells = [
+        `<td class="lvl ${getColorForValue('level', res.level)}">${fmt(res.level)}</td>`,
+        `<td class="name">
+          ${esc(res.name)}
+          ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(name)}">👻</span>` : ''}
+        </td>`,
+        `<td class="metric">${fmt(res.ws)}</td>`,
+        `<td class="metric ${getColorForValue('fkdr', res.fkdr)}">${fmt(res.fkdr)}</td>`,
+        `<td class="metric ${getColorForValue('wlr', res.wlr)}">${fmt(res.wlr)}</td>`,
+        `<td class="metric ${getColorForValue('bblr', res.bblr)}">${fmt(res.bblr)}</td>`,
+        `<td class="metric">${fmt(res.fk)}</td>`,
+        `<td class="metric">${fmt(res.wins)}</td>`
+      ].join('');
+
+      rows.insertAdjacentHTML("beforeend", `
+        <tr data-name="${escAttr(res.name)}">
+          ${orderedCells}
+          <td class="actions">
+            <button class="icon-btn row-menu-btn">⋮</button>
+            <div class="menu">
+              <button class="remove-btn">Remove</button>
+            </div>
+          </td>
+        </tr>
+      `);
+
+      // Rebind menu events for the new row
+      bindMenus();
+    }
+
+    // Remove a player from the displayed list
+    function removePlayer(name) {
+      const row = rows.querySelector(`tr[data-name="${escAttr(name)}"]`);
+      if (row) {
+        row.remove();
+        displayedPlayers.delete(name.toLowerCase());
+      }
+    }
+
+    // Handle incoming player lists (from chat logger)
+    ipcRenderer.on('chat:players', (_e, newPlayers) => {
+      try {
+        if (!Array.isArray(newPlayers)) return;
+
+        // Get currently displayed players
+        const currentPlayers = Array.from(displayedPlayers);
+        
+        // Remove players that are no longer in the list
+        currentPlayers.forEach(displayed => {
+          if (!newPlayers.some(p => p.toLowerCase() === displayed.toLowerCase())) {
+            removePlayer(displayed);
+          }
+        });
+
+        // Add new players that aren't displayed yet
+        newPlayers.forEach(player => {
+          if (!player || typeof player !== 'string') return;
+          fetchPlayerStats(player); // Will skip if already displayed
+        });
+
+      } catch (err) {
+        console.error('Error handling chat:players', err);
+      }
+    });
+
+    // Party members handling (similar to players but always add)
+    ipcRenderer.on('chat:party', (_e, members) => {
+      try {
+        if (!Array.isArray(members)) return;
+        members.forEach(member => {
+          if (!member || typeof member !== 'string') return;
+          fetchPlayerStats(member);
+        });
+      } catch (err) {
+        console.error('Error handling chat:party', err);
+      }
+    });
+
     function esc(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
     function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
     function fmt(n) { return (n == null || isNaN(n)) ? "—" : n; }
@@ -931,22 +1025,24 @@
         const res = await ipcRenderer.invoke("bedwars:stats", realName);
         if (res.error) continue;
 
-        const rowHtml = columnSettings.visible.map(col => {
-          if (col === 'name') {
-            return `<td class="name">
-              ${esc(res.name)}
-              ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(inputName)}">👻</span>` : ''}
-            </td>`;
-          }
-
-          const value = res[col];
-          const colorClass = getColorForValue(col, value);
-          return `<td class="metric ${colorClass}">${fmt(value)}</td>`;
-        }).join('');
+        // Ensure columns are in correct order matching the table head
+        const orderedCells = [
+          `<td class="lvl ${getColorForValue('level', res.level)}">${fmt(res.level)}</td>`,
+          `<td class="name">
+            ${esc(res.name)}
+            ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(inputName)}">👻</span>` : ''}
+          </td>`,
+          `<td class="metric">${fmt(res.ws)}</td>`,
+          `<td class="metric ${getColorForValue('fkdr', res.fkdr)}">${fmt(res.fkdr)}</td>`,
+          `<td class="metric ${getColorForValue('wlr', res.wlr)}">${fmt(res.wlr)}</td>`,
+          `<td class="metric ${getColorForValue('bblr', res.bblr)}">${fmt(res.bblr)}</td>`,
+          `<td class="metric">${fmt(res.fk)}</td>`,
+          `<td class="metric">${fmt(res.wins)}</td>`
+        ].join('');
 
         rows.insertAdjacentHTML("beforeend", `
           <tr data-name="${escAttr(res.name)}">
-            ${rowHtml}
+            ${orderedCells}
             <td class="actions">
               <button class="icon-btn row-menu-btn">⋮</button>
               <div class="menu">

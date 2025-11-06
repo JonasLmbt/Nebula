@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
 import fetch from 'node-fetch';
 import 'dotenv/config';
+import { MinecraftChatLogger } from './chat-logger';
 
 let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
@@ -36,7 +37,26 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  // Start chat logger to detect local Minecraft chat and forward player lists to renderer
+  try {
+    const chat = new MinecraftChatLogger();
+    chat.on('playersUpdated', (players: string[]) => {
+      if (win) win.webContents.send('chat:players', players);
+    });
+    chat.on('partyUpdated', (members: string[]) => {
+      if (win) win.webContents.send('chat:party', members);
+    });
+    chat.on('lobbyJoined', () => {
+      if (win) win.webContents.send('chat:lobbyJoined');
+    });
+    chat.on('error', (err) => console.error('ChatLogger error:', err));
+  } catch (e) {
+    console.error('Failed to start ChatLogger', e);
+  }
+});
 
 // Quit the app on all windows closed (Mac exception handled)
 app.on('window-all-closed', () => {
@@ -140,38 +160,52 @@ function createNicksWindow() {
   });
 }
 
-// --- API: Name → UUID
-async function uuidFor(name: string): Promise<string | null> {
-  const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
-  if (!res.ok) return null;
-  const data = (await res.json()) as { id?: string };
-  return data?.id ?? null; // undashed UUID
-}
+// Hypixel Cache & Rate Limiter
+class HypixelCache {
+  private cache = new Map<string, {
+    data: any;
+    timestamp: number;
+  }>();
+  private uuidCache = new Map<string, string>();
+  private queue = new Set<string>();
+  private readonly TTL = 10 * 60 * 1000; // 10 Minuten Cache-Zeit
+  private readonly MAX_CONCURRENT = 3; // Max. parallele Requests
 
-// --- API: Hypixel Player
-const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
+  constructor(private apiKey: string) {}
 
-async function hypixelPlayer(uuid: string): Promise<any> {
-  const res = await fetch(`https://api.hypixel.net/v2/player?uuid=${uuid}`, {
-    headers: { 'API-Key': HYPIXEL_KEY },
-  });
-  if (!res.ok) throw new Error(`Hypixel API: ${res.status}`);
-  const data = (await res.json()) as { player?: any };
-  return data.player;
-}
+  private async getUUID(name: string): Promise<string> {
+    const cached = this.uuidCache.get(name.toLowerCase());
+    if (cached) return cached;
 
-// --- IPC: Bedwars Stats Fetch
-ipcMain.handle('bedwars:stats', async (_e, name: string) => {
-  if (!HYPIXEL_KEY) return { error: 'Missing HYPIXEL_KEY in environment.' };
+    const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
+    if (!res.ok) throw new Error('UUID nicht gefunden');
+    
+    const data = await res.json() as { id?: string };
+    const uuid = data?.id;
+    if (!uuid) throw new Error('Ungültige UUID-Response');
 
-  try {
-    const uuid = await uuidFor(name);
-    if (!uuid) return { error: 'UUID not found.' };
+    this.uuidCache.set(name.toLowerCase(), uuid);
+    return uuid;
+  }
 
-    const player = await hypixelPlayer(uuid);
-    if (!player) return { error: 'Player not found on Hypixel.' };
+  private async fetchHypixelStats(uuid: string) {
+    const res = await fetch(`https://api.hypixel.net/v2/player?uuid=${uuid}`, {
+      headers: { 'API-Key': this.apiKey },
+    });
+    
+    if (!res.ok) {
+      if (res.status === 429) {
+        throw new Error('Hypixel Rate-Limit erreicht - bitte warte kurz');
+      }
+      throw new Error(`Hypixel API: ${res.status}`);
+    }
 
-    const bw = player.stats?.Bedwars || {};
+    const data = await res.json() as { player?: any };
+    return data.player;
+  }
+
+  private async processBedwarsStats(player: any, requestedName: string) {
+    const bw = player?.stats?.Bedwars || {};
     const stars = bw.Experience ? Math.floor(bw.Experience / 5000) : 0;
     const fk = bw.final_kills_bedwars ?? 0;
     const fd = bw.final_deaths_bedwars ?? 0;
@@ -181,7 +215,7 @@ ipcMain.handle('bedwars:stats', async (_e, name: string) => {
     const bblr = (bw.beds_broken_bedwars ?? 0) / Math.max(1, bw.beds_lost_bedwars ?? 1);
 
     return {
-      name: player.displayname ?? name,
+      name: player.displayname ?? requestedName,
       level: stars,
       ws,
       fkdr: +(fk / Math.max(1, fd)).toFixed(2),
@@ -190,7 +224,66 @@ ipcMain.handle('bedwars:stats', async (_e, name: string) => {
       fk,
       wins,
     };
-  } catch (err: any) {
-    return { error: String(err.message || err) };
   }
+
+  async getStats(name: string) {
+    const normalizedName = name.toLowerCase();
+    
+    // 1. Cache prüfen
+    const cached = this.cache.get(normalizedName);
+    if (cached && Date.now() - cached.timestamp < this.TTL) {
+      return cached.data;
+    }
+
+    // 2. Queue Management (max. 3 parallele Requests)
+    while (this.queue.size >= this.MAX_CONCURRENT) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    
+    // 3. Request durchführen
+    try {
+      this.queue.add(normalizedName);
+
+      // Kleine Verzögerung zwischen Requests
+      if (this.queue.size > 1) {
+        await new Promise(r => setTimeout(r, 150));
+      }
+
+      const uuid = await this.getUUID(name);
+      const player = await this.fetchHypixelStats(uuid);
+      if (!player) throw new Error('Spieler nicht auf Hypixel gefunden');
+
+      const stats = await this.processBedwarsStats(player, name);
+      
+      // Erfolgreichen Request cachen
+      this.cache.set(normalizedName, {
+        data: stats,
+        timestamp: Date.now()
+      });
+
+      return stats;
+
+    } catch (err: any) {
+      // Rate-Limit oder andere API-Fehler
+      return { error: String(err.message || err) };
+    } finally {
+      this.queue.delete(normalizedName);
+    }
+  }
+
+  clearCache() {
+    this.cache.clear();
+    this.uuidCache.clear();
+  }
+}
+
+// Zentraler Cache-Manager
+const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
+
+// --- IPC: Bedwars Stats Fetch (jetzt mit Cache)
+ipcMain.handle('bedwars:stats', async (_e, name: string) => {
+  if (!process.env.HYPIXEL_KEY) {
+    return { error: 'HYPIXEL_KEY fehlt in der Umgebung. Bitte .env Datei prüfen.' };
+  }
+  return hypixel.getStats(name);
 });

@@ -40,6 +40,7 @@ const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 require("dotenv/config");
+const chat_logger_1 = require("./chat-logger");
 let nicksWin = null;
 let win = null;
 function createWindow() {
@@ -67,7 +68,29 @@ function createWindow() {
         win = null;
     });
 }
-electron_1.app.whenReady().then(createWindow);
+electron_1.app.whenReady().then(() => {
+    createWindow();
+    // Start chat logger to detect local Minecraft chat and forward player lists to renderer
+    try {
+        const chat = new chat_logger_1.MinecraftChatLogger();
+        chat.on('playersUpdated', (players) => {
+            if (win)
+                win.webContents.send('chat:players', players);
+        });
+        chat.on('partyUpdated', (members) => {
+            if (win)
+                win.webContents.send('chat:party', members);
+        });
+        chat.on('lobbyJoined', () => {
+            if (win)
+                win.webContents.send('chat:lobbyJoined');
+        });
+        chat.on('error', (err) => console.error('ChatLogger error:', err));
+    }
+    catch (e) {
+        console.error('Failed to start ChatLogger', e);
+    }
+});
 // Quit the app on all windows closed (Mac exception handled)
 electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin')
