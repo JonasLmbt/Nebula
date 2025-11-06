@@ -3,21 +3,21 @@ import * as path from 'path';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 
-
 function createWindow() {
+  app.setName('Nebula');
+
   const win = new BrowserWindow({
-    width: 420, height: 340,
-    transparent: true, frame: false, alwaysOnTop: true,
+    width: 420,
+    height: 340,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    title: 'Nebula',
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
-  win.loadFile(path.join(__dirname, '../src/renderer/index.html'));
 
-  // Optional: F8 toggelt Click-Through (Overlay lässt Maus durch)
-  let passThrough = false;
-  globalShortcut.register('F8', () => {
-    passThrough = !passThrough;
-    win.setIgnoreMouseEvents(passThrough, { forward: true });
-  });
+  win.setTitle('Nebula');
+  win.loadFile(path.join(__dirname, '../src/renderer/index.html'));
 }
 
 app.whenReady().then(createWindow);
