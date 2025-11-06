@@ -60,8 +60,8 @@ async function uuidFor(name) {
     const r = await (0, node_fetch_1.default)(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
     if (!r.ok)
         return null;
-    const j = await r.json();
-    return j?.id ?? null; // undashed
+    const j = (await r.json()); // <-- typisieren
+    return j?.id ?? null; // undashed uuid
 }
 // --- API: Hypixel-Player
 const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
@@ -71,7 +71,7 @@ async function hypixelPlayer(uuid) {
     });
     if (!r.ok)
         throw new Error(`Hypixel: ${r.status}`);
-    const j = await r.json();
+    const j = (await r.json()); // <-- typisieren
     return j.player;
 }
 // IPC: Stats abrufen

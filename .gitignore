@@ -1,0 +1,26 @@
+# === Node & Build ===
+node_modules/
+dist/
+out/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Environment (API Keys etc.) ===
+.env
+.env.local
+.env.*.local
+
+# === Editor / System ===
+.vscode/
+.DS_Store
+Thumbs.db
+
+# === TypeScript ===
+*.tsbuildinfo
+
+# === Electron Packaging / Cache ===
+*.asar
+.cache/

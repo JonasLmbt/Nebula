@@ -26,8 +26,8 @@ app.whenReady().then(createWindow);
 async function uuidFor(name: string) {
   const r = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
   if (!r.ok) return null;
-  const j = await r.json();
-  return j?.id ?? null; // undashed
+  const j = (await r.json()) as { id?: string }; // <-- typisieren
+  return j?.id ?? null; // undashed uuid
 }
 
 // --- API: Hypixel-Player
@@ -37,7 +37,7 @@ async function hypixelPlayer(uuid: string) {
     headers: { 'API-Key': HYPIXEL_KEY }
   });
   if (!r.ok) throw new Error(`Hypixel: ${r.status}`);
-  const j = await r.json();
+  const j = (await r.json()) as { player?: any }; // <-- typisieren
   return j.player;
 }
 
