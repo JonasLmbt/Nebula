@@ -274,6 +274,7 @@ class HypixelCache {
     return {
       name: player.displayname ?? requestedName,
       level: stars,
+      experience: bw.Experience ?? 0,
       ws,
       fkdr: +(fk / Math.max(1, fd)).toFixed(2),
       wlr: +(wins / Math.max(1, losses)).toFixed(2),

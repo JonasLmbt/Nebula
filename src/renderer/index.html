@@ -476,6 +476,95 @@
     // Track currently displayed players to avoid duplicate fetches
     const displayedPlayers = new Set();
 
+    // Hypixel color constants (used for level/star coloring)
+    const HypixelColors = {
+      AQUA: '#55FFFF',
+      BLACK: '#000000',
+      BLUE: '#5555FF',
+      DARK_AQUA: '#00AAAA',
+      DARK_BLUE: '#0000AA',
+      DARK_GRAY: '#555555',
+      DARK_GREEN: '#00AA00',
+      DARK_PURPLE: '#AA00AA',
+      DARK_RED: '#AA0000',
+      GOLD: '#FFAA00',
+      GRAY: '#AAAAAA',
+      GREEN: '#55FF55',
+      LIGHT_PURPLE: '#FF55FF',
+      RED: '#FF5555',
+      WHITE: '#FFFFFF',
+      YELLOW: '#FFFF55'
+    };
+
+    function formatStars(level, star, ...colors) {
+      const span = (color, string) => `<span style="color: ${color}">${string}</span>`;
+      let template = ``;
+      const levelString = level.toString();
+
+      if (colors.length === levelString.length + 3) {
+        const digits = levelString.split('');
+        template += span(colors[0], "[");
+        for (let i = 0; i < digits.length; i++) {
+          template += span(colors[i + 1], digits[i]);
+        }
+        template += span(colors[colors.length - 2], star);
+        template += span(colors[colors.length - 1], "]");
+      } else {
+        template += span(colors.length == 1 ? colors[0] : '#AAAAAA', `[${level}${star}]`);
+      }
+
+      return template;
+    }
+
+    function starColor(stars) {
+      const { AQUA, BLACK, BLUE, DARK_AQUA, DARK_BLUE, DARK_GRAY, DARK_GREEN, DARK_PURPLE, DARK_RED, GOLD, GRAY, GREEN, LIGHT_PURPLE, RED, WHITE, YELLOW } = HypixelColors;
+
+      if (stars < 100) {
+        return formatStars(stars, '✫', GRAY);
+      } else if (stars < 200) {
+        return formatStars(stars, '✫', WHITE);
+      } else if (stars < 300) {
+        return formatStars(stars, '✫', GOLD);
+      } else if (stars < 400) {
+        return formatStars(stars, '✫', AQUA);
+      } else if (stars < 500) {
+        return formatStars(stars, '✫', DARK_GREEN);
+      } else if (stars < 600) {
+        return formatStars(stars, '✫', DARK_AQUA);
+      } else if (stars < 700) {
+        return formatStars(stars, '✫', DARK_RED);
+      } else if (stars < 800) {
+        return formatStars(stars, '✫', LIGHT_PURPLE);
+      } else if (stars < 900) {
+        return formatStars(stars, '✫', BLUE);
+      } else if (stars < 1000) {
+        return formatStars(stars, '✫', DARK_PURPLE);
+      } else if (stars < 1100) {
+        return formatStars(stars, '⚝', WHITE, WHITE, WHITE, WHITE, RED, RED, GRAY);
+      } else if (stars < 1200) {
+        return formatStars(stars, '⚝', GOLD, GOLD, WHITE, WHITE, AQUA, DARK_AQUA, DARK_AQUA);
+      } else if (stars < 1300) {
+        return formatStars(stars, '⚝', GREEN, GREEN, DARK_GREEN, DARK_GREEN, GOLD, GOLD, YELLOW);
+      } else {
+        return formatStars(stars, '✥', DARK_RED, DARK_RED, DARK_PURPLE, BLUE, BLUE, DARK_BLUE, BLACK);
+      }
+    }
+
+    function getBedWarsLevel(exp) {
+      let level = 100 * (Math.floor(exp / 487000));
+      exp = exp % 487000;
+      if (exp < 500) return level + exp / 500;
+      level++;
+      if (exp < 1500) return level + (exp - 500) / 1000;
+      level++;
+      if (exp < 3500) return level + (exp - 1500) / 2000;
+      level++;
+      if (exp < 7000) return level + (exp - 3500) / 3500;
+      level++;
+      exp -= 7000;
+      return level + exp / 5000;
+    }
+
     // Fetch stats for a single player and update UI
     async function fetchPlayerStats(name) {
       if (displayedPlayers.has(name.toLowerCase())) return; // Skip if already displayed
@@ -490,7 +579,8 @@
       
       // Use the same ordered cells logic as before
       const orderedCells = [
-        `<td class="lvl ${getColorForValue('level', res.level)}">${fmt(res.level)}</td>`,
+  // Use formatted, colored stars for Bedwars level if experience is available
+  `<td class="lvl">${res.experience ? starColor(Math.floor(getBedWarsLevel(res.experience))) : fmt(res.level)}</td>`,
         `<td class="name">
           ${res.rankTag ? `<span class="rank-tag" style="color:${esc(res.rankColor || '#ffffff')};font-weight:700;margin-right:6px">${esc(res.rankTag)}</span>` : ''}
           ${esc(res.name)}
