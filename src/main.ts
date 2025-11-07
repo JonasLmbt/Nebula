@@ -7,7 +7,7 @@ import { MinecraftChatLogger } from './chat-logger';
 let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
 
-function createWindow() {
+async function createWindow() {
   app.setName('Nebula');
 
   win = new BrowserWindow({
@@ -27,10 +27,17 @@ function createWindow() {
   });
 
   win.setTitle('Nebula');
+  
+  // Clear cache before loading to ensure fresh content
+  await win.webContents.session.clearCache();
+  
   win.loadFile(path.join(__dirname, '../src/renderer/index.html'));
 
   // Optional: open DevTools for debugging
-  // win.webContents.openDevTools({ mode: 'detach' });
+  const shouldOpenDevTools = process.env.NEBULA_DEVTOOLS === '1' || process.env.NODE_ENV === 'development';
+  if (shouldOpenDevTools) {
+    win.webContents.openDevTools({ mode: 'detach' });
+  }
 
   win.on('closed', () => {
     win = null;
@@ -48,6 +55,12 @@ app.whenReady().then(() => {
     });
     chat.on('partyUpdated', (members: string[]) => {
       if (win) win.webContents.send('chat:party', members);
+    });
+    chat.on('finalKill', (name: string) => {
+      if (win) win.webContents.send('chat:finalKill', name);
+    });
+    chat.on('message', (payload: { name: string; text: string }) => {
+      if (win) win.webContents.send('chat:message', payload);
     });
     chat.on('lobbyJoined', () => {
       if (win) win.webContents.send('chat:lobbyJoined');
@@ -74,6 +87,52 @@ ipcMain.on('window:minimize', () => {
 
 ipcMain.on('window:close', () => {
   app.quit();
+});
+
+// --- Global Shortcuts
+let clickThrough = false;
+let registered: Array<{ action: string; accelerator: string }> = [];
+
+function unregisterShortcuts() {
+  try { globalShortcut.unregisterAll(); } catch {}
+  registered = [];
+}
+
+function registerShortcuts(map: Record<string, string>) {
+  unregisterShortcuts();
+  const safeRegister = (accelerator: string | undefined, action: () => void, id: string) => {
+    if (!accelerator) return;
+    try {
+      if (globalShortcut.register(accelerator, action)) {
+        registered.push({ action: id, accelerator });
+      }
+    } catch (e) {
+      console.warn('Failed to register shortcut', accelerator, e);
+    }
+  };
+
+  safeRegister(map.toggleOverlay, () => {
+    if (!win) return;
+    if (win.isVisible()) win.hide(); else win.show();
+  }, 'toggleOverlay');
+
+  safeRegister(map.refreshAll, () => {
+    if (win) win.webContents.send('shortcut:refresh');
+  }, 'refreshAll');
+
+  safeRegister(map.clearAll, () => {
+    if (win) win.webContents.send('shortcut:clear');
+  }, 'clearAll');
+
+  safeRegister(map.toggleClickThrough, () => {
+    if (!win) return;
+    clickThrough = !clickThrough;
+    try { win.setIgnoreMouseEvents(clickThrough, { forward: true }); } catch {}
+  }, 'toggleClickThrough');
+}
+
+ipcMain.handle('shortcuts:register', (_e, map: Record<string, string>) => {
+  registerShortcuts(map || {} as any);
 });
 
 // Custom resize logic for frameless window
@@ -346,4 +405,15 @@ ipcMain.handle('bedwars:stats', async (_e, name: string) => {
     return { error: 'HYPIXEL_KEY fehlt in der Umgebung. Bitte .env Datei prüfen.' };
   }
   return hypixel.getStats(name);
+});
+
+// --- IPC: Always-on-top toggle from renderer appearance settings
+ipcMain.handle('window:setAlwaysOnTop', (_e, flag: boolean) => {
+  if (!win) return false;
+  try {
+    win.setAlwaysOnTop(!!flag);
+    return win.isAlwaysOnTop();
+  } catch {
+    return false;
+  }
 });

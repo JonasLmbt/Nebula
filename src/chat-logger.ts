@@ -106,6 +106,8 @@ export class MinecraftChatLogger extends EventEmitter {
     // Final kill (remove player from active list)
     if (msg.indexOf('FINAL KILL') !== -1 && msg.indexOf(':') === -1) {
       const killedPlayer = cleanName(msg.split(' ')[0]);
+      // Emit specific event for final kill
+      this.emit('finalKill', killedPlayer);
       if (this.players.has(killedPlayer)) {
         this.players.delete(killedPlayer);
         this.emit('playersUpdated', Array.from(this.players));
@@ -148,6 +150,25 @@ export class MinecraftChatLogger extends EventEmitter {
     if (msg.indexOf('The game starts in 1 second!') !== -1 && msg.indexOf(':') === -1) {
       this.players.clear();
       this.emit('playersUpdated', Array.from(this.players));
+      return;
+    }
+
+    // General chat message: "[RANK] Name: message" or "Name: message"
+    if (msg.includes(':')) {
+      const idx = msg.indexOf(':');
+      const prefix = msg.substring(0, idx).trim();
+      const text = msg.substring(idx + 1).trim();
+      if (!text) return;
+
+      // Extract probable player name from prefix
+      let name = prefix;
+      if (prefix.includes(']')) {
+        name = prefix.substring(prefix.lastIndexOf(']') + 1).trim();
+      }
+      name = cleanName(name);
+      if (name && /^[A-Za-z0-9_]{3,16}$/.test(name)) {
+        this.emit('message', { name, text });
+      }
       return;
     }
   }

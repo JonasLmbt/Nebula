@@ -59,6 +59,7 @@
   .content{padding:10px 12px}
   .table-wrap{padding:8px}
   table{width:100%;border-collapse:collapse;table-layout:fixed;box-sizing:border-box}
+  #table{font-size:var(--table-font-size,14px)}
   colgroup col.c-lvl{width:60px}
   colgroup col.c-name{width:180px}
   colgroup col.c-ws{width:60px}
@@ -133,6 +134,10 @@
   /* Panels */
   .panel{display:none;padding:14px;height:calc(100vh - 50px);overflow-y:auto}
   .panel.active{display:block}
+
+  /* Settings section containers */
+  .settings-content{display:none}
+  .settings-content.active{display:block}
 
   /* Nicks */
   .nicks-list{background:var(--panel);border-radius:12px;overflow:hidden}
@@ -211,6 +216,44 @@
   .nav-item.sub-item .nav-icon{font-size:14px}
   .nav-item.sub-item[data-settings="columns"].active{color:#00e676}
   .settings-nav-item[data-settings="columns"].active{color:#00e676}
+
+  /* Keyboard grid */
+  .kb-grid{display:flex;flex-direction:column;gap:10px}
+  .kb-row{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,0.2);padding:12px;border-radius:8px}
+  .kb-action{flex:1}
+  .kb-input{min-width:160px; text-align:center; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,0.06); cursor:pointer}
+  .kb-input.listening{outline:2px solid var(--accent)}
+  .kb-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5}
+
+  /* Settings inputs & controls */
+  .settings-input{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:14px;outline:0}
+  .settings-input:focus{border-color:var(--accent)}
+  .settings-select{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;outline:0}
+  .settings-select:focus{border-color:var(--accent)}
+  .settings-textarea{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:13px;outline:0;resize:vertical}
+  .settings-textarea:focus{border-color:var(--accent)}
+  
+  /* Toggle switch */
+  .toggle-switch{position:relative;width:44px;height:24px;display:inline-block}
+  .toggle-switch input{opacity:0;width:0;height:0}
+  .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.1);border-radius:24px;transition:.3s}
+  .toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}
+  .toggle-switch input:checked + .toggle-slider{background:var(--accent)}
+  .toggle-switch input:checked + .toggle-slider:before{transform:translateX(20px)}
+  
+  /* Checkbox */
+  .settings-checkbox{display:flex;align-items:flex-start;gap:8px;padding:8px 0;cursor:pointer;user-select:none}
+  .settings-checkbox input[type="checkbox"]{width:18px;height:18px;margin:2px 0 0 0;cursor:pointer;flex-shrink:0}
+  .settings-checkbox span{flex:1}
+  .settings-checkbox small{display:block;margin-top:4px}
+  
+  /* Premium badge */
+  .premium-badge{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
+  
+  /* Settings subsections */
+  .settings-subsection{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.06)}
+  .settings-subsection:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
+  .source-options{margin-left:0;display:flex;flex-direction:column;gap:4px}
   </style>
 </head>
 
@@ -291,11 +334,6 @@
             <span class="nav-label">Basic</span>
           </button>
           
-          <button class="nav-item sub-item" data-panel="settings" data-settings="advanced">
-            <span class="nav-icon">🔧</span>
-            <span class="nav-label">Advanced</span>
-          </button>
-          
           <button class="nav-item sub-item" data-panel="settings" data-settings="appearance">
             <span class="nav-icon">🎨</span>
             <span class="nav-label">Appearance</span>
@@ -311,20 +349,11 @@
             <span class="nav-label">Columns</span>
           </button>
           
-          <button class="nav-item sub-item" data-panel="settings" data-settings="antisniper">
-            <span class="nav-icon">🎯</span>
-            <span class="nav-label">Anti-Sniper</span>
-          </button>
-          
           <button class="nav-item sub-item" data-panel="settings" data-settings="keyboard">
             <span class="nav-icon">⌨️</span>
             <span class="nav-label">Keyboard Shortcuts</span>
           </button>
-          
-          <button class="nav-item sub-item" data-panel="settings" data-settings="notifications">
-            <span class="nav-icon">🔔</span>
-            <span class="nav-label">Notifications</span>
-          </button>
+        
         </div>
       
       <div class="nav-sep"></div>
@@ -332,7 +361,7 @@
       <div class="sidebar-footer">
         <div class="user-row">
           <span class="user-icon">👤</span>
-          <span class="user-name">username</span>
+          <span class="user-name" id="sidebarUsername">username</span>
         </div>
       </div>
     </div>
@@ -395,11 +424,195 @@
 
     <!-- Settings Panel -->
     <div class="panel" id="panel-settings">
-      <div class="settings-section">
-        <h2>
-          <span class="settings-icon">⚙️</span>
-          Columns Settings
-        </h2>
+      <!-- Basic Settings -->
+      <div class="settings-content" data-section="basic">
+        <div class="settings-section">
+          <h2>
+            <span class="settings-icon">📌</span>
+            Basic Settings
+          </h2>
+
+          <div class="settings-subsection">
+            <h3 style="margin: 20px 0 12px; font-size: 16px; font-weight: 600;">Essential</h3>
+            
+            <!-- Log File Dropdown -->
+            <div class="settings-row">
+              <span class="settings-icon" style="width: 24px; text-align: center;">📄</span>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label class="settings-label" style="margin: 0;">Log File</label>
+                <select id="logFileSelect" class="settings-select" style="width: 100%;">
+                  <option value="badlion">Badlion Client</option>
+                  <option value="lunar">Lunar Client</option>
+                  <option value="vanilla">Vanilla/Other</option>
+                  <option value="custom">Custom Path...</option>
+                </select>
+                <small style="color: var(--muted); font-size: 12px;">Make sure that the log file is set correctly.</small>
+              </div>
+            </div>
+
+            <!-- Username Input -->
+            <div class="settings-row">
+              <span class="settings-icon" style="width: 24px; text-align: center;">👤</span>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label class="settings-label" style="margin: 0;">Username</label>
+                <input id="usernameInput" type="text" placeholder="Your Minecraft username" class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sources Settings -->
+      <div class="settings-content" data-section="sources">
+        <div class="settings-section">
+          <h2>
+            <span class="settings-icon">🔗</span>
+            Sources Settings
+          </h2>
+
+          <!-- Game Section -->
+          <div class="settings-subsection">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Game</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="sourceGameToggle" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="source-options" id="gameSourceOptions">
+              <label class="settings-checkbox">
+                <input type="checkbox" id="gameAddFromChat" checked />
+                <span>Add From Chat</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="gameRemoveOnDeath" checked />
+                <span>Remove on Final Death</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="gameRemoveOnReconnect" checked />
+                <span>Remove/Add on Disconnect/Reconnect</span>
+                <small style="display: block; color: var(--muted); margin-left: 24px; font-size: 12px;">Players who disconnect while respawning will not be removed.</small>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="gameRemoveOnServerChange" checked />
+                <span>Remove All on Server Change</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Party Section -->
+          <div class="settings-subsection">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Party</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="sourcePartyToggle" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="source-options" id="partySourceOptions">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="width: 24px; text-align: center;">🔄</span>
+                <span style="font-weight: 500;">Auto-Refresh</span>
+                <span class="premium-badge" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Premium</span>
+              </div>
+              <label class="settings-checkbox" style="margin-left: 32px; opacity: 0.5;">
+                <input type="checkbox" id="partyRefreshServerChange" disabled />
+                <span>On Server Change</span>
+              </label>
+              <label class="settings-checkbox" style="margin-left: 32px; opacity: 0.5;">
+                <input type="checkbox" id="partyRefreshGameEnd" disabled />
+                <span>On Game End</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Party Invites Section -->
+          <div class="settings-subsection">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Party Invites</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="sourcePartyInvitesToggle" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Chat Section -->
+          <div class="settings-subsection">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Chat</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="sourceChatToggle" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="source-options" id="chatSourceOptions">
+              <label class="settings-checkbox">
+                <input type="checkbox" id="chatRemoveOnServerChange" checked />
+                <span>Remove All on Server Change</span>
+              </label>
+              
+              <div style="margin-top: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="width: 24px; text-align: center;">📝</span>
+                  <label class="settings-label" style="margin: 0;">Strings</label>
+                </div>
+                <textarea id="chatStrings" rows="3" placeholder="Enter chat strings (one per line)" class="settings-textarea" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 13px; font-family: monospace; resize: vertical;"></textarea>
+                <small style="display: block; color: var(--muted); margin-top: 4px; font-size: 12px;">Automatically add players who send a message containing one of the provided strings. Case-insensitive.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appearance Settings -->
+      <div class="settings-content" data-section="appearance">
+        <div class="settings-section">
+          <h2>
+            <span class="settings-icon">🎨</span>
+            Appearance Settings
+          </h2>
+
+          <!-- Opacity -->
+          <div class="settings-row">
+            <label class="settings-label">Opacity</label>
+            <input id="opacityRange" type="range" min="0.2" max="1" step="0.01" style="flex:1" />
+            <span id="opacityValue" style="width:48px;text-align:right;margin-left:10px"></span>
+          </div>
+
+          <!-- Players Table Font Size -->
+          <div class="settings-row">
+            <label class="settings-label">Players Table Font Size</label>
+            <input id="fontSizeRange" type="range" min="10" max="18" step="1" style="flex:1" />
+            <span id="fontSizeValue" style="width:48px;text-align:right;margin-left:10px"></span>
+          </div>
+
+          <!-- Always on top -->
+          <div class="settings-row">
+            <label class="settings-label">Always On Top</label>
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="alwaysOnTopToggle" type="checkbox" />
+            </label>
+          </div>
+
+          <!-- Background Color -->
+          <div class="settings-row">
+            <label class="settings-label">Background Color</label>
+            <input id="bgColorInput" type="color" style="width:44px;height:32px;border:0;background:transparent;padding:0" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Columns Settings (wrapped as section) -->
+      <div class="settings-content active" data-section="columns">
+        <div class="settings-section">
+          <h2>
+            <span class="settings-icon">⚙️</span>
+            Columns Settings
+          </h2>
         
         <!-- Game Select -->
         <div class="settings-row">
@@ -409,8 +622,8 @@
           </select>
         </div>
 
-        <!-- Columns List -->
-        <div class="columns-list" id="columnsList">
+  <!-- Columns List -->
+  <div class="columns-list" id="columnsList">
           <!-- Jede Spalte als eigene Zeile -->
           <div class="column-row" data-column="level">
             <div class="column-drag">⋮⋮</div>
@@ -421,6 +634,22 @@
             <button class="column-settings-btn" title="Color settings">🎨</button>
           </div>
           <!-- Weitere Spalten werden per JS hinzugefügt -->
+        </div>
+        </div>
+      </div>
+
+      <!-- Keyboard Shortcuts Settings -->
+      <div class="settings-content" data-section="keyboard">
+        <div class="settings-section">
+          <h2>
+            <span class="settings-icon">⌨️</span>
+            Keyboard Shortcuts
+          </h2>
+          <div class="kb-help" style="color: var(--muted); margin-bottom: 12px;">
+            Click a field and press the desired key (F-keys or key with modifiers). Press <b>Escape</b> to clear (no shortcut).
+            Shortcuts are global while Nebula is running.
+          </div>
+          <div class="kb-grid" id="kbGrid"></div>
         </div>
       </div>
 
@@ -468,13 +697,19 @@
   <div class="grip g-br" data-edge="bottom-right"></div>
 
   <script>
+    console.log('NEBULA LOADED - Version:', new Date().toISOString());
+    
     const { ipcRenderer } = require("electron");
     const rows = document.getElementById("rows");
     const input = document.getElementById("playerInput");
     let queue = [];
 
-    // Track currently displayed players to avoid duplicate fetches
-    const displayedPlayers = new Set();
+  // Track currently displayed players and their sources
+  // displayedPlayers: set of normalized names (lowercase of displayed name)
+  const displayedPlayers = new Set();
+  // playerSources: map normalized name -> set of sources ('username'|'manual'|'party'|'who'|'chat')
+  const playerSources = new Map();
+    console.log('displayedPlayers initialized:', displayedPlayers);
 
     // Hypixel color constants (used for level/star coloring)
     const HypixelColors = {
@@ -519,35 +754,57 @@
     function starColor(stars) {
       const { AQUA, BLACK, BLUE, DARK_AQUA, DARK_BLUE, DARK_GRAY, DARK_GREEN, DARK_PURPLE, DARK_RED, GOLD, GRAY, GREEN, LIGHT_PURPLE, RED, WHITE, YELLOW } = HypixelColors;
 
-      if (stars < 100) {
-        return formatStars(stars, '✫', GRAY);
-      } else if (stars < 200) {
-        return formatStars(stars, '✫', WHITE);
-      } else if (stars < 300) {
-        return formatStars(stars, '✫', GOLD);
-      } else if (stars < 400) {
-        return formatStars(stars, '✫', AQUA);
-      } else if (stars < 500) {
-        return formatStars(stars, '✫', DARK_GREEN);
-      } else if (stars < 600) {
-        return formatStars(stars, '✫', DARK_AQUA);
-      } else if (stars < 700) {
-        return formatStars(stars, '✫', DARK_RED);
-      } else if (stars < 800) {
-        return formatStars(stars, '✫', LIGHT_PURPLE);
-      } else if (stars < 900) {
-        return formatStars(stars, '✫', BLUE);
-      } else if (stars < 1000) {
-        return formatStars(stars, '✫', DARK_PURPLE);
-      } else if (stars < 1100) {
-        return formatStars(stars, '⚝', WHITE, WHITE, WHITE, WHITE, RED, RED, GRAY);
-      } else if (stars < 1200) {
-        return formatStars(stars, '⚝', GOLD, GOLD, WHITE, WHITE, AQUA, DARK_AQUA, DARK_AQUA);
-      } else if (stars < 1300) {
-        return formatStars(stars, '⚝', GREEN, GREEN, DARK_GREEN, DARK_GREEN, GOLD, GOLD, YELLOW);
-      } else {
-        return formatStars(stars, '✥', DARK_RED, DARK_RED, DARK_PURPLE, BLUE, BLUE, DARK_BLUE, BLACK);
-      }
+      if (stars < 100) return formatStars(stars, '✫', GRAY);
+      else if (stars < 200) return formatStars(stars, '✫', WHITE);
+      else if (stars < 300) return formatStars(stars, '✫', GOLD);
+      else if (stars < 400) return formatStars(stars, '✫', AQUA);
+      else if (stars < 500) return formatStars(stars, '✫', DARK_GREEN);
+      else if (stars < 600) return formatStars(stars, '✫', DARK_AQUA);
+      else if (stars < 700) return formatStars(stars, '✫', DARK_RED);
+      else if (stars < 800) return formatStars(stars, '✫', LIGHT_PURPLE);
+      else if (stars < 900) return formatStars(stars, '✫', BLUE);
+      else if (stars < 1000) return formatStars(stars, '✫', DARK_PURPLE);
+      else if (stars < 1100) return formatStars(stars, '✫', RED, GOLD, YELLOW, GREEN, AQUA, LIGHT_PURPLE, DARK_PURPLE);
+      else if (stars < 1200) return formatStars(stars, '✪', GRAY, WHITE, WHITE, WHITE, WHITE, GRAY, GRAY);
+      else if (stars < 1300) return formatStars(stars, '✪', GRAY, YELLOW, YELLOW, YELLOW, YELLOW, GOLD, GRAY);
+      else if (stars < 1400) return formatStars(stars, '✪', GRAY, AQUA, AQUA, AQUA, AQUA, DARK_AQUA, GRAY);
+      else if (stars < 1500) return formatStars(stars, '✪', GRAY, GREEN, GREEN, GREEN, GREEN, DARK_GREEN, GRAY);
+      else if (stars < 1600) return formatStars(stars, '✪', GRAY, DARK_AQUA, DARK_AQUA, DARK_AQUA, DARK_AQUA, BLUE, GRAY);
+      else if (stars < 1700) return formatStars(stars, '✪', GRAY, RED, RED, RED, RED, DARK_RED, GRAY);
+      else if (stars < 1800) return formatStars(stars, '✪', GRAY, LIGHT_PURPLE, LIGHT_PURPLE, LIGHT_PURPLE, LIGHT_PURPLE, DARK_PURPLE, GRAY);
+      else if (stars < 1900) return formatStars(stars, '✪', GRAY, BLUE, BLUE, BLUE, BLUE, DARK_BLUE, GRAY);
+      else if (stars < 2000) return formatStars(stars, '✪', GRAY, DARK_PURPLE, DARK_PURPLE, DARK_PURPLE, DARK_PURPLE, DARK_GRAY, GRAY);
+      else if (stars < 2100) return formatStars(stars, '✪', DARK_GRAY, GRAY, WHITE, WHITE, GRAY, GRAY, DARK_GRAY);
+      else if (stars < 2200) return formatStars(stars, '⚝', WHITE, WHITE, YELLOW, YELLOW, GOLD, GOLD, GOLD);
+      else if (stars < 2300) return formatStars(stars, '⚝', GOLD, GOLD, WHITE, WHITE, AQUA, DARK_AQUA, DARK_AQUA);
+      else if (stars < 2400) return formatStars(stars, '⚝', DARK_PURPLE, DARK_PURPLE, LIGHT_PURPLE, LIGHT_PURPLE, GOLD, YELLOW, YELLOW);
+      else if (stars < 2500) return formatStars(stars, '⚝', AQUA, AQUA, WHITE, WHITE, GRAY, GRAY, DARK_GRAY);
+      else if (stars < 2600) return formatStars(stars, '⚝', WHITE, WHITE, GREEN, GREEN, DARK_GRAY, DARK_GRAY, DARK_GRAY);
+      else if (stars < 2700) return formatStars(stars, '⚝', DARK_RED, DARK_RED, RED, RED, LIGHT_PURPLE, LIGHT_PURPLE, DARK_PURPLE);
+      else if (stars < 2800) return formatStars(stars, '⚝', YELLOW, YELLOW, WHITE, WHITE, DARK_GRAY, DARK_GRAY, DARK_GRAY);
+      else if (stars < 2900) return formatStars(stars, '⚝', GREEN, GREEN, DARK_GREEN, DARK_GREEN, GOLD, GOLD, YELLOW);
+      else if (stars < 3000) return formatStars(stars, '⚝', AQUA, AQUA, DARK_AQUA, DARK_AQUA, BLUE, BLUE, DARK_BLUE);
+      else if (stars < 3100) return formatStars(stars, '⚝', YELLOW, YELLOW, GOLD, GOLD, RED, RED, DARK_RED);
+      else if (stars < 3200) return formatStars(stars, '✥', BLUE, BLUE, AQUA, AQUA, GOLD, GOLD, YELLOW);
+      else if (stars < 3300) return formatStars(stars, '✥', RED, DARK_RED, GRAY, GRAY, DARK_RED, RED, RED);
+      else if (stars < 3400) return formatStars(stars, '✥', BLUE, BLUE, BLUE, LIGHT_PURPLE, RED, RED, DARK_RED);
+      else if (stars < 3500) return formatStars(stars, '✥', DARK_GREEN, GREEN, LIGHT_PURPLE, LIGHT_PURPLE, DARK_PURPLE, DARK_PURPLE, DARK_GREEN);
+      else if (stars < 3600) return formatStars(stars, '✥', RED, RED, DARK_RED, DARK_RED, DARK_GREEN, GREEN, GREEN);
+      else if (stars < 3700) return formatStars(stars, '✥', GREEN, GREEN, GREEN, AQUA, BLUE, BLUE, DARK_BLUE);
+      else if (stars < 3800) return formatStars(stars, '✥', DARK_RED, DARK_RED, RED, RED, AQUA, DARK_AQUA, DARK_AQUA);
+      else if (stars < 3900) return formatStars(stars, '✥', DARK_BLUE, DARK_BLUE, BLUE, DARK_PURPLE, DARK_PURPLE, LIGHT_PURPLE, DARK_BLUE);
+      else if (stars < 4000) return formatStars(stars, '✥', RED, RED, GREEN, GREEN, AQUA, BLUE, BLUE);
+      else if (stars < 4100) return formatStars(stars, '✥', DARK_PURPLE, DARK_PURPLE, RED, RED, GOLD, GOLD, YELLOW);
+      else if (stars < 4200) return formatStars(stars, '✥', YELLOW, YELLOW, GOLD, RED, LIGHT_PURPLE, LIGHT_PURPLE, DARK_PURPLE);
+      else if (stars < 4300) return formatStars(stars, '✥', DARK_BLUE, BLUE, DARK_AQUA, AQUA, WHITE, GRAY, GRAY);
+      else if (stars < 4400) return formatStars(stars, '✥', BLACK, DARK_PURPLE, DARK_GRAY, DARK_GRAY, DARK_PURPLE, DARK_PURPLE, BLACK);
+      else if (stars < 4500) return formatStars(stars, '✥', DARK_GREEN, DARK_GREEN, GREEN, YELLOW, GOLD, DARK_PURPLE, LIGHT_PURPLE);
+      else if (stars < 4600) return formatStars(stars, '✥', WHITE, WHITE, AQUA, AQUA, DARK_AQUA, DARK_AQUA, DARK_AQUA);
+      else if (stars < 4700) return formatStars(stars, '✥', DARK_AQUA, AQUA, YELLOW, YELLOW, GOLD, LIGHT_PURPLE, DARK_PURPLE);
+      else if (stars < 4800) return formatStars(stars, '✥', WHITE, DARK_RED, RED, RED, BLUE, DARK_BLUE, BLUE);
+      else if (stars < 4900) return formatStars(stars, '✥', DARK_PURPLE, DARK_PURPLE, RED, GOLD, YELLOW, AQUA, DARK_AQUA);
+      else if (stars < 5000) return formatStars(stars, '✥', DARK_GREEN, GREEN, WHITE, WHITE, GREEN, GREEN, DARK_GREEN);
+      else return formatStars(stars, '✥', DARK_RED, DARK_RED, DARK_PURPLE, BLUE, BLUE, DARK_BLUE, BLACK);
     }
 
     function getBedWarsLevel(exp) {
@@ -578,23 +835,32 @@
 
     // Fetch stats for a single player and update UI
     async function fetchPlayerStats(name) {
-      if (displayedPlayers.has(name.toLowerCase())) return; // Skip if already displayed
-      
+      // Normalize by real name to reduce duplicates
       const realName = getRealName(name);
+      const key = realName.toLowerCase();
+      if (displayedPlayers.has(key)) return; // Skip if already displayed
       const wasNick = isNick(name);
       
       const res = await ipcRenderer.invoke("bedwars:stats", realName);
-      if (res.error) return;
+      if (res.error) {
+        console.error('Stats error for', realName, ':', res.error);
+        return;
+      }
 
-      displayedPlayers.add(name.toLowerCase());
+  console.log('Received stats for', realName, ':', res);
+
+  displayedPlayers.add(String(res.name || realName).toLowerCase());
+      
+      // Generate level HTML
+      const levelHTML = updatePlayerLevel(res);
+      console.log('Level HTML:', levelHTML);
       
       // Use the same ordered cells logic as before
       const orderedCells = [
-  // Use formatted, colored stars for Bedwars level if experience is available
-  `<td class="lvl">${updatePlayerLevel(res)}</td>`,
+        `<td class="lvl">${levelHTML}</td>`,
         `<td class="name">
-          ${res.rankTag ? `<span class="rank-tag" style="color:${esc(res.rankColor || '#ffffff')};font-weight:700;margin-right:6px">${esc(res.rankTag)}</span>` : ''}
-          ${esc(res.name)}
+          ${res.rankTag ? `<span class="rank-tag" style="color:${res.rankColor || '#ffffff'}">${res.rankTag}</span>` : ''}
+          ${res.rankColor ? `<span class="player-name" style="color:${res.rankColor}">${esc(res.name)}</span>` : `${esc(res.name)}`}
           ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(name)}">👻</span>` : ''}
         </td>`,
         `<td class="metric">${fmt(res.ws)}</td>`,
@@ -621,12 +887,62 @@
       bindMenus();
     }
 
-    // Remove a player from the displayed list
+    // Remove a player row and all state completely
     function removePlayer(name) {
       const row = rows.querySelector(`tr[data-name="${escAttr(name)}"]`);
-      if (row) {
-        row.remove();
-        displayedPlayers.delete(name.toLowerCase());
+      const key = String(getRealName(name) || name).toLowerCase();
+      if (row) row.remove();
+      displayedPlayers.delete(key);
+      playerSources.delete(key);
+    }
+
+    // Add/track a source for a player
+    function addPlayerSource(name, source) {
+      const key = String(getRealName(name) || name).toLowerCase();
+      const set = playerSources.get(key) || new Set();
+      set.add(source);
+      playerSources.set(key, set);
+    }
+
+    function removePlayerSource(name, source) {
+      const key = String(getRealName(name) || name).toLowerCase();
+      const set = playerSources.get(key);
+      if (!set) return;
+      set.delete(source);
+      if (set.size === 0) {
+        removePlayer(name);
+      } else {
+        playerSources.set(key, set);
+      }
+    }
+
+    function clearAllButUsername() {
+      // Remove all non-username-backed players; keep username-only
+      for (const [key, set] of Array.from(playerSources.entries())) {
+        if (set.has('username')) {
+          // Keep only username source
+          playerSources.set(key, new Set(['username']));
+          continue;
+        }
+        // remove entirely
+        const tr = rows.querySelector(`tr[data-name="${escAttr(key)}"]`);
+        if (tr) tr.remove();
+        displayedPlayers.delete(key);
+        playerSources.delete(key);
+      }
+      // Clean any stray rows
+      rows.querySelectorAll('tr[data-name]').forEach(tr => {
+        const dn = tr.getAttribute('data-name')?.toLowerCase();
+        if (dn && !playerSources.has(dn)) tr.remove();
+      });
+    }
+
+    function addPlayer(name, source) {
+      if (!name) return;
+      addPlayerSource(name, source);
+      const key = String(getRealName(name) || name).toLowerCase();
+      if (!displayedPlayers.has(key)) {
+        fetchPlayerStats(name);
       }
     }
 
@@ -634,25 +950,27 @@
     ipcRenderer.on('chat:players', (_e, newPlayers) => {
       try {
         if (!Array.isArray(newPlayers)) return;
-
-        // Get currently displayed players
-        const currentPlayers = Array.from(displayedPlayers);
-        
-        // Remove players that are no longer in the list
-        currentPlayers.forEach(displayed => {
-          if (!newPlayers.some(p => p.toLowerCase() === displayed.toLowerCase())) {
-            removePlayer(displayed);
-          }
-        });
-
-        // Add new players that aren't displayed yet
+        // Treat as /who list → source 'who'
         newPlayers.forEach(player => {
           if (!player || typeof player !== 'string') return;
-          fetchPlayerStats(player); // Will skip if already displayed
+          addPlayer(player, 'who');
         });
 
       } catch (err) {
         console.error('Error handling chat:players', err);
+      }
+    });
+
+    // Remove on Final Death (if enabled in settings)
+    ipcRenderer.on('chat:finalKill', (_e, name) => {
+      try {
+        if (!name || typeof name !== 'string') return;
+        if (sourcesSettings?.game?.removeOnDeath) {
+          // Only remove the 'who' source; keep other sources (manual, party, chat, username)
+          removePlayerSource(name, 'who');
+        }
+      } catch (err) {
+        console.error('Error handling chat:finalKill', err);
       }
     });
 
@@ -662,7 +980,7 @@
         if (!Array.isArray(members)) return;
         members.forEach(member => {
           if (!member || typeof member !== 'string') return;
-          fetchPlayerStats(member);
+          addPlayer(member, 'party');
         });
       } catch (err) {
         console.error('Error handling chat:party', err);
@@ -761,43 +1079,29 @@
       }
     });
 
-    async function fetchAll() {
-      rows.innerHTML = "";
-      for (const inputName of queue) {
-        // Check if it's a nick and get real name
-        const realName = getRealName(inputName);
-        const wasNick = isNick(inputName);
-        
-        const res = await ipcRenderer.invoke("bedwars:stats", realName);
-        if (res.error) continue;
-
-        const fkdrC = res.fkdr > 3 ? "good" : res.fkdr > 1 ? "warn" : "bad";
-        const wlrC = res.wlr > 3 ? "good" : res.wlr > 1 ? "warn" : "bad";
-        const lvlC = res.level > 300 ? "good" : res.level > 100 ? "warn" : "bad";
-
-        rows.insertAdjacentHTML("beforeend", `
-          <tr data-name="${escAttr(res.name)}">
-            <td class="lvl ${lvlC}">${res.level ?? 0}</td>
-            <td class="name">
-              ${esc(res.name)}
-              ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(inputName)}">👻</span>` : ''}
-            </td>
-            <td class="metric">${fmt(res.ws)}</td>
-            <td class="metric ${fkdrC}">${fmt(res.fkdr)}</td>
-            <td class="metric ${wlrC}">${fmt(res.wlr)}</td>
-            <td class="metric">${fmt(res.bblr)}</td>
-            <td class="metric">${fmt(res.fk)}</td>
-            <td class="metric">${fmt(res.wins)}</td>
-            <td class="actions">
-              <button class="icon-btn row-menu-btn">⋮</button>
-              <div class="menu">
-                <button class="remove-btn">Remove</button>
-              </div>
-            </td>
-          </tr>
-        `);
+    // Chat strings → add player who matches any configured string (case-insensitive)
+    ipcRenderer.on('chat:message', (_e, payload) => {
+      try {
+        if (!payload || !sourcesSettings?.chat?.enabled) return;
+        const { name, text } = payload;
+        if (!name || !text) return;
+        const patterns = (sourcesSettings.chat.strings || []).filter(Boolean).map(String);
+        if (!patterns.length) return;
+        const t = String(text).toLowerCase();
+        if (patterns.some(p => t.includes(String(p).toLowerCase()))) {
+          addPlayer(name, 'chat');
+        }
+      } catch (err) {
+        console.error('Error handling chat:message', err);
       }
-      bindMenus();
+    });
+
+    async function fetchAll() {
+      // Add all queued players as manual entries (does not clear current list)
+      for (const inputName of queue) {
+        addPlayer(inputName, 'manual');
+      }
+      queue = [];
     }
 
     function bindMenus() {
@@ -819,7 +1123,8 @@
           const tr = b.closest("tr");
           const name = tr.getAttribute("data-name");
           queue = queue.filter(n => n.toLowerCase() !== name.toLowerCase());
-          fetchAll();
+          removePlayer(name);
+          closeAllMenus();
         });
       });
 
@@ -841,12 +1146,19 @@
 
     document.getElementById("clearAll").addEventListener("click", () => {
       queue = [];
-      rows.innerHTML = "";
+      clearAllButUsername();
     });
 
     document.getElementById("refresh").addEventListener("click", fetchAll);
     document.getElementById("minBtn").addEventListener("click", () => ipcRenderer.send("window:minimize"));
     document.getElementById("closeBtn").addEventListener("click", () => ipcRenderer.send("window:close"));
+
+    // Shortcut-triggered actions from main
+    ipcRenderer.on('shortcut:refresh', () => fetchAll());
+    ipcRenderer.on('shortcut:clear', () => {
+      queue = [];
+      clearAllButUsername();
+    });
 
     // --- resize grips
     let resizing = null;
@@ -1106,6 +1418,375 @@
     // Initialize settings
     renderColumnsList();
 
+    // --- Keyboard Shortcuts
+    const ACTIONS = [
+      { id: 'toggleOverlay', label: 'Hide or show' },
+      { id: 'refreshAll', label: 'Refresh all players' },
+      { id: 'clearAll', label: 'Remove all players' },
+      { id: 'toggleClickThrough', label: 'Toggle click-through' }
+    ];
+
+    const DEFAULT_SHORTCUTS = {
+      toggleOverlay: 'F9',
+      refreshAll: '',
+      clearAll: 'F8',
+      toggleClickThrough: ''
+    };
+
+    let shortcuts = JSON.parse(localStorage.getItem('shortcuts') || JSON.stringify(DEFAULT_SHORTCUTS));
+
+    function saveShortcuts() {
+      localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+      // Inform main to (re)register
+      ipcRenderer.invoke('shortcuts:register', shortcuts);
+    }
+
+    function renderShortcuts() {
+      const grid = document.getElementById('kbGrid');
+      if (!grid) return;
+      grid.innerHTML = ACTIONS.map(a => `
+        <div class="kb-row" data-action="${a.id}">
+          <div class="kb-action">${a.label}</div>
+          <div class="kb-input" tabindex="0">${shortcuts[a.id] || '—'}</div>
+        </div>
+      `).join('');
+
+      grid.querySelectorAll('.kb-input').forEach(inputEl => {
+        inputEl.addEventListener('click', () => startListen(inputEl));
+        inputEl.addEventListener('keydown', (e) => startListen(inputEl, e));
+      });
+    }
+
+    function startListen(inputEl, evt) {
+      const row = inputEl.closest('.kb-row');
+      const action = row.getAttribute('data-action');
+      inputEl.classList.add('listening');
+      inputEl.textContent = 'Press key…';
+
+      const onKey = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        // ESC clears the shortcut (unassigned)
+        if (e.key === 'Escape') {
+          shortcuts[action] = '';
+          inputEl.textContent = '—';
+          inputEl.classList.remove('listening');
+          window.removeEventListener('keydown', onKey, true);
+          saveShortcuts();
+          return;
+        }
+        const acc = toAccelerator(e);
+        shortcuts[action] = acc;
+        inputEl.textContent = acc || '—';
+        inputEl.classList.remove('listening');
+        window.removeEventListener('keydown', onKey, true);
+        saveShortcuts();
+      };
+      window.addEventListener('keydown', onKey, true);
+    }
+
+    function toAccelerator(e) {
+      // Allow only F-keys or simple combos
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.altKey) parts.push('Alt');
+      const k = e.key;
+      let key = '';
+      if (/^F\d{1,2}$/i.test(k)) key = k.toUpperCase();
+      else if (k.length === 1) key = k.toUpperCase();
+      else if (k === 'Escape') key = 'Esc';
+      else if (k === ' ') key = 'Space';
+      else return '';
+      return [...parts, key].join('+');
+    }
+
+    // initial render and register
+    renderShortcuts();
+    ipcRenderer.invoke('shortcuts:register', shortcuts);
+
+    // --- Appearance Settings
+    const defaultAppearance = {
+      opacity: 0.78,
+      fontSize: 14,
+      alwaysOnTop: true,
+      bgColor: '#14141c' // matches rgba(20,20,28,alpha)
+    };
+
+    let appearance = JSON.parse(localStorage.getItem('appearanceSettings') || JSON.stringify(defaultAppearance));
+
+    function saveAppearance() {
+      localStorage.setItem('appearanceSettings', JSON.stringify(appearance));
+    }
+
+    function hexToRgb(hex) {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      if (!m) return { r: 20, g: 20, b: 28 };
+      return { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) };
+    }
+
+    function applyAppearance() {
+      const { r,g,b } = hexToRgb(appearance.bgColor);
+      const rgba = `rgba(${r},${g},${b},${appearance.opacity})`;
+      document.documentElement.style.setProperty('--bg', rgba);
+      document.documentElement.style.setProperty('--table-font-size', appearance.fontSize + 'px');
+      // also set body background directly to ensure immediate effect
+      document.body && (document.body.style.background = rgba);
+      // sync always-on-top with main
+      ipcRenderer.invoke('window:setAlwaysOnTop', !!appearance.alwaysOnTop);
+      // Update UI labels
+      const ov = document.getElementById('opacityValue'); if (ov) ov.textContent = Math.round(appearance.opacity*100)+'%';
+      const fv = document.getElementById('fontSizeValue'); if (fv) fv.textContent = appearance.fontSize+'px';
+    }
+
+    // Bind inputs
+    const opacityRange = document.getElementById('opacityRange');
+    const fontSizeRange = document.getElementById('fontSizeRange');
+    const alwaysOnTopToggle = document.getElementById('alwaysOnTopToggle');
+    const bgColorInput = document.getElementById('bgColorInput');
+
+    if (opacityRange) {
+      opacityRange.value = String(appearance.opacity);
+      opacityRange.addEventListener('input', () => {
+        appearance.opacity = Number(opacityRange.value);
+        saveAppearance();
+        applyAppearance();
+      });
+    }
+
+    if (fontSizeRange) {
+      fontSizeRange.value = String(appearance.fontSize);
+      fontSizeRange.addEventListener('input', () => {
+        appearance.fontSize = parseInt(fontSizeRange.value,10);
+        saveAppearance();
+        applyAppearance();
+      });
+    }
+
+    if (alwaysOnTopToggle) {
+      alwaysOnTopToggle.checked = !!appearance.alwaysOnTop;
+      alwaysOnTopToggle.addEventListener('change', () => {
+        appearance.alwaysOnTop = !!alwaysOnTopToggle.checked;
+        saveAppearance();
+        applyAppearance();
+      });
+    }
+
+    if (bgColorInput) {
+      bgColorInput.value = appearance.bgColor;
+      bgColorInput.addEventListener('input', () => {
+        appearance.bgColor = bgColorInput.value;
+        saveAppearance();
+        applyAppearance();
+      });
+    }
+
+    // Apply on load
+    applyAppearance();
+
+    // --- Basic Settings
+    const defaultBasic = {
+      logFile: 'badlion',
+      customLogPath: '',
+      username: ''
+    };
+
+    let basicSettings = JSON.parse(localStorage.getItem('basicSettings') || JSON.stringify(defaultBasic));
+
+    function saveBasicSettings() {
+      localStorage.setItem('basicSettings', JSON.stringify(basicSettings));
+      console.log('Basic settings saved:', basicSettings);
+        updateSidebarUsername();
+        // Ensure username entry exists when set
+        if (basicSettings.username && basicSettings.username.trim()) {
+          addPlayer(basicSettings.username.trim(), 'username');
+        }
+    }
+
+      function updateSidebarUsername() {
+        const sidebarUsernameEl = document.getElementById('sidebarUsername');
+        if (sidebarUsernameEl) {
+          sidebarUsernameEl.textContent = basicSettings.username || 'username';
+        }
+      }
+
+    // Bind Basic inputs
+    const logFileSelect = document.getElementById('logFileSelect');
+    const usernameInput = document.getElementById('usernameInput');
+
+    if (logFileSelect) {
+      logFileSelect.value = basicSettings.logFile || 'badlion';
+      logFileSelect.addEventListener('change', () => {
+        basicSettings.logFile = logFileSelect.value;
+        saveBasicSettings();
+        // TODO: wenn custom, zeige Datei-Dialog oder Input-Feld
+      });
+    }
+
+    if (usernameInput) {
+      usernameInput.value = basicSettings.username || '';
+      usernameInput.addEventListener('input', () => {
+        const prev = (basicSettings.username || '').trim();
+        const next = (usernameInput.value || '').trim();
+        if (prev && prev.toLowerCase() !== next.toLowerCase()) {
+          // Remove old username source (but keep row if other sources exist)
+          removePlayerSource(prev, 'username');
+        }
+        basicSettings.username = next;
+        saveBasicSettings();
+      });
+    }
+
+      // Initialize sidebar username on load and ensure presence in list
+      updateSidebarUsername();
+      if (basicSettings.username && basicSettings.username.trim()) {
+        addPlayer(basicSettings.username.trim(), 'username');
+      }
+
+    // --- Sources Settings
+    const defaultSources = {
+      game: {
+        enabled: true,
+        addFromChat: true,
+        removeOnDeath: true,
+        removeOnReconnect: true,
+        removeOnServerChange: true
+      },
+      party: {
+        enabled: true,
+        autoRefreshServerChange: false, // premium
+        autoRefreshGameEnd: false // premium
+      },
+      partyInvites: {
+        enabled: true
+      },
+      chat: {
+        enabled: true,
+        removeOnServerChange: true,
+        strings: []
+      }
+    };
+
+    let sourcesSettings = JSON.parse(localStorage.getItem('sourcesSettings') || JSON.stringify(defaultSources));
+
+    function saveSourcesSettings() {
+      localStorage.setItem('sourcesSettings', JSON.stringify(sourcesSettings));
+      console.log('Sources settings saved:', sourcesSettings);
+    }
+
+    // Bind Sources inputs
+    const sourceGameToggle = document.getElementById('sourceGameToggle');
+    const gameAddFromChat = document.getElementById('gameAddFromChat');
+    const gameRemoveOnDeath = document.getElementById('gameRemoveOnDeath');
+    const gameRemoveOnReconnect = document.getElementById('gameRemoveOnReconnect');
+    const gameRemoveOnServerChange = document.getElementById('gameRemoveOnServerChange');
+    
+    const sourcePartyToggle = document.getElementById('sourcePartyToggle');
+    const partyRefreshServerChange = document.getElementById('partyRefreshServerChange');
+    const partyRefreshGameEnd = document.getElementById('partyRefreshGameEnd');
+    
+    const sourcePartyInvitesToggle = document.getElementById('sourcePartyInvitesToggle');
+    
+    const sourceChatToggle = document.getElementById('sourceChatToggle');
+    const chatRemoveOnServerChange = document.getElementById('chatRemoveOnServerChange');
+    const chatStrings = document.getElementById('chatStrings');
+
+    if (sourceGameToggle) {
+      sourceGameToggle.checked = sourcesSettings.game.enabled;
+      sourceGameToggle.addEventListener('change', () => {
+        sourcesSettings.game.enabled = sourceGameToggle.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (gameAddFromChat) {
+      gameAddFromChat.checked = sourcesSettings.game.addFromChat;
+      gameAddFromChat.addEventListener('change', () => {
+        sourcesSettings.game.addFromChat = gameAddFromChat.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (gameRemoveOnDeath) {
+      gameRemoveOnDeath.checked = sourcesSettings.game.removeOnDeath;
+      gameRemoveOnDeath.addEventListener('change', () => {
+        sourcesSettings.game.removeOnDeath = gameRemoveOnDeath.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (gameRemoveOnReconnect) {
+      gameRemoveOnReconnect.checked = sourcesSettings.game.removeOnReconnect;
+      gameRemoveOnReconnect.addEventListener('change', () => {
+        sourcesSettings.game.removeOnReconnect = gameRemoveOnReconnect.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (gameRemoveOnServerChange) {
+      gameRemoveOnServerChange.checked = sourcesSettings.game.removeOnServerChange;
+      gameRemoveOnServerChange.addEventListener('change', () => {
+        sourcesSettings.game.removeOnServerChange = gameRemoveOnServerChange.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (sourcePartyToggle) {
+      sourcePartyToggle.checked = sourcesSettings.party.enabled;
+      sourcePartyToggle.addEventListener('change', () => {
+        sourcesSettings.party.enabled = sourcePartyToggle.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    // Party auto-refresh are premium (disabled for now)
+    if (partyRefreshServerChange) {
+      partyRefreshServerChange.checked = sourcesSettings.party.autoRefreshServerChange;
+      partyRefreshServerChange.addEventListener('change', () => {
+        sourcesSettings.party.autoRefreshServerChange = partyRefreshServerChange.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (partyRefreshGameEnd) {
+      partyRefreshGameEnd.checked = sourcesSettings.party.autoRefreshGameEnd;
+      partyRefreshGameEnd.addEventListener('change', () => {
+        sourcesSettings.party.autoRefreshGameEnd = partyRefreshGameEnd.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (sourcePartyInvitesToggle) {
+      sourcePartyInvitesToggle.checked = sourcesSettings.partyInvites.enabled;
+      sourcePartyInvitesToggle.addEventListener('change', () => {
+        sourcesSettings.partyInvites.enabled = sourcePartyInvitesToggle.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (sourceChatToggle) {
+      sourceChatToggle.checked = sourcesSettings.chat.enabled;
+      sourceChatToggle.addEventListener('change', () => {
+        sourcesSettings.chat.enabled = sourceChatToggle.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (chatRemoveOnServerChange) {
+      chatRemoveOnServerChange.checked = sourcesSettings.chat.removeOnServerChange;
+      chatRemoveOnServerChange.addEventListener('change', () => {
+        sourcesSettings.chat.removeOnServerChange = chatRemoveOnServerChange.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (chatStrings) {
+      chatStrings.value = (sourcesSettings.chat.strings || []).join('\n');
+      chatStrings.addEventListener('input', () => {
+        sourcesSettings.chat.strings = chatStrings.value.split('\n').map(s => s.trim()).filter(Boolean);
+        saveSourcesSettings();
+      });
+    }
+
     // Update table rendering to use column settings
     function getColorForValue(column, value) {
       const rules = columnSettings.colorRules[column];
@@ -1116,46 +1797,6 @@
         if (rule.op === '<' && value < rule.value) return rule.color;
       }
       return '';
-    }
-
-    // Update fetchAll to use column settings
-    async function fetchAll() {
-      rows.innerHTML = "";
-      for (const inputName of queue) {
-        const realName = getRealName(inputName);
-        const wasNick = isNick(inputName);
-        
-        const res = await ipcRenderer.invoke("bedwars:stats", realName);
-        if (res.error) continue;
-
-        // Ensure columns are in correct order matching the table head
-        const orderedCells = [
-          `<td class="lvl ${getColorForValue('level', res.level)}">${fmt(res.level)}</td>`,
-          `<td class="name">
-            ${esc(res.name)}
-            ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(inputName)}">👻</span>` : ''}
-          </td>`,
-          `<td class="metric">${fmt(res.ws)}</td>`,
-          `<td class="metric ${getColorForValue('fkdr', res.fkdr)}">${fmt(res.fkdr)}</td>`,
-          `<td class="metric ${getColorForValue('wlr', res.wlr)}">${fmt(res.wlr)}</td>`,
-          `<td class="metric ${getColorForValue('bblr', res.bblr)}">${fmt(res.bblr)}</td>`,
-          `<td class="metric">${fmt(res.fk)}</td>`,
-          `<td class="metric">${fmt(res.wins)}</td>`
-        ].join('');
-
-        rows.insertAdjacentHTML("beforeend", `
-          <tr data-name="${escAttr(res.name)}">
-            ${orderedCells}
-            <td class="actions">
-              <button class="icon-btn row-menu-btn">⋮</button>
-              <div class="menu">
-                <button class="remove-btn">Remove</button>
-              </div>
-            </td>
-          </tr>
-        `);
-      }
-      bindMenus();
     }
 
     // Settings submenu toggle
