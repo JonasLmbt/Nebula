@@ -432,9 +432,9 @@
             <span class="nav-label">Sources</span>
           </button>
           
-          <button class="nav-item sub-item" data-panel="settings" data-settings="stats">
+          <button class="nav-item sub-item" data-panel="settings" data-settings="columns">
             <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
-            <span class="nav-label">Stats</span>
+            <span class="nav-label">Columns</span>
           </button>
           
           <button class="nav-item sub-item" data-panel="settings" data-settings="keyboard">
@@ -720,31 +720,17 @@
         </div>
       </div>
 
-      <!-- Stats Settings (wrapped as section) -->
-      <div class="settings-content active" data-section="stats">
+      <!-- Columns Settings -->
+      <div class="settings-content active" data-section="columns">
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
-            Stats Settings
+            Columns
           </h2>
         
-
-  <!-- Stats List -->
-  <div class="stats-list" id="statsList">
-          <!-- Jede Spalte als eigene Zeile -->
-          <div class="stat-row" data-column="level">
-            <div class="stat-drag">⋮⋮</div>
-            <label class="stat-toggle">
-              <input type="checkbox" checked data-column="level">
-              <span class="stat-name">Level</span>
-            </label>
-            <button class="stat-settings-btn" title="Color settings"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></button>
-          </div>
-          <!-- Weitere Spalten werden per JS hinzugefügt -->
-        </div>
         <div class="layout-editor" id="statLayoutEditor">
           <h3><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg> Overlay Columns</h3>
-          <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning.</div>
+          <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning. Click on a filled slot to configure color rules.</div>
           <div class="layout-palette" id="layoutPalette"></div>
           <div class="layout-slots" id="layoutSlots"></div>
         </div>
@@ -1639,44 +1625,6 @@
       updateOverlaySize();
     }
 
-    // Render stats list in settings
-    function renderStatsList() {
-      const list = document.getElementById('statsList');
-      if (!list) return;
-
-      list.innerHTML = statSettings.order.map(col => `
-        <div class="stat-row" data-column="${col}">
-          <div class="stat-drag">⋮⋮</div>
-          <label class="stat-toggle">
-            <input type="checkbox" ${statSettings.visible.includes(col) ? 'checked' : ''} data-column="${col}">
-            <span class="stat-name">${STATS[col].name}</span>
-          </label>
-          ${STATS[col].colorRules ? `
-            <button class="stat-settings-btn" data-column="${col}" title="Color rules"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></button>
-          ` : ''}
-        </div>
-      `).join('');
-
-      // Bind events
-      list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', e => {
-          const col = e.target.dataset.column;
-          if (e.target.checked) {
-            statSettings.visible.push(col);
-          } else {
-            statSettings.visible = statSettings.visible.filter(c => c !== col);
-          }
-          saveStatSettings();
-        });
-      });
-
-      list.querySelectorAll('.stat-settings-btn').forEach(btn => {
-        btn.addEventListener('click', () => showColorRules(btn.dataset.column));
-      });
-      renderStatLayoutPalette();
-      renderStatLayoutSlots();
-    }
-
     // Color rules modal
     function showColorRules(column) {
       const modal = document.getElementById('colorRulesModal');
@@ -1758,7 +1706,6 @@
     }
 
     // Initialize settings
-    renderStatsList();
     renderStatLayoutPalette();
     renderStatLayoutSlots();
 
@@ -1802,9 +1749,22 @@
           statSettings.layout[idx] = stat;
           saveStatSettings();
         });
+        // Click on filled slot: open color rules (if stat supports it)
+        if (!slot.dataset.empty && slot.dataset.stat) {
+          const statKey = slot.dataset.stat;
+          if (STATS[statKey]?.colorRules) {
+            slot.style.cursor = 'pointer';
+            slot.addEventListener('click', e => {
+              // Ignore click if user clicked remove button
+              if (e.target.closest('.slot-remove')) return;
+              showColorRules(statKey);
+            });
+          }
+        }
         const removeBtn = slot.querySelector('.slot-remove');
         if (removeBtn) {
-          removeBtn.addEventListener('click', () => {
+          removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // prevent triggering slot click
             const idx = parseInt(slot.dataset.slot);
             statSettings.layout[idx] = null;
             saveStatSettings();
