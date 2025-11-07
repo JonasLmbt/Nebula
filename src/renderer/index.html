@@ -12,7 +12,8 @@
     --panel: rgba(255,255,255,0.06);
     --text: #e9e9f1;
     --muted: #9aa0aa;
-    --accent: #6ee7ff;
+    --accent: #66eaff; /* aktualisiert gemäß neuem Style-Snippet */
+    --accent-soft: rgba(102,234,255,0.25);
     --good: #43d17f;
     --warn: #e0c14d;
     --bad: #e05a5a;
@@ -32,23 +33,29 @@
     -webkit-font-smoothing:antialiased;
     user-select:none;
   }
+  /* Hide scrollbars */
+  *::-webkit-scrollbar{width:0;height:0;background:transparent}
+  *{scrollbar-width:none;-ms-overflow-style:none}
 
   /* Topbar */
   .topbar{
     display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);
     -webkit-app-region:drag;
   }
-  .brand{font-weight:700;letter-spacing:0.2px;color:var(--accent)}
+  .brand{display:flex;align-items:center}
+  .brand img{height:32px;opacity:.95;display:block} /* reduziert für präzisere Topbar-Abstände */
   .spacer{flex:1}
   .icon-btn,.search{ -webkit-app-region:no-drag }
   .icon-btn{
     width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:0;
-    background:transparent;color:var(--text);cursor:pointer;
+    background:transparent;color:#cfd6e3;cursor:pointer; /* Farbe laut neuem Snippet */
   }
-  .icon-btn:hover{background:var(--row-hover)}
-  .svg{width:16px;height:16px;display:block;opacity:.85}
-  .icon-btn:hover .svg{opacity:1}
-  .icon-btn--danger:hover{background:rgba(224,90,90,0.22);color:#ff6b6b}
+  .icon-btn:hover{background:var(--row-hover);color:var(--accent)}
+  /* Unified icon styling (SVG sprite via <use>) */
+  .icon{width:16px;height:16px;display:block;opacity:.9}
+  .icon-btn:hover .icon{opacity:1;filter:drop-shadow(0 0 6px var(--accent-soft))}
+  .nav-icon .icon{width:18px;height:18px;opacity:.85}
+  .icon-btn--danger:hover{background:rgba(224,90,90,0.20);color:#ff6b6b;filter:drop-shadow(0 0 6px rgba(255,107,107,0.25))}
 
   /* Search */
   .search{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--row);border-radius:12px}
@@ -57,15 +64,15 @@
 
   /* Content / Table */
   .content{padding:10px 12px}
-  .table-wrap{padding:8px}
-  table{width:100%;border-collapse:collapse;table-layout:fixed;box-sizing:border-box}
+  .table-wrap{padding:8px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;table-layout:auto;box-sizing:border-box}
   #table{font-size:var(--table-font-size,14px)}
-  colgroup col.c-lvl{width:60px}
-  colgroup col.c-name{width:180px}
-  colgroup col.c-ws{width:60px}
-  colgroup col.c-fkdr, colgroup col.c-wlr, colgroup col.c-bblr{width:88px}
-  colgroup col.c-fk, colgroup col.c-wins{width:96px}
-  colgroup col.c-actions{width:60px}
+  colgroup col.c-lvl{min-width:64px;width:auto}
+  colgroup col.c-name{min-width:140px;width:auto}
+  colgroup col.c-ws{min-width:50px;width:auto}
+  colgroup col.c-fkdr, colgroup col.c-wlr, colgroup col.c-bblr{min-width:70px;width:auto}
+  colgroup col.c-fk, colgroup col.c-wins{min-width:80px;width:auto}
+  colgroup col.c-actions{min-width:50px;width:50px}
 
   thead th{
     text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:6px 8px;cursor:pointer;
@@ -122,7 +129,7 @@
   .nav-icon{width:22px;display:inline-block;text-align:center}
   .nav-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .nav-sep{height:1px;background:rgba(255,255,255,0.03);margin:10px 0;border-radius:2px}
-  .sidebar-footer{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:12px}
+  .sidebar-footer{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:0}
   .user-row{display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--muted);padding-top:8px;border-top:1px solid rgba(255,255,255,0.02)}
   .user-icon{width:20px;display:inline-block;text-align:center}
 
@@ -148,12 +155,13 @@
   .delete-btn{opacity:.5;padding:6px;cursor:pointer;border:0;background:transparent;color:var(--text)}
   .delete-btn:hover{opacity:1}
   .add-btn{
-    position:fixed;right:20px;bottom:20px;width:48px;height:48px;border-radius:24px;background:#00e676;color:#111;border:0;
-    font-size:24px;cursor:pointer;box-shadow:0 4px 12px rgba(0,230,118,0.4)
+    position:fixed;right:20px;bottom:20px;width:48px;height:48px;border-radius:24px;background:var(--accent);color:#111;border:0;
+    font-size:24px;cursor:pointer;box-shadow:0 4px 12px var(--accent-soft);transition:transform .2s ease
   }
-  .add-btn:hover{transform:scale(1.05)}
+  .add-btn:hover{transform:scale(1.05);box-shadow:0 6px 16px rgba(102,234,255,0.5)}
 
-  .nick-indicator{font-size:12px;margin-left:6px;opacity:.7;cursor:help}
+  .nick-indicator{display:inline-flex;align-items:center;margin-left:6px;opacity:.7;cursor:help}
+  .nick-indicator .icon{width:16px;height:16px}
 
   /* Forms */
   .add-nick-form{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px}
@@ -162,23 +170,24 @@
   .form-label{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:8px}
   .form-label .icon{opacity:.7}
   .form-label input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font-size:14px;padding:4px 0}
-  .form-submit{width:100%;background:#00e676;color:#111;border:0;padding:10px;border-radius:8px;font-weight:600;cursor:pointer;margin-top:4px}
-  .form-submit:hover{opacity:.9}
+  .form-submit{width:100%;background:var(--accent);color:#111;border:0;padding:10px;border-radius:8px;font-weight:600;cursor:pointer;margin-top:4px;transition:all .2s ease}
+  .form-submit:hover{transform:scale(1.02);box-shadow:0 4px 12px var(--accent-soft)}
 
   /* Settings */
   .settings-section{background:var(--panel);border-radius:8px;margin-top:16px;padding:20px}
   .settings-section h2{margin:0 0 20px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .settings-icon .icon{width:18px;height:18px}
   .settings-row{margin-bottom:16px;display:flex;align-items:center}
   .settings-label{flex:0 0 120px;color:var(--muted)}
   .settings-select{background:rgba(0,0,0,0.2);color:var(--text);border:0;padding:8px 12px;border-radius:6px;min-width:200px}
 
-  /* Columns list */
-  .columns-list{display:flex;flex-direction:column;gap:4px}
-  .column-row{display:flex;align-items:center;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:8px;gap:12px}
-  .column-drag{cursor:move;color:var(--muted);font-size:16px}
-  .column-toggle{flex:1;display:flex;align-items:center;gap:8px;cursor:pointer}
-  .column-settings-btn{background:transparent;border:0;color:var(--text);opacity:.7;cursor:pointer;padding:4px 8px;border-radius:4px}
-  .column-settings-btn:hover{opacity:1;background:rgba(255,255,255,0.05)}
+  /* Stats list */
+  .stats-list{display:flex;flex-direction:column;gap:4px}
+  .stat-row{display:flex;align-items:center;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:8px;gap:12px}
+  .stat-drag{cursor:move;color:var(--muted);font-size:16px}
+  .stat-toggle{flex:1;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .stat-settings-btn{background:transparent;border:0;color:var(--text);opacity:.7;cursor:pointer;padding:4px 8px;border-radius:4px}
+  .stat-settings-btn:hover{opacity:1;background:rgba(255,255,255,0.05)}
 
   /* Modal / Color rules */
   .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9000}
@@ -204,18 +213,19 @@
   .settings-nav{display:flex;flex-direction:column;gap:1px;background:var(--panel);border-radius:12px;overflow:hidden}
   .settings-nav-item{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--panel);border:0;color:var(--text);font-size:14px;text-align:left;cursor:pointer}
   .settings-nav-item:hover{background:rgba(255,255,255,0.03)}
-  .settings-nav-item.active{background:rgba(255,255,255,0.04)}
+  .settings-nav-item.active{font-weight:700}
   .settings-nav-item .nav-icon{width:20px;text-align:center;font-size:16px}
   .settings-nav-item .nav-label{flex:1;font-weight:500}
   .nav-arrow{font-size:12px;opacity:.5;margin-left:4px;transition:transform .2s}
   .settings-nav-item.active .nav-arrow{transform:rotate(180deg)}
   .nav-item.expanded .nav-arrow{transform:rotate(180deg)}
+  .nav-item.expanded .nav-icon .icon{transform:rotate(45deg);}
+  .nav-icon .icon{transition:transform .25s ease;}
   .settings-submenu{display:none;margin-left:24px;margin-top:4px;border-left:1px solid rgba(255,255,255,0.1)}
   .settings-submenu.expanded{display:block}
   .nav-item.sub-item{padding:8px 12px;font-size:13px}
   .nav-item.sub-item .nav-icon{font-size:14px}
-  .nav-item.sub-item[data-settings="columns"].active{color:#00e676}
-  .settings-nav-item[data-settings="columns"].active{color:#00e676}
+  /* entfernt: grüne Schrift für Stats */
 
   /* Keyboard grid */
   .kb-grid{display:flex;flex-direction:column;gap:10px}
@@ -224,6 +234,8 @@
   .kb-input{min-width:160px; text-align:center; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,0.06); cursor:pointer}
   .kb-input.listening{outline:2px solid var(--accent)}
   .kb-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5}
+  /* Nicks help box (analog kb-help) */
+  .nicks-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:16px}
 
   /* Settings inputs & controls */
   .settings-input{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:14px;outline:0}
@@ -258,27 +270,82 @@
 </head>
 
 <body>
+  <!-- Nebula icon sprite (stroke=2, round caps/joins, currentColor) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12a9 9 0 0 1-9 9 9 9 0 1 1 6.3-15.3"/><path d="M21 3v6h-6"/>
+    </symbol>
+    <symbol id="i-clear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 13h10l1-13"/><path d="M10 10v7M14 10v7"/>
+    </symbol>
+    <symbol id="i-min" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+
+    <!-- Sidebar -->
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>
+    </symbol>
+    <symbol id="i-nicks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="8.5" r="3"/><path d="M2.5 19c1.6-3 4-4.5 6.5-4.5s4.9 1.5 6.5 4.5"/>
+      <path d="M16 5h4M16 9h6M16 13h5" />
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M4 12h2.5M17.5 12H20"/>
+      <path d="M12 4v2.5M12 17.5V20"/>
+      <path d="M6.6 6.6l1.8 1.8M15.6 15.6l1.8 1.8"/>
+      <path d="M6.6 17.4l1.8-1.8M15.6 8.4l1.8-1.8"/>
+    </symbol>
+    <symbol id="i-basic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7h12"/><circle cx="16" cy="7" r="2.5"/>
+      <path d="M4 17h8"/><circle cx="10" cy="17" r="2.5"/>
+    </symbol>
+    <symbol id="i-appearance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="7"/><path d="M5 12h14M12 5v14"/>
+    </symbol>
+    <symbol id="i-sources" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 16l6-6 4 4 8-8"/><path d="M14 6h7v7"/>
+    </symbol>
+    <symbol id="i-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 5v14M15 5v14"/>
+    </symbol>
+    <symbol id="i-shortcuts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M9 14h6"/>
+    </symbol>
+    <symbol id="i-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c1.8-3.2 4.7-5 8-5s6.2 1.8 8 5"/>
+    </symbol>
+    <!-- Additional icons for settings subitems -->
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <path d="M14 2v6h6"/>
+    </symbol>
+    <symbol id="i-ghost" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2c-4.42 0-8 3.58-8 8v12l2-2 2 2 2-2 2 2 2-2 2 2 2-2V10c0-4.42-3.58-8-8-8zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 1a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+    </symbol>
+    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <circle cx="12" cy="12" r="6"/>
+      <circle cx="12" cy="12" r="2"/>
+    </symbol>
+  </svg>
   <div class="topbar">
     <button id="menuBtn" class="icon-btn" aria-label="Menu" title="Menu">
       <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
       </svg>
     </button>
-    <div class="brand">Nebula</div>
+  <div class="brand"><img src="../../assets/nebula-logo.svg" alt="Nebula"></div>
     <div class="spacer"></div>
 
     <!-- Refresh -->
     <button id="refresh" class="icon-btn" aria-label="Refresh" title="Refresh">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.64 0 3.13.66 4.22 1.73L13 11h7V4l-2.35 2.35z"/>
-      </svg>
+      <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
     </button>
 
     <!-- Clear all -->
     <button id="clearAll" class="icon-btn" aria-label="Clear all players" title="Clear all players">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M9 3h6v2h5v2H4V5h5V3zm1 6h2v9h-2V9zm4 0h2v9h-2V9z"/>
-      </svg>
+      <svg class="icon" aria-hidden="true"><use href="#i-clear"/></svg>
     </button>
 
     <!-- Search -->
@@ -291,16 +358,12 @@
 
     <!-- Minimize -->
     <button id="minBtn" class="icon-btn" aria-label="Minimize" title="Minimize">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M19 13H5v-2h14v2z"/>
-      </svg>
+      <svg class="icon" aria-hidden="true"><use href="#i-min"/></svg>
     </button>
 
     <!-- Close -->
     <button id="closeBtn" class="icon-btn icon-btn--danger" aria-label="Close" title="Close">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3 10.59 10.59 16.89 4.3z"/>
-      </svg>
+      <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
     </button>
 
 
@@ -310,19 +373,19 @@
     <div class="sidebar-inner">
       <nav class="nav">
         <button class="nav-item active" data-panel="home">
-          <span class="nav-icon">🏠</span>
-          <span class="nav-label">Home</span>
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg></span>
+          <span class="nav-label">Overlay</span>
         </button>
 
         <button class="nav-item" data-panel="nicks">
-          <span class="nav-icon">👥</span>
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
           <span class="nav-label">Nicks</span>
         </button>
 
         <div class="nav-sep"></div>
 
         <button class="nav-item" data-panel="settings">
-          <span class="nav-icon">⚙️</span>
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
           <span class="nav-label">Settings</span>
           <span class="nav-arrow">▾</span>
         </button>
@@ -330,27 +393,27 @@
         <!-- Untermenü für Settings -->
         <div class="settings-submenu">
           <button class="nav-item sub-item" data-panel="settings" data-settings="basic">
-            <span class="nav-icon">📌</span>
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
             <span class="nav-label">Basic</span>
           </button>
           
           <button class="nav-item sub-item" data-panel="settings" data-settings="appearance">
-            <span class="nav-icon">🎨</span>
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
             <span class="nav-label">Appearance</span>
           </button>
           
           <button class="nav-item sub-item" data-panel="settings" data-settings="sources">
-            <span class="nav-icon">🔗</span>
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
             <span class="nav-label">Sources</span>
           </button>
           
-          <button class="nav-item sub-item" data-panel="settings" data-settings="columns">
-            <span class="nav-icon">📊</span>
-            <span class="nav-label">Columns</span>
+          <button class="nav-item sub-item" data-panel="settings" data-settings="stats">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
+            <span class="nav-label">Stats</span>
           </button>
           
           <button class="nav-item sub-item" data-panel="settings" data-settings="keyboard">
-            <span class="nav-icon">⌨️</span>
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
             <span class="nav-label">Keyboard Shortcuts</span>
           </button>
         
@@ -360,7 +423,7 @@
 
       <div class="sidebar-footer">
         <div class="user-row">
-          <span class="user-icon">👤</span>
+          <span class="user-icon"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
           <span class="user-name" id="sidebarUsername">username</span>
         </div>
       </div>
@@ -397,18 +460,25 @@
 
     <!-- Nicks Panel -->
     <div class="panel" id="panel-nicks">
+      <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+        <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
+        Nicks
+      </h2>
+      <div class="nicks-help">
+        Create a small nickname dictionary here: assign nicknames to their real player names. If a player with a registered nickname appears in the overlay, a <svg class="icon" style="width:16px;height:16px;vertical-align:text-bottom;display:inline-block" aria-hidden="true" title="Nick recognised"><use href="#i-ghost"/></svg> icon is displayed. This helps you to immediately classify statistics from nicked players correctly.
+      </div>
       <!-- Add Nick Form -->
       <div class="add-nick-form" id="addNickForm" style="display: none;">
-        <h2>Add Nick</h2>
+        <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">Neuen Nick hinzufügen</h3>
         <div class="form-row">
           <label class="form-label">
-            <span class="icon">👤</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
             <input type="text" id="nickInput" placeholder="Nick" />
           </label>
         </div>
         <div class="form-row">
           <label class="form-label">
-            <span class="icon">🎯</span>
+            <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
             <input type="text" id="realNameInput" placeholder="Name" />
           </label>
         </div>
@@ -428,7 +498,7 @@
       <div class="settings-content" data-section="basic">
         <div class="settings-section">
           <h2>
-            <span class="settings-icon">📌</span>
+            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
             Basic Settings
           </h2>
 
@@ -437,7 +507,7 @@
             
             <!-- Log File Dropdown -->
             <div class="settings-row">
-              <span class="settings-icon" style="width: 24px; text-align: center;">📄</span>
+              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
               <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
                 <label class="settings-label" style="margin: 0;">Log File</label>
                 <select id="logFileSelect" class="settings-select" style="width: 100%;">
@@ -452,7 +522,7 @@
 
             <!-- Username Input -->
             <div class="settings-row">
-              <span class="settings-icon" style="width: 24px; text-align: center;">👤</span>
+              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
               <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
                 <label class="settings-label" style="margin: 0;">Username</label>
                 <input id="usernameInput" type="text" placeholder="Your Minecraft username" class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
@@ -466,7 +536,7 @@
       <div class="settings-content" data-section="sources">
         <div class="settings-section">
           <h2>
-            <span class="settings-icon">🔗</span>
+            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
             Sources Settings
           </h2>
 
@@ -513,16 +583,15 @@
 
             <div class="source-options" id="partySourceOptions">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="width: 24px; text-align: center;">🔄</span>
+                <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span>
                 <span style="font-weight: 500;">Auto-Refresh</span>
-                <span class="premium-badge" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Premium</span>
               </div>
-              <label class="settings-checkbox" style="margin-left: 32px; opacity: 0.5;">
-                <input type="checkbox" id="partyRefreshServerChange" disabled />
+              <label class="settings-checkbox" style="margin-left: 32px;">
+                <input type="checkbox" id="partyRefreshServerChange" />
                 <span>On Server Change</span>
               </label>
-              <label class="settings-checkbox" style="margin-left: 32px; opacity: 0.5;">
-                <input type="checkbox" id="partyRefreshGameEnd" disabled />
+              <label class="settings-checkbox" style="margin-left: 32px;">
+                <input type="checkbox" id="partyRefreshGameEnd" />
                 <span>On Game End</span>
               </label>
             </div>
@@ -557,7 +626,7 @@
               
               <div style="margin-top: 12px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                  <span style="width: 24px; text-align: center;">📝</span>
+                  <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
                   <label class="settings-label" style="margin: 0;">Strings</label>
                 </div>
                 <textarea id="chatStrings" rows="3" placeholder="Enter chat strings (one per line)" class="settings-textarea" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 13px; font-family: monospace; resize: vertical;"></textarea>
@@ -572,7 +641,7 @@
       <div class="settings-content" data-section="appearance">
         <div class="settings-section">
           <h2>
-            <span class="settings-icon">🎨</span>
+            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
             Appearance Settings
           </h2>
 
@@ -598,6 +667,14 @@
             </label>
           </div>
 
+          <!-- Auto-resize overlay -->
+          <div class="settings-row">
+            <label class="settings-label">Auto-Resize Overlay</label>
+            <label style="display:flex;align-items:center;gap:8px">
+              <input id="autoResizeToggle" type="checkbox" />
+            </label>
+          </div>
+
           <!-- Background Color -->
           <div class="settings-row">
             <label class="settings-label">Background Color</label>
@@ -606,32 +683,25 @@
         </div>
       </div>
 
-      <!-- Columns Settings (wrapped as section) -->
-      <div class="settings-content active" data-section="columns">
+      <!-- Stats Settings (wrapped as section) -->
+      <div class="settings-content active" data-section="stats">
         <div class="settings-section">
           <h2>
-            <span class="settings-icon">⚙️</span>
-            Columns Settings
+            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
+            Stats Settings
           </h2>
         
-        <!-- Game Select -->
-        <div class="settings-row">
-          <label class="settings-label">Game</label>
-          <select class="settings-select" id="gameSelect">
-            <option value="bedwars">Bed Wars</option>
-          </select>
-        </div>
 
-  <!-- Columns List -->
-  <div class="columns-list" id="columnsList">
+  <!-- Stats List -->
+  <div class="stats-list" id="statsList">
           <!-- Jede Spalte als eigene Zeile -->
-          <div class="column-row" data-column="level">
-            <div class="column-drag">⋮⋮</div>
-            <label class="column-toggle">
+          <div class="stat-row" data-column="level">
+            <div class="stat-drag">⋮⋮</div>
+            <label class="stat-toggle">
               <input type="checkbox" checked data-column="level">
-              <span class="column-name">Level</span>
+              <span class="stat-name">Level</span>
             </label>
-            <button class="column-settings-btn" title="Color settings">🎨</button>
+            <button class="stat-settings-btn" title="Color settings"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></button>
           </div>
           <!-- Weitere Spalten werden per JS hinzugefügt -->
         </div>
@@ -642,7 +712,7 @@
       <div class="settings-content" data-section="keyboard">
         <div class="settings-section">
           <h2>
-            <span class="settings-icon">⌨️</span>
+            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
             Keyboard Shortcuts
           </h2>
           <div class="kb-help" style="color: var(--muted); margin-bottom: 12px;">
@@ -703,6 +773,54 @@
     const rows = document.getElementById("rows");
     const input = document.getElementById("playerInput");
     let queue = [];
+
+    // Auto-resize overlay logic (defined early so it can be called anywhere)
+    const TOPBAR_HEIGHT = 50; // topbar height
+    const MIN_HEIGHT = 220; // minimum window height
+    const DEFAULT_HEIGHT = 560; // default full height
+    let resizeTimeout = null;
+
+    function updateOverlaySize() {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const activePanel = document.querySelector('.panel.active');
+        const panelHome = document.getElementById('panel-home');
+        const sidebar = document.getElementById('sidebar');
+
+        // Get appearance settings safely
+        const appearanceSettings = JSON.parse(localStorage.getItem('appearanceSettings') || '{}');
+
+        // Only auto-resize if:
+        // 1. Feature is enabled
+        // 2. Home panel is active
+        // 3. Sidebar is closed
+        if (!appearanceSettings.autoResize || !activePanel || activePanel !== panelHome || sidebar?.classList.contains('open')) {
+          // Reset to default
+          ipcRenderer.invoke('window:setBounds', { height: DEFAULT_HEIGHT });
+          return;
+        }
+
+        // Calculate table content height
+        const table = document.getElementById('table');
+        const rowCount = table?.querySelectorAll('tbody tr').length || 0;
+        
+        if (rowCount === 0) {
+          // No players: minimal overlay
+          ipcRenderer.invoke('window:setBounds', { height: MIN_HEIGHT });
+          return;
+        }
+
+        // Calculate needed height: topbar + thead + rows + padding
+        const theadHeight = table?.querySelector('thead')?.offsetHeight || 40;
+        const rowHeight = 42; // approximate height per row
+        const padding = 30; // some breathing room
+        
+        const neededHeight = TOPBAR_HEIGHT + theadHeight + (rowCount * rowHeight) + padding;
+        const finalHeight = Math.max(MIN_HEIGHT, Math.min(neededHeight, DEFAULT_HEIGHT));
+
+        ipcRenderer.invoke('window:setBounds', { height: finalHeight });
+      }, 100); // debounce
+    }
 
   // Track currently displayed players and their sources
   // displayedPlayers: set of normalized names (lowercase of displayed name)
@@ -861,7 +979,7 @@
         `<td class="name">
           ${res.rankTag ? `<span class="rank-tag" style="color:${res.rankColor || '#ffffff'}">${res.rankTag}</span>` : ''}
           ${res.rankColor ? `<span class="player-name" style="color:${res.rankColor}">${esc(res.name)}</span>` : `${esc(res.name)}`}
-          ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(name)}">👻</span>` : ''}
+          ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(name)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
         </td>`,
         `<td class="metric">${fmt(res.ws)}</td>`,
         `<td class="metric ${getColorForValue('fkdr', res.fkdr)}">${fmt(res.fkdr)}</td>`,
@@ -894,6 +1012,7 @@
       if (row) row.remove();
       displayedPlayers.delete(key);
       playerSources.delete(key);
+      updateOverlaySize();
     }
 
     // Add/track a source for a player
@@ -935,6 +1054,7 @@
         const dn = tr.getAttribute('data-name')?.toLowerCase();
         if (dn && !playerSources.has(dn)) tr.remove();
       });
+      updateOverlaySize(); // Update window size after clearing
     }
 
     function addPlayer(name, source) {
@@ -942,7 +1062,7 @@
       addPlayerSource(name, source);
       const key = String(getRealName(name) || name).toLowerCase();
       if (!displayedPlayers.has(key)) {
-        fetchPlayerStats(name);
+        fetchPlayerStats(name).then(() => updateOverlaySize());
       }
     }
 
@@ -1191,6 +1311,7 @@
         e.stopPropagation();
         const opened = sidebar.classList.toggle('open');
         sidebar.setAttribute('aria-hidden', String(!opened));
+        updateOverlaySize(); // recalculate when sidebar opens/closes
       });
 
       // Close sidebar when clicking outside
@@ -1199,6 +1320,7 @@
         if (e.target.closest && (e.target.closest('#sidebar') || e.target.closest('#menuBtn'))) return;
         sidebar.classList.remove('open');
         sidebar.setAttribute('aria-hidden', 'true');
+        updateOverlaySize(); // recalculate
       });
 
       // Close with Escape
@@ -1206,17 +1328,11 @@
         if (e.key === 'Escape' && sidebar.classList.contains('open')) {
           sidebar.classList.remove('open');
           sidebar.setAttribute('aria-hidden', 'true');
+          updateOverlaySize(); // recalculate
         }
       });
 
-      // Nav item activation (no panel switching implemented yet)
-      document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.addEventListener('click', (ev) => {
-          document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          // Optionally: toggle content panels here based on data-panel attribute
-        });
-      });
+      // Entfernt: generische Aktivierung aller Nav-Items (führte zu Konflikten mit Sub-Items)
     }
 
     document.querySelectorAll(".grip").forEach(g => g.addEventListener("mousedown", onDown));
@@ -1228,10 +1344,12 @@
       });
       localStorage.setItem('activePanel', id);
 
-      // Update nav items
-      document.querySelectorAll('.nav-item').forEach(b => 
-        b.classList.toggle('active', b.getAttribute('data-panel') === id)
-      );
+      // Update nur Top-Level-Navigation (Home, Nicks, Settings) – keine Sub-Items
+      document.querySelectorAll('.nav > .nav-item:not(.sub-item)').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-panel') === id);
+      });
+
+      updateOverlaySize(); // recalculate when panel switches
     }
 
     // Update nav item click handler
@@ -1262,8 +1380,8 @@
     // Initial render
     renderNicks();
 
-    // Column definitions
-    const COLUMNS = {
+    // Stat column definitions
+    const STATS = {
       level: { name: 'Level', type: 'number', colorRules: true },
       name: { name: 'Name', type: 'text' },
       ws: { name: 'Win Streak', type: 'number', colorRules: true },
@@ -1274,10 +1392,10 @@
       wins: { name: 'Wins', type: 'number' }
     };
 
-    // Load/save column settings
-    let columnSettings = JSON.parse(localStorage.getItem('columnSettings') || JSON.stringify({
-      visible: Object.keys(COLUMNS),
-      order: Object.keys(COLUMNS),
+    // Load/save stat settings
+    let statSettings = JSON.parse(localStorage.getItem('statSettings') || JSON.stringify({
+      visible: Object.keys(STATS),
+      order: Object.keys(STATS),
       colorRules: {
         level: [
           { op: '>=', value: 300, color: 'good' },
@@ -1294,25 +1412,25 @@
       }
     }));
 
-    function saveColumnSettings() {
-      localStorage.setItem('columnSettings', JSON.stringify(columnSettings));
+    function saveStatSettings() {
+      localStorage.setItem('statSettings', JSON.stringify(statSettings));
       renderTable(); // Re-render main table with new settings
     }
 
-    // Render columns list in settings
-    function renderColumnsList() {
-      const list = document.getElementById('columnsList');
+    // Render stats list in settings
+    function renderStatsList() {
+      const list = document.getElementById('statsList');
       if (!list) return;
 
-      list.innerHTML = columnSettings.order.map(col => `
-        <div class="column-row" data-column="${col}">
-          <div class="column-drag">⋮⋮</div>
-          <label class="column-toggle">
-            <input type="checkbox" ${columnSettings.visible.includes(col) ? 'checked' : ''} data-column="${col}">
-            <span class="column-name">${COLUMNS[col].name}</span>
+      list.innerHTML = statSettings.order.map(col => `
+        <div class="stat-row" data-column="${col}">
+          <div class="stat-drag">⋮⋮</div>
+          <label class="stat-toggle">
+            <input type="checkbox" ${statSettings.visible.includes(col) ? 'checked' : ''} data-column="${col}">
+            <span class="stat-name">${STATS[col].name}</span>
           </label>
-          ${COLUMNS[col].colorRules ? `
-            <button class="column-settings-btn" data-column="${col}" title="Color rules">🎨</button>
+          ${STATS[col].colorRules ? `
+            <button class="stat-settings-btn" data-column="${col}" title="Color rules"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></button>
           ` : ''}
         </div>
       `).join('');
@@ -1322,15 +1440,15 @@
         cb.addEventListener('change', e => {
           const col = e.target.dataset.column;
           if (e.target.checked) {
-            columnSettings.visible.push(col);
+            statSettings.visible.push(col);
           } else {
-            columnSettings.visible = columnSettings.visible.filter(c => c !== col);
+            statSettings.visible = statSettings.visible.filter(c => c !== col);
           }
-          saveColumnSettings();
+          saveStatSettings();
         });
       });
 
-      list.querySelectorAll('.column-settings-btn').forEach(btn => {
+      list.querySelectorAll('.stat-settings-btn').forEach(btn => {
         btn.addEventListener('click', () => showColorRules(btn.dataset.column));
       });
     }
@@ -1341,11 +1459,11 @@
       const title = document.getElementById('colorRuleTitle');
       const rulesList = document.getElementById('colorRulesList');
       
-      title.textContent = COLUMNS[column].name;
+      title.textContent = STATS[column].name;
       modal.classList.add('open');
 
       function renderRules() {
-        const rules = columnSettings.colorRules[column] || [];
+        const rules = statSettings.colorRules[column] || [];
         rulesList.innerHTML = rules.map((rule, i) => `
           <div class="color-rule" data-index="${i}">
             <select class="rule-operator">
@@ -1370,24 +1488,24 @@
           const i = parseInt(rule.dataset.index);
           
           rule.querySelector('.rule-operator').addEventListener('change', e => {
-            columnSettings.colorRules[column][i].op = e.target.value;
-            saveColumnSettings();
+            statSettings.colorRules[column][i].op = e.target.value;
+            saveStatSettings();
           });
 
           rule.querySelector('.rule-value').addEventListener('change', e => {
-            columnSettings.colorRules[column][i].value = parseFloat(e.target.value);
-            saveColumnSettings();
+            statSettings.colorRules[column][i].value = parseFloat(e.target.value);
+            saveStatSettings();
           });
 
           rule.querySelector('.color-select').addEventListener('change', e => {
-            columnSettings.colorRules[column][i].color = e.target.value;
+            statSettings.colorRules[column][i].color = e.target.value;
             rule.querySelector('.color-preview').style.background = `var(--${e.target.value})`;
-            saveColumnSettings();
+            saveStatSettings();
           });
 
           rule.querySelector('.rule-delete').addEventListener('click', () => {
-            columnSettings.colorRules[column].splice(i, 1);
-            saveColumnSettings();
+            statSettings.colorRules[column].splice(i, 1);
+            saveStatSettings();
             renderRules();
           });
         });
@@ -1397,15 +1515,15 @@
 
       // Add rule button
       document.querySelector('.add-rule-btn').onclick = () => {
-        if (!columnSettings.colorRules[column]) {
-          columnSettings.colorRules[column] = [];
+        if (!statSettings.colorRules[column]) {
+          statSettings.colorRules[column] = [];
         }
-        columnSettings.colorRules[column].push({
+        statSettings.colorRules[column].push({
           op: '>=',
           value: 0,
           color: 'good'
         });
-        saveColumnSettings();
+        saveStatSettings();
         renderRules();
       };
 
@@ -1416,7 +1534,7 @@
     }
 
     // Initialize settings
-    renderColumnsList();
+    renderStatsList();
 
     // --- Keyboard Shortcuts
     const ACTIONS = [
@@ -1509,6 +1627,7 @@
       opacity: 0.78,
       fontSize: 14,
       alwaysOnTop: true,
+      autoResize: false,
       bgColor: '#14141c' // matches rgba(20,20,28,alpha)
     };
 
@@ -1542,6 +1661,7 @@
     const opacityRange = document.getElementById('opacityRange');
     const fontSizeRange = document.getElementById('fontSizeRange');
     const alwaysOnTopToggle = document.getElementById('alwaysOnTopToggle');
+    const autoResizeToggle = document.getElementById('autoResizeToggle');
     const bgColorInput = document.getElementById('bgColorInput');
 
     if (opacityRange) {
@@ -1568,6 +1688,15 @@
         appearance.alwaysOnTop = !!alwaysOnTopToggle.checked;
         saveAppearance();
         applyAppearance();
+      });
+    }
+
+    if (autoResizeToggle) {
+      autoResizeToggle.checked = !!appearance.autoResize;
+      autoResizeToggle.addEventListener('change', () => {
+        appearance.autoResize = !!autoResizeToggle.checked;
+        saveAppearance();
+        updateOverlaySize();
       });
     }
 
@@ -1787,9 +1916,9 @@
       });
     }
 
-    // Update table rendering to use column settings
+    // Update table rendering to use stat settings
     function getColorForValue(column, value) {
-      const rules = columnSettings.colorRules[column];
+      const rules = statSettings.colorRules[column];
       if (!rules) return '';
 
       for (const rule of rules) {
@@ -1808,10 +1937,14 @@
       e.stopPropagation(); // Prevent panel switch
       settingsBtn.classList.toggle('expanded');
       settingsSubmenu.classList.toggle('expanded');
-      
+      // Nach dem Aufklappen: Nur Basic als aktiv markieren
+      document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
+      const basicBtn = document.querySelector('.nav-item.sub-item[data-settings="basic"]');
+      if(basicBtn) basicBtn.classList.add('active');
+      showSettingsSection('basic');
+      localStorage.setItem('activeSettingsSection', 'basic');
       // Save state
-      localStorage.setItem('settingsExpanded', 
-        settingsBtn.classList.contains('expanded'));
+      localStorage.setItem('settingsExpanded', settingsBtn.classList.contains('expanded'));
     });
 
     // Handle settings section clicks
@@ -1819,16 +1952,12 @@
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const section = btn.getAttribute('data-settings');
-        
-        // Update active states
-        document.querySelectorAll('.nav-item.sub-item').forEach(b => 
-          b.classList.toggle('active', b === btn)
-        );
-        
-        // Show settings panel and active section
+        // Nur diese Kategorie als aktiv markieren
+        document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Show settings panel und Section
         showPanel('settings');
         showSettingsSection(section);
-        
         // Save active section
         localStorage.setItem('activeSettingsSection', section);
       });
@@ -1850,15 +1979,12 @@
     }
 
     // Restore active settings section
-    const activeSection = localStorage.getItem('activeSettingsSection') || 'columns';
-    const activeBtn = document.querySelector(
-      `.nav-item.sub-item[data-settings="${activeSection}"]`
-    );
+    const activeSection = localStorage.getItem('activeSettingsSection') || 'basic';
+    document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.querySelector(`.nav-item.sub-item[data-settings="${activeSection}"]`);
     if (activeBtn) {
       activeBtn.classList.add('active');
-      if (document.querySelector('.panel#panel-settings.active')) {
-        showSettingsSection(activeSection);
-      }
+      showSettingsSection(activeSection);
     }
   </script>
 </body>

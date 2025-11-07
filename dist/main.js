@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 require("dotenv/config");
 const chat_logger_1 = require("./chat-logger");
@@ -45,6 +46,25 @@ let nicksWin = null;
 let win = null;
 async function createWindow() {
     electron_1.app.setName('Nebula');
+    // On Windows, set an explicit AppUserModelID for proper taskbar grouping/notifications
+    try {
+        if (process.platform === 'win32')
+            electron_1.app.setAppUserModelId('Nebula');
+    }
+    catch { }
+    // Try to resolve an application icon (preferring .ico on Windows, then .png, then .svg)
+    const resolveAsset = (file) => path.resolve(__dirname, '..', 'assets', file);
+    const iconCandidates = process.platform === 'win32'
+        ? ['nebula-logo.ico', 'nebula-logo.png', 'nebula-logo.svg']
+        : ['nebula-logo.png', 'nebula-logo.svg', 'nebula-logo.ico'];
+    let iconPath;
+    for (const f of iconCandidates) {
+        const p = resolveAsset(f);
+        if (fs.existsSync(p)) {
+            iconPath = p;
+            break;
+        }
+    }
     win = new electron_1.BrowserWindow({
         width: 860,
         height: 560,
@@ -55,6 +75,7 @@ async function createWindow() {
         maximizable: false,
         alwaysOnTop: true,
         title: 'Nebula',
+        icon: iconPath,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -414,6 +435,24 @@ electron_1.ipcMain.handle('window:setAlwaysOnTop', (_e, flag) => {
     try {
         win.setAlwaysOnTop(!!flag);
         return win.isAlwaysOnTop();
+    }
+    catch {
+        return false;
+    }
+});
+// --- IPC: Set window bounds (for auto-resize)
+electron_1.ipcMain.handle('window:setBounds', (_e, bounds) => {
+    if (!win)
+        return false;
+    try {
+        const current = win.getBounds();
+        win.setBounds({
+            x: bounds.x ?? current.x,
+            y: bounds.y ?? current.y,
+            width: bounds.width ?? current.width,
+            height: bounds.height ?? current.height
+        }, false);
+        return true;
     }
     catch {
         return false;

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './chat-logger';
@@ -9,6 +10,19 @@ let win: BrowserWindow | null = null;
 
 async function createWindow() {
   app.setName('Nebula');
+  // On Windows, set an explicit AppUserModelID for proper taskbar grouping/notifications
+  try { if (process.platform === 'win32') app.setAppUserModelId('Nebula'); } catch {}
+
+  // Try to resolve an application icon (preferring .ico on Windows, then .png, then .svg)
+  const resolveAsset = (file: string) => path.resolve(__dirname, '..', 'assets', file);
+  const iconCandidates = process.platform === 'win32'
+    ? ['nebula-logo.ico', 'nebula-logo.png', 'nebula-logo.svg']
+    : ['nebula-logo.png', 'nebula-logo.svg', 'nebula-logo.ico'];
+  let iconPath: string | undefined;
+  for (const f of iconCandidates) {
+    const p = resolveAsset(f);
+    if (fs.existsSync(p)) { iconPath = p; break; }
+  }
 
   win = new BrowserWindow({
     width: 860,
@@ -20,6 +34,7 @@ async function createWindow() {
     maximizable: false,
     alwaysOnTop: true,
     title: 'Nebula',
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -413,6 +428,23 @@ ipcMain.handle('window:setAlwaysOnTop', (_e, flag: boolean) => {
   try {
     win.setAlwaysOnTop(!!flag);
     return win.isAlwaysOnTop();
+  } catch {
+    return false;
+  }
+});
+
+// --- IPC: Set window bounds (for auto-resize)
+ipcMain.handle('window:setBounds', (_e, bounds: { width?: number; height?: number; x?: number; y?: number }) => {
+  if (!win) return false;
+  try {
+    const current = win.getBounds();
+    win.setBounds({
+      x: bounds.x ?? current.x,
+      y: bounds.y ?? current.y,
+      width: bounds.width ?? current.width,
+      height: bounds.height ?? current.height
+    }, false);
+    return true;
   } catch {
     return false;
   }
