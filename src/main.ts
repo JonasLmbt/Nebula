@@ -290,57 +290,61 @@ class HypixelCache {
 
     // Determine rank/prefix and a display color
     const getRankInfo = (p: any) => {
-      // Priority: prefix (custom), then package/rank fields
-      const prefix = p?.prefix; // sometimes contains formatted prefix with § codes
+      // Precedence (Hypixel specifics): custom prefix > special rank field (rank) > monthlyPackageRank (SUPERSTAR) > newPackageRank > packageRank
+      // The previous implementation chose newPackageRank first, causing MVP++ (SUPERSTAR) and YOUTUBER to degrade to MVP+.
+      const prefix = p?.prefix; // may contain § color codes + brackets
+      const rank = p?.rank; // staff / youtube ranks live here (e.g. YOUTUBER, ADMIN)
+      const monthly = p?.monthlyPackageRank; // SUPERSTAR for MVP++
+      const newPkg = p?.newPackageRank; // MVP_PLUS etc.
+      const pkg = p?.packageRank; // legacy
       const displayname = p?.displayname;
 
       const stripColor = (s: string) => s ? s.replace(/§[0-9a-fk-or]/gi, '').trim() : s;
 
-      // If displayname itself contains a bracketed tag, prefer that (after stripping color codes)
+      // If prefix exists, prefer it entirely (extract bracketed portion if present)
+      if (prefix) {
+        const raw = stripColor(prefix);
+        const m = raw.match(/\[(.+?)\]/);
+        return { tag: m ? `[${m[1]}]` : raw, color: '#FFFFFF' };
+      }
+
+      // Displayname may itself have leading bracket tag (rare custom formatting)
       if (displayname) {
         const dn = stripColor(displayname);
         const match = dn.match(/^\s*\[(.+?)\]/);
         if (match) return { tag: `[${match[1]}]`, color: '#FFFFFF' };
       }
-      const rankField = p?.newPackageRank || p?.monthlyPackageRank || p?.packageRank || p?.rank || null;
 
-      // stripColor already defined above
-      if (prefix) {
-        const raw = stripColor(prefix);
-        // If prefix contains a bracketed tag like [MVP++], extract that
-        const m = raw.match(/\[(.+?)\]/);
-        if (m) return { tag: `[${m[1]}]`, color: '#FFFFFF' };
-        return { tag: raw, color: '#FFFFFF' };
-      }
-
-      if (!rankField) return { tag: null, color: null };
-
-      const r = String(rankField).toUpperCase();
+      // Helper mapping
       const map: Record<string, { tag: string; color: string }> = {
         VIP: { tag: '[VIP]', color: '#55FF55' },
         VIP_PLUS: { tag: '[VIP+]', color: '#55FF55' },
         MVP: { tag: '[MVP]', color: '#55FFFF' },
         MVP_PLUS: { tag: '[MVP+]', color: '#55FFFF' },
-        MVP_PLUS_PLUS: { tag: '[MVP++]', color: '#FFAA00' },
-        SUPERSTAR: { tag: '[MVP++]', color: '#FFAA00' },
-        YT: { tag: '[YOUTUBE]', color: '#FF5555' },
+        SUPERSTAR: { tag: '[MVP++]', color: '#FFAA00' }, // MVP++ monthly
+        MVP_PLUS_PLUS: { tag: '[MVP++]', color: '#FFAA00' }, // sometimes appears explicitly
         YOUTUBER: { tag: '[YOUTUBE]', color: '#FF5555' },
+        YT: { tag: '[YOUTUBE]', color: '#FF5555' },
         ADMIN: { tag: '[ADMIN]', color: '#FF5555' },
         OWNER: { tag: '[OWNER]', color: '#FF5555' },
         MOD: { tag: '[MOD]', color: '#55AAFF' },
         HELPER: { tag: '[HELPER]', color: '#55AAFF' }
       };
 
-      if (map[r]) return map[r];
+      // Evaluate rank fields by precedence
+      const candidates = [rank, monthly, newPkg, pkg].filter(Boolean).map((r: string) => String(r).toUpperCase());
+      for (const c of candidates) {
+        if (map[c]) return map[c];
+        // Pattern handling inside loop to allow early precedence
+        if (c.includes('SUPERSTAR') || c.includes('MVP_PLUS_PLUS') || c.includes('PLUS_PLUS')) return map['SUPERSTAR'];
+        if (c.includes('VIP')) return map['VIP'];
+        if (c.includes('MVP') && c.includes('PLUS')) return map['MVP_PLUS'];
+        if (c === 'MVP') return map['MVP'];
+        if (c === 'YOUTUBER' || c === 'YT') return map['YOUTUBER'];
+      }
 
-      // Handle common patterns
-      if (r.includes('VIP')) return map['VIP'];
-      if (r.includes('SUPERSTAR') || r.includes('MVP_PLUS_PLUS') || r.includes('PLUS_PLUS')) return map['MVP_PLUS_PLUS'];
-      if (r.includes('MVP') && r.includes('PLUS')) return map['MVP_PLUS'];
-      if (r.includes('MVP')) return map['MVP'];
-
-      // Fallback: present the raw rank
-      return { tag: `[${r}]`, color: '#FFFFFF' };
+      // No rank detected (NORMAL)
+      return { tag: null, color: null };
     };
 
     const rankInfo = getRankInfo(player ?? {});

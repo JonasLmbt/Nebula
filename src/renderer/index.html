@@ -53,7 +53,8 @@
   .icon-btn:hover{background:var(--row-hover);color:var(--accent)}
   /* Unified icon styling (SVG sprite via <use>) */
   .icon{width:16px;height:16px;display:block;opacity:.9}
-  .icon-btn:hover .icon{opacity:1;filter:drop-shadow(0 0 6px var(--accent-soft))}
+  /* Inline icon utility: keep SVG inline within text without breaking lines */
+  .icon-inline{display:inline-block;vertical-align:text-bottom;line-height:0}
   .nav-icon .icon{width:18px;height:18px;opacity:.85}
   .icon-btn--danger:hover{background:rgba(224,90,90,0.20);color:#ff6b6b;filter:drop-shadow(0 0 6px rgba(255,107,107,0.25))}
 
@@ -63,8 +64,9 @@
   .search input{background:transparent;border:0;outline:0;color:var(--text);width:280px;font-size:13px}
 
   /* Content / Table */
-  .content{padding:10px 12px}
-  .table-wrap{padding:8px;overflow-x:auto}
+  /* Reduced vertical padding to tighten space above table */
+  .content{padding:4px 10px 4px}
+  .table-wrap{padding:0 6px 4px;overflow-x:auto}
   table{width:100%;border-collapse:collapse;table-layout:auto;box-sizing:border-box}
   #table{font-size:var(--table-font-size,14px)}
   colgroup col.c-lvl{min-width:64px;width:auto}
@@ -75,12 +77,13 @@
   colgroup col.c-actions{min-width:50px;width:50px}
 
   thead th{
-    text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:6px 8px;cursor:pointer;
+    text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:3px 6px;cursor:pointer; /* reduced vertical padding */
     -webkit-app-region:no-drag;
   }
   th.metric-h, td.metric{ text-align:right;font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1,"lnum" 1 }
   tbody td{
-    padding:10px 8px;border-top:1px solid rgba(255,255,255,0.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    padding:2px 6px;border-top:1px solid rgba(255,255,255,0.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; /* tighter rows */
+    line-height:1.3;
   }
   tbody tr:hover{background:var(--row-hover)}
   .lvl{font-weight:600}
@@ -88,6 +91,14 @@
   .rank-tag{font-weight:700;margin-right:6px}
   .metric{text-align:right}
   .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+
+  /* sort indicators */
+  thead th[data-sort-key]{position:relative}
+  thead th.sort-asc::after, thead th.sort-desc::after{
+    content:"";display:inline-block;margin-left:6px;border:5px solid transparent;opacity:.6
+  }
+  thead th.sort-asc::after{border-bottom-color:var(--muted)}
+  thead th.sort-desc::after{border-top-color:var(--muted)}
 
   /* Row actions / menu */
   .actions{ text-align:right; position:relative; overflow:visible }
@@ -442,14 +453,14 @@
           </colgroup>
           <thead>
             <tr>
-              <th data-key="level">Lvl</th>
-              <th data-key="name">Name</th>
-              <th class="metric-h">WS</th>
-              <th class="metric-h">FKDR</th>
-              <th class="metric-h">WLR</th>
-              <th class="metric-h">BBLR</th>
-              <th class="metric-h">F. Kills</th>
-              <th class="metric-h">Wins</th>
+              <th data-sort-key="level">Lvl</th>
+              <th>Name</th>
+              <th class="metric-h" data-sort-key="ws">WS</th>
+              <th class="metric-h" data-sort-key="fkdr">FKDR</th>
+              <th class="metric-h" data-sort-key="wlr">WLR</th>
+              <th class="metric-h" data-sort-key="bblr">BBLR</th>
+              <th class="metric-h" data-sort-key="fk">F. Kills</th>
+              <th class="metric-h" data-sort-key="wins">Wins</th>
               <th></th>
             </tr>
           </thead>
@@ -464,12 +475,24 @@
         <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
         Nicks
       </h2>
-      <div class="nicks-help">
-        Create a small nickname dictionary here: assign nicknames to their real player names. If a player with a registered nickname appears in the overlay, a <svg class="icon" style="width:16px;height:16px;vertical-align:text-bottom;display:inline-block" aria-hidden="true" title="Nick recognised"><use href="#i-ghost"/></svg> icon is displayed. This helps you to immediately classify statistics from nicked players correctly.
+      <div class="nicks-help">Create a small nickname dictionary here: assign nicknames to their real player names. If a player with a registered nickname appears in the overlay, a <svg class="icon icon-inline" style="width:16px;height:16px;vertical-align:middle" aria-hidden="true" title="Nick recognised"><use href="#i-ghost"/></svg> icon is displayed. This helps you immediately classify statistics from nicked players correctly.</div>
+      <div class="nick-display-setting" style="margin:12px 0 16px;padding:10px 12px;border-radius:8px;background:var(--panel);display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">
+          <span>Overlay name display</span>
+          <select id="nickDisplayMode" style="background:rgba(0,0,0,0.25);color:var(--text);border:0;padding:6px 8px;border-radius:6px;font-size:13px">
+            <option value="nick">Nickname (real stats)</option>
+            <option value="real">Real name</option>
+          </select>
+        </label>
+        <div style="font-size:11px;color:var(--muted);line-height:1.4">
+          Choose whether to show the nick or the real name — stats always reflect the real player. The
+          <svg class="icon icon-inline" style="width:14px;height:14px" aria-hidden="true"><use href="#i-ghost"/></svg>
+          icon is always shown, and the tooltip reveals the other name.
+        </div>
       </div>
       <!-- Add Nick Form -->
       <div class="add-nick-form" id="addNickForm" style="display: none;">
-        <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">Neuen Nick hinzufügen</h3>
+        <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">Add new nick</h3>
         <div class="form-row">
           <label class="form-label">
             <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
@@ -479,7 +502,7 @@
         <div class="form-row">
           <label class="form-label">
             <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
-            <input type="text" id="realNameInput" placeholder="Name" />
+            <input type="text" id="realNameInput" placeholder="Real name" />
           </label>
         </div>
         <button class="form-submit" id="saveNickBtn">ADD</button>
@@ -775,7 +798,7 @@
     let queue = [];
 
     // Auto-resize overlay logic (defined early so it can be called anywhere)
-    const TOPBAR_HEIGHT = 50; // topbar height
+  const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
     const MIN_HEIGHT = 220; // minimum window height
     const DEFAULT_HEIGHT = 560; // default full height
     let resizeTimeout = null;
@@ -794,9 +817,16 @@
         // 1. Feature is enabled
         // 2. Home panel is active
         // 3. Sidebar is closed
-        if (!appearanceSettings.autoResize || !activePanel || activePanel !== panelHome || sidebar?.classList.contains('open')) {
-          // Reset to default
-          ipcRenderer.invoke('window:setBounds', { height: DEFAULT_HEIGHT });
+        const allowAuto = appearanceSettings.autoResize !== false; // default true
+        if (sidebar?.classList.contains('open')) {
+          // Sidebar offen: auf Default-Höhe gehen (volle Ansicht)
+            ipcRenderer.invoke('window:setBounds', { height: DEFAULT_HEIGHT });
+            return;
+        }
+        if (!allowAuto || !activePanel || activePanel !== panelHome) {
+          const table = document.getElementById('table');
+          const rc = table?.querySelectorAll('tbody tr').length || 0;
+          if (rc === 0) ipcRenderer.invoke('window:setBounds', { height: MIN_HEIGHT });
           return;
         }
 
@@ -812,11 +842,32 @@
 
         // Calculate needed height: topbar + thead + rows + padding
         const theadHeight = table?.querySelector('thead')?.offsetHeight || 40;
-        const rowHeight = 42; // approximate height per row
-        const padding = 30; // some breathing room
         
-        const neededHeight = TOPBAR_HEIGHT + theadHeight + (rowCount * rowHeight) + padding;
-        const finalHeight = Math.max(MIN_HEIGHT, Math.min(neededHeight, DEFAULT_HEIGHT));
+        // Get actual row height from first row, or estimate based on font size
+        let rowHeight = 24; // base minimum
+        const firstRow = table?.querySelector('tbody tr');
+        if (firstRow) {
+          rowHeight = firstRow.offsetHeight;
+        } else {
+          // Estimate: font size + padding (4px top + 4px bottom) + line-height
+          const fontSize = appearanceSettings.fontSize || 14;
+          rowHeight = Math.ceil(fontSize * 1.4) + 8; // line-height 1.4 + 8px padding
+        }
+        
+  const padding = 8; // minimal breathing room
+
+  // Dynamic measurements
+  const topbarEl = document.querySelector('.topbar');
+  const topbarHeight = topbarEl?.offsetHeight || TOPBAR_HEIGHT;
+  const contentEl = document.querySelector('.content');
+  const wrapEl = document.querySelector('.table-wrap');
+  const contentPadTop = contentEl ? parseInt(getComputedStyle(contentEl).paddingTop) || 0 : 0;
+  const wrapPadTop = wrapEl ? parseInt(getComputedStyle(wrapEl).paddingTop) || 0 : 0;
+
+  // Total needed height: topbar + content top padding + table-wrap top padding + header + rows + padding
+  const extra = 12; // small extra slack below table
+  const neededHeight = topbarHeight + contentPadTop + wrapPadTop + theadHeight + (rowCount * rowHeight) + padding + extra;
+  const finalHeight = Math.min(neededHeight, DEFAULT_HEIGHT);
 
         ipcRenderer.invoke('window:setBounds', { height: finalHeight });
       }, 100); // debounce
@@ -824,10 +875,83 @@
 
   // Track currently displayed players and their sources
   // displayedPlayers: set of normalized names (lowercase of displayed name)
+
   const displayedPlayers = new Set();
+  const nickedPlayers = new Set(); // tracks players originally added via nick
   // playerSources: map normalized name -> set of sources ('username'|'manual'|'party'|'who'|'chat')
   const playerSources = new Map();
-    console.log('displayedPlayers initialized:', displayedPlayers);
+  // Cache for all loaded player objects (keyed by normalized name)
+  let playerCache = {};
+  console.log('displayedPlayers initialized:', displayedPlayers);
+  const originalNicks = {}; // realName(lower) -> originally eingegebener Nick
+  let nickDisplayMode = localStorage.getItem('nickDisplayMode') || 'nick';
+
+  // Sorting state
+  let sortKey = null; // 'level' | 'ws' | 'fkdr' | 'wlr' | 'bblr' | 'fk' | 'wins'
+  let sortDir = 'asc'; // 'asc' | 'desc'
+
+  function getNumeric(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  function getSortValue(player, key) {
+    switch (key) {
+      case 'level': {
+        if (player?.level != null) return getNumeric(player.level);
+        const exp = player?.stats?.Bedwars?.Experience ?? player?.experience;
+        return exp != null ? Math.floor(getBedWarsLevel(Number(exp))) : 0;
+      }
+      case 'ws': return getNumeric(player?.ws ?? 0);
+      case 'fkdr': return getNumeric(player?.fkdr ?? 0);
+      case 'wlr': return getNumeric(player?.wlr ?? 0);
+      case 'bblr': return getNumeric(player?.bblr ?? 0);
+      case 'fk': return getNumeric(player?.fk ?? 0);
+      case 'wins': return getNumeric(player?.wins ?? 0);
+      default: return 0;
+    }
+  }
+
+  // Insert row for this player (used by both fetchPlayerStats and renderTable)
+  function renderPlayerRow(player, wasNick) {
+    console.log('[DEBUG] renderPlayerRow', player?.name, player);
+    const levelHTML = updatePlayerLevel(player);
+    const realName = player.name;
+    const originalNick = originalNicks[realName.toLowerCase()] || getNickFromReal(realName);
+    const hasNick = !!originalNick;
+    const showNick = hasNick && nickDisplayMode === 'nick';
+    const displayName = showNick ? originalNick : realName;
+    const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
+    const orderedCells = [
+      `<td class="lvl">${levelHTML}</td>`,
+      `<td class="name">
+        ${(() => {
+          // When showing a nickname, only show [NICK] (suppress original rank tag).
+          if (showNick) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
+          return player.rankTag ? `<span class="rank-tag" style="color:${player.rankColor || '#ffffff'}">${player.rankTag}</span>` : '';
+        })()}
+        ${showNick ? `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>` : (player.rankColor ? `<span class="player-name" style="color:${player.rankColor}">${esc(displayName)}</span>` : `${esc(displayName)}`)}
+        ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
+      </td>`,
+      `<td class="metric">${fmt(player.ws)}</td>`,
+      `<td class="metric ${getColorForValue('fkdr', player.fkdr)}">${fmt(player.fkdr)}</td>`,
+      `<td class="metric ${getColorForValue('wlr', player.wlr)}">${fmt(player.wlr)}</td>`,
+      `<td class="metric ${getColorForValue('bblr', player.bblr)}">${fmt(player.bblr)}</td>`,
+      `<td class="metric">${fmt(player.fk)}</td>`,
+      `<td class="metric">${fmt(player.wins)}</td>`
+    ].join('');
+    rows.insertAdjacentHTML("beforeend", `
+      <tr data-name="${escAttr(player.name)}">
+        ${orderedCells}
+        <td class="actions">
+          <button class="icon-btn row-menu-btn">⋮</button>
+          <div class="menu">
+            <button class="remove-btn">Remove</button>
+          </div>
+        </td>
+      </tr>
+    `);
+  }
 
     // Hypixel color constants (used for level/star coloring)
     const HypixelColors = {
@@ -953,6 +1077,7 @@
 
     // Fetch stats for a single player and update UI
     async function fetchPlayerStats(name) {
+      console.log('[DEBUG] fetchPlayerStats called for', name);
       // Normalize by real name to reduce duplicates
       const realName = getRealName(name);
       const key = realName.toLowerCase();
@@ -960,46 +1085,21 @@
       const wasNick = isNick(name);
       
       const res = await ipcRenderer.invoke("bedwars:stats", realName);
+
       if (res.error) {
-        console.error('Stats error for', realName, ':', res.error);
+        console.error('[DEBUG] Stats error for', realName, ':', res.error);
         return;
       }
 
   console.log('Received stats for', realName, ':', res);
 
-  displayedPlayers.add(String(res.name || realName).toLowerCase());
+  const normName = String(res.name || realName).toLowerCase();
+  displayedPlayers.add(normName);
+  playerCache[normName] = res;
+  if (wasNick) { nickedPlayers.add(normName); originalNicks[res.name.toLowerCase()] = name; } else nickedPlayers.delete(normName);
       
-      // Generate level HTML
-      const levelHTML = updatePlayerLevel(res);
-      console.log('Level HTML:', levelHTML);
-      
-      // Use the same ordered cells logic as before
-      const orderedCells = [
-        `<td class="lvl">${levelHTML}</td>`,
-        `<td class="name">
-          ${res.rankTag ? `<span class="rank-tag" style="color:${res.rankColor || '#ffffff'}">${res.rankTag}</span>` : ''}
-          ${res.rankColor ? `<span class="player-name" style="color:${res.rankColor}">${esc(res.name)}</span>` : `${esc(res.name)}`}
-          ${wasNick ? `<span class="nick-indicator" title="Nick: ${esc(name)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
-        </td>`,
-        `<td class="metric">${fmt(res.ws)}</td>`,
-        `<td class="metric ${getColorForValue('fkdr', res.fkdr)}">${fmt(res.fkdr)}</td>`,
-        `<td class="metric ${getColorForValue('wlr', res.wlr)}">${fmt(res.wlr)}</td>`,
-        `<td class="metric ${getColorForValue('bblr', res.bblr)}">${fmt(res.bblr)}</td>`,
-        `<td class="metric">${fmt(res.fk)}</td>`,
-        `<td class="metric">${fmt(res.wins)}</td>`
-      ].join('');
-
-      rows.insertAdjacentHTML("beforeend", `
-        <tr data-name="${escAttr(res.name)}">
-          ${orderedCells}
-          <td class="actions">
-            <button class="icon-btn row-menu-btn">⋮</button>
-            <div class="menu">
-              <button class="remove-btn">Remove</button>
-            </div>
-          </td>
-        </tr>
-      `);
+      // After caching stats simply re-render table (row rendering centralised there)
+      renderTable();
 
       // Rebind menu events for the new row
       bindMenus();
@@ -1012,6 +1112,8 @@
       if (row) row.remove();
       displayedPlayers.delete(key);
       playerSources.delete(key);
+  nickedPlayers.delete(key);
+      delete originalNicks[key];
       updateOverlaySize();
     }
 
@@ -1032,6 +1134,7 @@
         removePlayer(name);
       } else {
         playerSources.set(key, set);
+        updateOverlaySize();
       }
     }
 
@@ -1048,6 +1151,8 @@
         if (tr) tr.remove();
         displayedPlayers.delete(key);
         playerSources.delete(key);
+  nickedPlayers.delete(key);
+    delete originalNicks[key];
       }
       // Clean any stray rows
       rows.querySelectorAll('tr[data-name]').forEach(tr => {
@@ -1062,7 +1167,10 @@
       addPlayerSource(name, source);
       const key = String(getRealName(name) || name).toLowerCase();
       if (!displayedPlayers.has(key)) {
-        fetchPlayerStats(name).then(() => updateOverlaySize());
+        fetchPlayerStats(name).then(() => {
+          updateOverlaySize();
+          renderTable();
+        });
       }
     }
 
@@ -1122,6 +1230,10 @@
       const nick = nicks.find(n => n.nick.toLowerCase() === name.toLowerCase());
       return nick ? nick.real : name;
     }
+    function getNickFromReal(realName) {
+      const entry = nicks.find(n => n.real.toLowerCase() === realName.toLowerCase());
+      return entry ? entry.nick : undefined;
+    }
 
     function isNick(name) {
       return nicks.some(n => n.nick.toLowerCase() === name.toLowerCase());
@@ -1147,6 +1259,7 @@
           nicks = nicks.filter(n => n.nick !== nick);
           saveNicks();
           renderNicks();
+          renderTable();
         });
       });
     }
@@ -1157,6 +1270,15 @@
     const nickInput = document.getElementById('nickInput');
     const realNameInput = document.getElementById('realNameInput');
     const saveNickBtn = document.getElementById('saveNickBtn');
+    const nickDisplayModeSelect = document.getElementById('nickDisplayMode');
+    if (nickDisplayModeSelect) {
+      nickDisplayModeSelect.value = nickDisplayMode;
+      nickDisplayModeSelect.addEventListener('change', () => {
+        nickDisplayMode = nickDisplayModeSelect.value;
+        localStorage.setItem('nickDisplayMode', nickDisplayMode);
+        renderTable();
+      });
+    }
 
     // Show/hide form when + button is clicked
     addNickBtn?.addEventListener('click', () => {
@@ -1174,6 +1296,7 @@
           nicks.push({nick, real});
           saveNicks();
           renderNicks();
+          renderTable();
           
           // Reset form
           nickInput.value = '';
@@ -1267,6 +1390,7 @@
     document.getElementById("clearAll").addEventListener("click", () => {
       queue = [];
       clearAllButUsername();
+      updateOverlaySize();
     });
 
     document.getElementById("refresh").addEventListener("click", fetchAll);
@@ -1363,6 +1487,26 @@
     // Immer mit Home starten
     showPanel('home');
 
+    // Sorting header click handling
+    (function initSorting(){
+      const thead = document.querySelector('#table thead');
+      if (!thead) return;
+      thead.addEventListener('click', (e) => {
+        const th = e.target.closest('th');
+        if (!th || !th.dataset.sortKey) return;
+        const key = th.dataset.sortKey;
+        if (sortKey === key) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortKey = key; sortDir = 'asc';
+        }
+        // visual state
+        document.querySelectorAll('#table thead th').forEach(h => h.classList.remove('sort-asc','sort-desc'));
+        th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+        renderTable();
+      });
+    })();
+
     // Add new nick
     document.getElementById('addNickBtn')?.addEventListener('click', () => {
       const nick = prompt('Enter nick:');
@@ -1374,6 +1518,7 @@
         nicks.push({nick, real});
         saveNicks();
         renderNicks();
+        renderTable();
       }
     });
 
@@ -1415,6 +1560,37 @@
     function saveStatSettings() {
       localStorage.setItem('statSettings', JSON.stringify(statSettings));
       renderTable(); // Re-render main table with new settings
+    }
+
+    // Rebuild the entire table from cache (used when stat settings change)
+    function renderTable() {
+      console.log('[DEBUG] renderTable called. displayedPlayers:', Array.from(displayedPlayers));
+      rows.innerHTML = '';
+
+      // Collect current players with their normalized names
+      let entries = Array.from(displayedPlayers)
+        .map(n => [n, playerCache[n]])
+        .filter(([, p]) => Boolean(p));
+
+      // Apply sorting if requested
+      if (sortKey) {
+        const dir = sortDir === 'asc' ? 1 : -1;
+        entries.sort(([, a], [, b]) => {
+          const va = getSortValue(a, sortKey);
+          const vb = getSortValue(b, sortKey);
+          const na = Number.isFinite(va) ? va : -Infinity; // missing values last
+          const nb = Number.isFinite(vb) ? vb : -Infinity;
+          return dir * (na - nb);
+        });
+      }
+
+      // Render rows
+      for (const [normName, player] of entries) {
+        const wasNick = typeof nickedPlayers !== 'undefined' && nickedPlayers.has(normName);
+        renderPlayerRow(player, wasNick);
+      }
+      bindMenus();
+      updateOverlaySize(); // adjust window height after table changes
     }
 
     // Render stats list in settings
@@ -1769,6 +1945,7 @@
       updateSidebarUsername();
       if (basicSettings.username && basicSettings.username.trim()) {
         addPlayer(basicSettings.username.trim(), 'username');
+        renderTable();
       }
 
     // --- Sources Settings
@@ -1934,17 +2111,21 @@
 
     // Toggle submenu when settings is clicked
     settingsBtn?.addEventListener('click', (e) => {
-      e.stopPropagation(); // Prevent panel switch
-      settingsBtn.classList.toggle('expanded');
-      settingsSubmenu.classList.toggle('expanded');
-      // Nach dem Aufklappen: Nur Basic als aktiv markieren
+      // We still stop propagation so the generic listener does not fire twice,
+      // but we explicitly invoke the panel switch here to ensure the Settings panel becomes visible.
+      e.stopPropagation();
+      const expanded = settingsBtn.classList.toggle('expanded');
+      settingsSubmenu.classList.toggle('expanded', expanded);
+      // Activate Settings top-level panel
+      showPanel('settings');
+      // Mark only Basic subsection active initially when expanding
       document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
       const basicBtn = document.querySelector('.nav-item.sub-item[data-settings="basic"]');
-      if(basicBtn) basicBtn.classList.add('active');
+      if (basicBtn) basicBtn.classList.add('active');
       showSettingsSection('basic');
       localStorage.setItem('activeSettingsSection', 'basic');
-      // Save state
-      localStorage.setItem('settingsExpanded', settingsBtn.classList.contains('expanded'));
+      // Persist expanded state
+      localStorage.setItem('settingsExpanded', expanded);
     });
 
     // Handle settings section clicks
