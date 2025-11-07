@@ -200,6 +200,20 @@
   .stat-settings-btn{background:transparent;border:0;color:var(--text);opacity:.7;cursor:pointer;padding:4px 8px;border-radius:4px}
   .stat-settings-btn:hover{opacity:1;background:rgba(255,255,255,0.05)}
 
+  /* Dynamic stat layout editor */
+  .layout-editor{margin-top:16px;padding:14px;background:var(--panel);border-radius:12px;display:flex;flex-direction:column;gap:14px}
+  .layout-editor h3{margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .layout-palette{display:flex;flex-wrap:wrap;gap:8px}
+  .stat-pill{padding:6px 10px;background:rgba(255,255,255,0.07);border-radius:24px;font-size:12px;font-weight:500;cursor:grab;user-select:none;display:flex;align-items:center;gap:6px;position:relative}
+  .stat-pill[data-used="1"]{opacity:.35;filter:grayscale(60%);cursor:not-allowed}
+  .layout-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+  .slot{background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.14);border-radius:10px;min-height:46px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);position:relative;padding:4px;transition:.15s}
+  .slot.filled{border-style:solid;color:var(--text);font-weight:500}
+  .slot.drag-over{outline:2px solid var(--accent);outline-offset:2px}
+  .slot .slot-remove{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.4);border:0;color:var(--muted);width:20px;height:20px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+  .slot .slot-remove:hover{color:#fff;background:rgba(0,0,0,0.65)}
+  .layout-help{font-size:11px;color:var(--muted);line-height:1.4}
+
   /* Modal / Color rules */
   .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9000}
   .modal.open{display:flex;align-items:center;justify-content:center}
@@ -728,6 +742,12 @@
           </div>
           <!-- Weitere Spalten werden per JS hinzugefügt -->
         </div>
+        <div class="layout-editor" id="statLayoutEditor">
+          <h3><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg> Overlay Columns</h3>
+          <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning.</div>
+          <div class="layout-palette" id="layoutPalette"></div>
+          <div class="layout-slots" id="layoutSlots"></div>
+        </div>
         </div>
       </div>
 
@@ -913,7 +933,7 @@
   }
 
   // Insert row for this player (used by both fetchPlayerStats and renderTable)
-  function renderPlayerRow(player, wasNick) {
+  function renderPlayerRow(player, wasNick, dynamicStats) {
     console.log('[DEBUG] renderPlayerRow', player?.name, player);
     const levelHTML = updatePlayerLevel(player);
     const realName = player.name;
@@ -922,23 +942,24 @@
     const showNick = hasNick && nickDisplayMode === 'nick';
     const displayName = showNick ? originalNick : realName;
     const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
+    const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
+    const dynamicCells = selectedStats.map(key => {
+      if (key === 'level' || key === 'name') return '';
+      const val = player[key];
+      const colorClass = getColorForValue(key, typeof val === 'number' ? val : Number(val));
+      return `<td class="metric ${colorClass}">${fmt(val)}</td>`;
+    }).join('');
     const orderedCells = [
       `<td class="lvl">${levelHTML}</td>`,
       `<td class="name">
         ${(() => {
-          // When showing a nickname, only show [NICK] (suppress original rank tag).
           if (showNick) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
           return player.rankTag ? `<span class="rank-tag" style="color:${player.rankColor || '#ffffff'}">${player.rankTag}</span>` : '';
         })()}
         ${showNick ? `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>` : (player.rankColor ? `<span class="player-name" style="color:${player.rankColor}">${esc(displayName)}</span>` : `${esc(displayName)}`)}
         ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
       </td>`,
-      `<td class="metric">${fmt(player.ws)}</td>`,
-      `<td class="metric ${getColorForValue('fkdr', player.fkdr)}">${fmt(player.fkdr)}</td>`,
-      `<td class="metric ${getColorForValue('wlr', player.wlr)}">${fmt(player.wlr)}</td>`,
-      `<td class="metric ${getColorForValue('bblr', player.bblr)}">${fmt(player.bblr)}</td>`,
-      `<td class="metric">${fmt(player.fk)}</td>`,
-      `<td class="metric">${fmt(player.wins)}</td>`
+      dynamicCells
     ].join('');
     rows.insertAdjacentHTML("beforeend", `
       <tr data-name="${escAttr(player.name)}">
@@ -1533,64 +1554,89 @@
       fkdr: { name: 'Final K/D Ratio', type: 'number', colorRules: true },
       wlr: { name: 'Win/Loss Ratio', type: 'number', colorRules: true },
       bblr: { name: 'Bed Break/Loss Ratio', type: 'number', colorRules: true },
-      fk: { name: 'Final Kills', type: 'number' },
-      wins: { name: 'Wins', type: 'number' }
+      fk: { name: 'Final Kills', type: 'number', colorRules: true },
+      wins: { name: 'Wins', type: 'number', colorRules: true }
     };
 
     // Load/save stat settings
     let statSettings = JSON.parse(localStorage.getItem('statSettings') || JSON.stringify({
       visible: Object.keys(STATS),
       order: Object.keys(STATS),
+      layout: ['ws','fkdr','wlr','bblr','fk','wins',null,null,null,null],
       colorRules: {
         level: [
           { op: '>=', value: 300, color: 'good' },
           { op: '>=', value: 100, color: 'warn' }
         ],
         fkdr: [
-          { op: '>=', value: 3, color: 'bad' },
-          { op: '>=', value: 1, color: 'warn' }
+          { op: '>=', value: 5, color: 'bad' },
+          { op: '>=', value: 3, color: 'warn' }
         ],
         wlr: [
-          { op: '>=', value: 3, color: 'bad' },
-          { op: '>=', value: 1, color: 'warn' }
+          { op: '>=', value: 5, color: 'bad' },
+          { op: '>=', value: 3, color: 'warn' }
+        ],
+        ws: [
+          { op: '>=', value: 100, color: 'bad' },
+          { op: '>=', value: 50, color: 'warn' }
         ]
       }
     }));
+    if (!Array.isArray(statSettings.layout)) {
+      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins',null,null,null,null];
+    }
 
     function saveStatSettings() {
       localStorage.setItem('statSettings', JSON.stringify(statSettings));
-      renderTable(); // Re-render main table with new settings
+      renderTable();
+      renderStatLayoutSlots();
+      renderStatLayoutPalette();
     }
 
     // Rebuild the entire table from cache (used when stat settings change)
     function renderTable() {
+      const table = document.getElementById('table');
+      if (!table) return;
       console.log('[DEBUG] renderTable called. displayedPlayers:', Array.from(displayedPlayers));
-      rows.innerHTML = '';
-
-      // Collect current players with their normalized names
-      let entries = Array.from(displayedPlayers)
-        .map(n => [n, playerCache[n]])
-        .filter(([, p]) => Boolean(p));
-
-      // Apply sorting if requested
+      const dynamicStats = statSettings.layout.filter(k => k && statSettings.visible.includes(k));
+      const colgroup = table.querySelector('colgroup');
+      const thead = table.querySelector('thead');
+      if (colgroup) {
+        colgroup.innerHTML = ['c-lvl','c-name', ...dynamicStats.map(s => 'c-'+s), 'c-actions']
+          .map(cls => `<col class="${cls}">`).join('');
+      }
+      if (thead) {
+        thead.innerHTML = `<tr>
+          <th data-sort-key="level">Lvl</th>
+          <th>Name</th>
+          ${dynamicStats.map(s => {
+            const stat = STATS[s];
+            const sortable = stat.type === 'number';
+            return `<th class="metric-h" ${sortable ? `data-sort-key="${s}"` : ''}>${stat.name}</th>`;
+          }).join('')}
+          <th></th>
+        </tr>`;
+      }
+      const tbody = document.getElementById('rows');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      let entries = Array.from(displayedPlayers).map(n => [n, playerCache[n]]).filter(([,p]) => Boolean(p));
       if (sortKey) {
         const dir = sortDir === 'asc' ? 1 : -1;
         entries.sort(([, a], [, b]) => {
           const va = getSortValue(a, sortKey);
           const vb = getSortValue(b, sortKey);
-          const na = Number.isFinite(va) ? va : -Infinity; // missing values last
+          const na = Number.isFinite(va) ? va : -Infinity;
           const nb = Number.isFinite(vb) ? vb : -Infinity;
           return dir * (na - nb);
         });
       }
-
-      // Render rows
       for (const [normName, player] of entries) {
         const wasNick = typeof nickedPlayers !== 'undefined' && nickedPlayers.has(normName);
-        renderPlayerRow(player, wasNick);
+        renderPlayerRow(player, wasNick, dynamicStats);
       }
       bindMenus();
-      updateOverlaySize(); // adjust window height after table changes
+      updateOverlaySize();
     }
 
     // Render stats list in settings
@@ -1627,6 +1673,8 @@
       list.querySelectorAll('.stat-settings-btn').forEach(btn => {
         btn.addEventListener('click', () => showColorRules(btn.dataset.column));
       });
+      renderStatLayoutPalette();
+      renderStatLayoutSlots();
     }
 
     // Color rules modal
@@ -1711,6 +1759,59 @@
 
     // Initialize settings
     renderStatsList();
+    renderStatLayoutPalette();
+    renderStatLayoutSlots();
+
+    // --- Layout Editor Functions ---
+    function renderStatLayoutPalette() {
+      const palette = document.getElementById('layoutPalette');
+      if (!palette) return;
+      const used = new Set(statSettings.layout.filter(Boolean));
+      const stats = Object.keys(STATS).filter(k => !['level','name'].includes(k));
+      palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].name}</div>`).join('');
+      palette.querySelectorAll('.stat-pill[draggable="true"]').forEach(pill => {
+        pill.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/stat', pill.dataset.stat);
+        });
+      });
+    }
+    function renderStatLayoutSlots() {
+      const slotsEl = document.getElementById('layoutSlots');
+      if (!slotsEl) return;
+      const layout = statSettings.layout;
+      slotsEl.innerHTML = layout.map((stat, i) => {
+        if (!stat) return `<div class="slot" data-slot="${i}" data-empty="1">Empty</div>`;
+        return `<div class="slot filled" data-slot="${i}" data-stat="${stat}">${STATS[stat]?.name || stat}<button class="slot-remove" title="Remove">×</button></div>`;
+      }).join('');
+      slotsEl.querySelectorAll('.slot').forEach(slot => {
+        slot.addEventListener('dragover', e => {
+          e.preventDefault();
+          slot.classList.add('drag-over');
+        });
+        slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+        slot.addEventListener('drop', e => {
+          e.preventDefault();
+          slot.classList.remove('drag-over');
+          const stat = e.dataTransfer.getData('text/stat');
+          if (!stat) return;
+          // Remove existing occurrence
+          const idxExisting = statSettings.layout.indexOf(stat);
+          if (idxExisting !== -1) statSettings.layout[idxExisting] = null;
+          // Put into this slot
+          const idx = parseInt(slot.dataset.slot);
+          statSettings.layout[idx] = stat;
+          saveStatSettings();
+        });
+        const removeBtn = slot.querySelector('.slot-remove');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', () => {
+            const idx = parseInt(slot.dataset.slot);
+            statSettings.layout[idx] = null;
+            saveStatSettings();
+          });
+        }
+      });
+    }
 
     // --- Keyboard Shortcuts
     const ACTIONS = [
