@@ -3451,48 +3451,27 @@
     // ==========================================
 
     // ==========================================
-    // Firebase Cloud Sync
+    // Firebase Cloud Sync (via Main Process)
     // ==========================================
 
-    // Import Firebase (using require for Electron compatibility)
-    let firebase, firestore, initializeApp, getFirestore, doc, setDoc, getDoc, serverTimestamp;
+    // Firebase is now handled in main process to avoid CSP issues
+    let firebaseInitialized = false;
     
-    try {
-      const firebaseApp = require('firebase/app');
-      const firestoreModule = require('firebase/firestore');
-      
-      initializeApp = firebaseApp.initializeApp;
-      getFirestore = firestoreModule.getFirestore;
-      doc = firestoreModule.doc;
-      setDoc = firestoreModule.setDoc;
-      getDoc = firestoreModule.getDoc;
-      serverTimestamp = firestoreModule.serverTimestamp;
-      
-      // Initialize Firebase with environment variables
-      const firebaseConfig = {
-        apiKey: process.env.FIREBASE_API_KEY,
-        authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.FIREBASE_APP_ID
-      };
-      
-      firebase = initializeApp(firebaseConfig);
-      firestore = getFirestore(firebase);
-      
-      console.log('[Firebase] Initialized successfully');
-    } catch (error) {
-      console.error('[Firebase] Failed to initialize:', error);
-      firestore = null;
+    // Check if Firebase is available
+    async function checkFirebase() {
+      try {
+        const config = await ipcRenderer.invoke('firebase:getConfig');
+        firebaseInitialized = !!config.apiKey;
+        console.log('[Firebase] Available:', firebaseInitialized);
+        return firebaseInitialized;
+      } catch (error) {
+        console.error('[Firebase] Check failed:', error);
+        return false;
+      }
     }
 
-    // Cloud Sync Functions
+    // Cloud Sync Functions (now using IPC)
     async function uploadUserSettings(userId) {
-      if (!firestore) {
-        throw new Error('Firebase not initialized');
-      }
-      
       try {
         // Collect all local settings
         const settings = {
@@ -3505,13 +3484,12 @@
           nickDisplayMode: localStorage.getItem('nickDisplayMode') || 'nick',
         };
         
-        // Upload to Firestore
-        const userDocRef = doc(firestore, 'users', userId);
-        await setDoc(userDocRef, {
-          settings,
-          updatedAt: serverTimestamp(),
-          version: '1.0.0'
-        });
+        // Upload via main process
+        const result = await ipcRenderer.invoke('firebase:upload', userId, settings);
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
         
         // Update local sync timestamp
         localStorage.setItem('lastSyncTime', Date.now().toString());
@@ -3525,21 +3503,19 @@
     }
 
     async function downloadUserSettings(userId) {
-      if (!firestore) {
-        throw new Error('Firebase not initialized');
-      }
-      
       try {
-        const userDocRef = doc(firestore, 'users', userId);
-        const docSnap = await getDoc(userDocRef);
+        const result = await ipcRenderer.invoke('firebase:download', userId);
         
-        if (!docSnap.exists()) {
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        if (!result.data) {
           console.log('[Firebase] No cloud settings found');
           return { success: true, data: null };
         }
         
-        const data = docSnap.data();
-        const settings = data.settings;
+        const settings = result.data;
         
         // Apply settings to localStorage
         if (settings.nicks) localStorage.setItem('nicks', JSON.stringify(settings.nicks));
@@ -3554,7 +3530,7 @@
         localStorage.setItem('lastSyncTime', Date.now().toString());
         
         console.log('[Firebase] Settings downloaded successfully');
-        return { success: true, data: settings, timestamp: data.updatedAt };
+        return { success: true, data: settings, timestamp: result.timestamp };
       } catch (error) {
         console.error('[Firebase] Download failed:', error);
         throw error;
@@ -3578,18 +3554,20 @@
           return result;
         } else {
           // Auto: Check which is newer
-          const userDocRef = doc(firestore, 'users', userId);
-          const docSnap = await getDoc(userDocRef);
+          const downloadResult = await ipcRenderer.invoke('firebase:download', userId);
+          
+          if (downloadResult.error) {
+            throw new Error(downloadResult.error);
+          }
           
           const lastLocalSync = parseInt(localStorage.getItem('lastSyncTime') || '0');
           
-          if (!docSnap.exists()) {
+          if (!downloadResult.data) {
             // No cloud data, upload local
             return await uploadUserSettings(userId);
           }
           
-          const cloudData = docSnap.data();
-          const cloudTimestamp = cloudData.updatedAt ? cloudData.updatedAt.toMillis() : 0;
+          const cloudTimestamp = downloadResult.timestamp || 0;
           
           if (cloudTimestamp > lastLocalSync) {
             // Cloud is newer, download
@@ -3868,6 +3846,11 @@
           return;
         }
 
+        if (!firebaseInitialized) {
+          showNotification('Firebase not configured. Please check your .env settings.');
+          return;
+        }
+
         try {
           syncNowBtn.disabled = true;
           syncNowBtn.textContent = 'Syncing...';
@@ -3916,22 +3899,30 @@
       }
     }
 
-    // Initialize profile UI on load
-    updateProfileUI();
-    checkAndRefreshToken();
-    
-    // Auto-Sync: Check for cloud updates every 5 minutes
-    setInterval(async () => {
-      if (userProfile && firestore) {
-        try {
-          console.log('[Firebase] Auto-sync check...');
-          await syncUserSettings(userProfile.id, 'auto');
-        } catch (error) {
-          console.warn('[Firebase] Auto-sync failed:', error);
-          // Don't show notification for background sync failures
-        }
+    // Initialize Firebase and profile UI on load
+    async function initialize() {
+      const firebaseReady = await checkFirebase();
+      updateProfileUI();
+      checkAndRefreshToken();
+      
+      // Only start auto-sync if Firebase is ready
+      if (firebaseReady) {
+        setInterval(async () => {
+          if (userProfile && firebaseInitialized) {
+            try {
+              console.log('[Firebase] Auto-sync check...');
+              await syncUserSettings(userProfile.id, 'auto');
+            } catch (error) {
+              console.warn('[Firebase] Auto-sync failed:', error);
+              // Don't show notification for background sync failures
+            }
+          }
+        }, 5 * 60 * 1000); // 5 minutes
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }
+    
+    // Start initialization
+    initialize();
   </script>
 </body>
 </html>

@@ -769,3 +769,105 @@ ipcMain.handle('auth:discord:refresh', async (_e, refreshToken: string) => {
     return { error: String(err) };
   }
 });
+
+// Get Firebase configuration for renderer process
+ipcMain.handle('firebase:getConfig', async () => {
+  return {
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID
+  };
+});
+
+// Initialize Firebase in main process
+let firebaseApp: any = null;
+let firestore: any = null;
+
+async function initFirebaseMain() {
+  if (firebaseApp) return true; // Already initialized
+  
+  try {
+    const { initializeApp } = require('firebase/app');
+    const { getFirestore, doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
+    
+    const firebaseConfig = {
+      apiKey: process.env.FIREBASE_API_KEY,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.FIREBASE_APP_ID
+    };
+    
+    if (!firebaseConfig.apiKey) {
+      console.error('[Firebase Main] No API key found');
+      return false;
+    }
+    
+    firebaseApp = initializeApp(firebaseConfig);
+    firestore = getFirestore(firebaseApp);
+    
+    console.log('[Firebase Main] Initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('[Firebase Main] Initialization failed:', error);
+    return false;
+  }
+}
+
+// Firebase Cloud Sync Handlers
+ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
+  if (!await initFirebaseMain()) {
+    return { error: 'Firebase not initialized' };
+  }
+  
+  try {
+    const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
+    
+    const userDocRef = doc(firestore, 'users', userId);
+    await setDoc(userDocRef, {
+      settings,
+      updatedAt: serverTimestamp(),
+      version: '1.0.0'
+    });
+    
+    console.log('[Firebase Main] Settings uploaded for user:', userId);
+    return { success: true };
+  } catch (error) {
+    console.error('[Firebase Main] Upload failed:', error);
+    return { error: String(error) };
+  }
+});
+
+ipcMain.handle('firebase:download', async (_e, userId: string) => {
+  if (!await initFirebaseMain()) {
+    return { error: 'Firebase not initialized' };
+  }
+  
+  try {
+    const { doc, getDoc } = require('firebase/firestore');
+    
+    const userDocRef = doc(firestore, 'users', userId);
+    const docSnap = await getDoc(userDocRef);
+    
+    if (!docSnap.exists()) {
+      return { success: true, data: null };
+    }
+    
+    const data = docSnap.data();
+    const timestamp = data.updatedAt ? data.updatedAt.toMillis() : 0;
+    
+    console.log('[Firebase Main] Settings downloaded for user:', userId);
+    return { 
+      success: true, 
+      data: data.settings,
+      timestamp: timestamp
+    };
+  } catch (error) {
+    console.error('[Firebase Main] Download failed:', error);
+    return { error: String(error) };
+  }
+});
