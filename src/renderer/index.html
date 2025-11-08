@@ -258,7 +258,7 @@
   .settings-submenu.expanded{display:block}
   .nav-item.sub-item{padding:8px 12px;font-size:13px}
   .nav-item.sub-item .nav-icon{font-size:14px}
-  /* entfernt: grüne Schrift für Stats */
+  /* Removed: green text for stats */
 
   /* Keyboard grid */
   .kb-grid{display:flex;flex-direction:column;gap:10px}
@@ -267,7 +267,7 @@
   .kb-input{min-width:160px; text-align:center; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,0.06); cursor:pointer}
   .kb-input.listening{outline:2px solid var(--accent)}
   .kb-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5}
-  /* Nicks help box (analog kb-help) */
+  /* Nicks help box (like kb-help) */
   .nicks-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:16px}
 
   /* Settings inputs & controls */
@@ -607,13 +607,13 @@
                 <button class="client-btn" data-client="custom"><span class="badge">C</span> Custom...</button>
               </div>
               <div id="customPathRow" style="display:none;flex-direction:column;gap:4px;">
-                <input id="customLogPathInput" type="text" placeholder="Absolute Pfad zur latest.log" style="width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:12px;" />
+                <input id="customLogPathInput" type="text" placeholder="Absolute path to latest.log" style="width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:12px;" />
                 <div style="display:flex;align-items:center;gap:8px;">
                   <button id="applyCustomPathBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Apply Path</button>
-                  <small style="color:var(--muted);font-size:11px;">Pfad ändern setzt Spieler-/Party-Listen zurück.</small>
+                  <small style="color:var(--muted);font-size:11px;">Changing the path resets player/party lists.</small>
                 </div>
               </div>
-              <div id="clientStatus" class="ok">Noch kein Client ausgewählt.</div>
+              <div id="clientStatus" class="ok">No client selected yet.</div>
             </div>
             <h3 style="margin: 28px 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
               <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
@@ -624,8 +624,8 @@
             <div class="settings-row" style="margin-top:4px;">
               <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
               <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                <input id="usernameInput" type="text" placeholder="Minecraft IGN eingeben..." class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
-                <small style="color:var(--muted);font-size:11px;">Wird genutzt für Erwähnungen im Chat & automatische Listenaufnahme.</small>
+                <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
+                <small style="color:var(--muted);font-size:11px;">Used for chat mentions and automatic adding to the list.</small>
               </div>
             </div>
           </div>
@@ -1013,7 +1013,7 @@
     console.log('[DEBUG] renderPlayerRow', player?.name, player);
     const levelHTML = updatePlayerLevel(player);
   const realName = player.name;
-  // Spieler konnte ggf. nicht geladen werden (error placeholder) -> als Nick markieren
+  // Player might not have loaded (error placeholder) -> mark as nick
   const isUnresolved = player.error || player.unresolved;
   const key = realName.toLowerCase();
   const sources = playerSources.get(key);
@@ -1291,11 +1291,11 @@
     ipcRenderer.on('chat:players', (_e, newPlayers) => {
       try {
         if (!Array.isArray(newPlayers)) return;
-        // Diff alte /who-Einträge entfernen (nur wenn nicht durch andere Quellen gehalten)
+  // Remove diffed old /who entries (only if not held by other sources)
         const incomingSet = new Set(newPlayers.map(p => String(p).toLowerCase()));
         for (const [key, sources] of Array.from(playerSources.entries())) {
           if (sources.has('who') && !incomingSet.has(key)) {
-            // Entferne nur die 'who' Quelle; andere Quellen halten den Spieler ggf. weiter
+            // Remove only the 'who' source; other sources may still keep the player
             sources.delete('who');
             if (sources.size === 0) {
               removePlayer(key);
@@ -1304,7 +1304,7 @@
             }
           }
         }
-        // Jetzt neue Spieler hinzufügen / who Quelle setzen
+  // Now add new players / set 'who' source
         newPlayers.forEach(player => {
           if (!player || typeof player !== 'string') return;
           addPlayer(player, 'who');
@@ -1723,7 +1723,7 @@
         }
       });
 
-      // Entfernt: generische Aktivierung aller Nav-Items (führte zu Konflikten mit Sub-Items)
+  // Removed: generic activation of all nav items (caused conflicts with sub-items)
     }
 
     document.querySelectorAll(".grip").forEach(g => g.addEventListener("mousedown", onDown));
@@ -1735,7 +1735,7 @@
       });
       localStorage.setItem('activePanel', id);
 
-      // Update nur Top-Level-Navigation (Home, Nicks, Settings) – keine Sub-Items
+  // Update only top-level navigation (Home, Nicks, Settings) – no sub-items
       document.querySelectorAll('.nav > .nav-item:not(.sub-item)').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-panel') === id);
       });
@@ -2341,12 +2341,12 @@
       let line = '';
       const sel = basicSettings.logFile;
       if (sel === 'custom') {
-        line = `Custom Pfad aktiv: ${basicSettings.customLogPath || '(leer)'}`;
+  line = `Custom path active: ${basicSettings.customLogPath || '(empty)'}`;
       } else {
-        line = `Aktiver Client: ${sel}`;
+  line = `Active client: ${sel}`;
       }
       if (basicSettings.lastDetected?.client && basicSettings.lastDetected.client !== sel) {
-        line += ` • Zuletzt erkannt: ${basicSettings.lastDetected.client}`;
+  line += ` • Last detected: ${basicSettings.lastDetected.client}`;
         clientStatusEl.classList.add('warn');
       } else if (basicSettings.lastDetected?.client === sel) {
         clientStatusEl.classList.add('ok');
@@ -2402,12 +2402,12 @@
             }
             saveBasicSettings();
             updateClientButtons();
-            updateClientStatus('Auto-Detect erfolgreich');
+            updateClientStatus('Auto-detect succeeded');
           } else {
-            updateClientStatus('Keine Logs gefunden');
+            updateClientStatus('No logs found');
           }
         } catch (err) {
-          updateClientStatus('Auto-Detect Fehler');
+          updateClientStatus('Auto-detect error');
         }
       });
     }
@@ -2419,7 +2419,7 @@
           // Sync chosen client if backend auto switched due to detection
           if (!basicSettings.logFile) basicSettings.logFile = payload.client;
         }
-        updateClientStatus('Pfad gewechselt');
+  updateClientStatus('Path switched');
       });
     } catch {}
 

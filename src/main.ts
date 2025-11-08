@@ -285,7 +285,7 @@ class HypixelCache {
   private uuidCache = new Map<string, string>();
   private guildCache = new Map<string, { data: any; timestamp: number }>();
   private queue = new Set<string>();
-  private readonly TTL = 10 * 60 * 1000; // 10 Minuten Cache-Zeit
+  private readonly TTL = 10 * 60 * 1000; // 10 minutes cache TTL
   private readonly MAX_CONCURRENT = 3; // Max. parallele Requests
 
   constructor(private apiKey: string) {}
@@ -295,11 +295,11 @@ class HypixelCache {
     if (cached) return cached;
 
     const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
-    if (!res.ok) throw new Error('UUID nicht gefunden');
+  if (!res.ok) throw new Error('UUID not found');
     
     const data = await res.json() as { id?: string };
     const uuid = data?.id;
-    if (!uuid) throw new Error('Ungültige UUID-Response');
+  if (!uuid) throw new Error('Invalid UUID response');
 
     this.uuidCache.set(name.toLowerCase(), uuid);
     return uuid;
@@ -312,7 +312,7 @@ class HypixelCache {
     
     if (!res.ok) {
       if (res.status === 429) {
-        throw new Error('Hypixel Rate-Limit erreicht - bitte warte kurz');
+  throw new Error('Hypixel rate limit reached - please wait');
       }
       throw new Error(`Hypixel API: ${res.status}`);
     }
@@ -329,8 +329,8 @@ class HypixelCache {
         headers: { 'API-Key': this.apiKey },
       });
       if (!res.ok) {
-        if (res.status === 429) throw new Error('Hypixel Rate-Limit (Guild)');
-        return null; // kein Guild gefunden oder anderer Fehler
+  if (res.status === 429) throw new Error('Hypixel rate limit (guild)');
+  return null; // no guild found or other error
       }
       const data = await res.json() as { guild?: any };
       const guild = data.guild || null;
@@ -439,7 +439,7 @@ class HypixelCache {
         const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
         return Math.max(0, Math.floor(lvl));
       })(),
-      // Guild Daten aus separatem Endpoint (falls vorhanden)
+  // Guild data from separate endpoint (if available)
       guildName: guild?.name ?? null,
       guildTag: guild?.tag ?? null,
       mfkdr: null, // Monthly Final K/D Ratio
@@ -481,11 +481,11 @@ class HypixelCache {
         return { name, level: 0, ws: 0, fkdr: 0, wlr: 0, bblr: 0, fk: 0, wins: 0, rankTag: null, rankColor: null, unresolved: true };
       }
   const player = await this.fetchHypixelStats(uuid);
-      if (!player) throw new Error('Spieler nicht auf Hypixel gefunden');
+  if (!player) throw new Error('Player not found on Hypixel');
   const guild = await this.fetchGuild(uuid);
   const stats = await this.processBedwarsStats(player, name, guild);
       
-      // Erfolgreichen Request cachen
+  // Cache successful request
       this.cache.set(normalizedName, {
         data: stats,
         timestamp: Date.now()
@@ -494,7 +494,7 @@ class HypixelCache {
       return stats;
 
     } catch (err: any) {
-      // Rate-Limit oder andere API-Fehler
+  // Rate limit or other API errors
       return { error: String(err.message || err) };
     } finally {
       this.queue.delete(normalizedName);
@@ -513,7 +513,7 @@ const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
 // --- IPC: Bedwars Stats Fetch (jetzt mit Cache)
 ipcMain.handle('bedwars:stats', async (_e, name: string) => {
   if (!process.env.HYPIXEL_KEY) {
-    return { error: 'HYPIXEL_KEY fehlt in der Umgebung. Bitte .env Datei prüfen.' };
+  return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
   }
   return hypixel.getStats(name);
 });
