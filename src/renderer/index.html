@@ -172,6 +172,7 @@
   .add-btn:hover{transform:scale(1.05);box-shadow:0 6px 16px rgba(102,234,255,0.5)}
 
   .nick-indicator{display:inline-flex;align-items:center;margin-left:6px;opacity:.7;cursor:help}
+  .party-indicator{display:inline-flex;align-items:center;margin-left:4px;opacity:.8;cursor:help;color:var(--accent)}
   .nick-indicator .icon{width:16px;height:16px}
 
   /* Forms */
@@ -354,6 +355,9 @@
     </symbol>
     <symbol id="i-ghost" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2c-4.42 0-8 3.58-8 8v12l2-2 2 2 2-2 2 2 2-2 2 2 2-2V10c0-4.42-3.58-8-8-8zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 1a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+    </symbol>
+    <symbol id="i-party" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
     </symbol>
     <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"/>
@@ -944,6 +948,9 @@
   const realName = player.name;
   // Spieler konnte ggf. nicht geladen werden (error placeholder) -> als Nick markieren
   const isUnresolved = player.error || player.unresolved;
+  const key = realName.toLowerCase();
+  const sources = playerSources.get(key);
+  const isPartyMember = sources && sources.has('party');
     const originalNick = originalNicks[realName.toLowerCase()] || getNickFromReal(realName);
     const hasNick = !!originalNick;
     const showNick = hasNick && nickDisplayMode === 'nick';
@@ -974,7 +981,8 @@
           // Unranked -> grau wie Stone Prestige
           return `<span class="player-name" style="color:#AAAAAA">${esc(displayName)}</span>`;
         })()}
-        ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
+        ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
+        ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
       </td>`,
       dynamicCells
     ].join('');
@@ -1254,7 +1262,7 @@
       }
     });
 
-    // Party members handling (similar to players but always add)
+    // Party members handling (source: party)
     ipcRenderer.on('chat:party', (_e, members) => {
       try {
         if (!Array.isArray(members)) return;
@@ -1262,8 +1270,42 @@
           if (!member || typeof member !== 'string') return;
           addPlayer(member, 'party');
         });
+        renderTable();
+        updateOverlaySize();
       } catch (err) {
         console.error('Error handling chat:party', err);
+      }
+    });
+
+    // Party invite (only fetch stats, don't add to party source)
+    ipcRenderer.on('chat:partyInvite', (_e, inviter) => {
+      try {
+        if (!inviter || typeof inviter !== 'string') return;
+        // Add as temporary 'invite' source so it appears briefly
+        addPlayer(inviter, 'invite');
+      } catch (err) {
+        console.error('Error handling chat:partyInvite', err);
+      }
+    });
+
+    // Party cleared (You left the party)
+    ipcRenderer.on('chat:partyCleared', () => {
+      try {
+        // Remove all party sources
+        for (const [key, sources] of Array.from(playerSources.entries())) {
+          if (sources.has('party')) {
+            sources.delete('party');
+            if (sources.size === 0) {
+              removePlayer(key);
+            } else {
+              playerSources.set(key, sources);
+            }
+          }
+        }
+        renderTable();
+        updateOverlaySize();
+      } catch (err) {
+        console.error('Error handling chat:partyCleared', err);
       }
     });
 

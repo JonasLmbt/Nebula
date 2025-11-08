@@ -107,6 +107,14 @@ electron_1.app.whenReady().then(() => {
             if (win)
                 win.webContents.send('chat:party', members);
         });
+        chat.on('partyInvite', (inviter) => {
+            if (win)
+                win.webContents.send('chat:partyInvite', inviter);
+        });
+        chat.on('partyCleared', () => {
+            if (win)
+                win.webContents.send('chat:partyCleared');
+        });
         chat.on('finalKill', (name) => {
             if (win)
                 win.webContents.send('chat:finalKill', name);

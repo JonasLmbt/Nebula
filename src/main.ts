@@ -71,6 +71,12 @@ app.whenReady().then(() => {
     chat.on('partyUpdated', (members: string[]) => {
       if (win) win.webContents.send('chat:party', members);
     });
+    chat.on('partyInvite', (inviter: string) => {
+      if (win) win.webContents.send('chat:partyInvite', inviter);
+    });
+    chat.on('partyCleared', () => {
+      if (win) win.webContents.send('chat:partyCleared');
+    });
     chat.on('finalKill', (name: string) => {
       if (win) win.webContents.send('chat:finalKill', name);
     });

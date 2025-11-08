@@ -38,6 +38,7 @@ export class MinecraftChatLogger extends EventEmitter {
   private tail?: Tail;
   private logPath?: string;
   public players = new Set<string>();
+  public partyMembers = new Set<string>();
   public inLobby = false;
 
   constructor(opts?: { manualPath?: string }) {
@@ -123,7 +124,18 @@ export class MinecraftChatLogger extends EventEmitter {
         .filter(m => /^[a-zA-Z0-9_]+$/.test(m))  // Valid Minecraft usernames only
         .map(cleanName);
 
-      this.emit('partyUpdated', members);
+      // Update party members set
+      members.forEach(m => this.partyMembers.add(m));
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+
+    // Party invite (to join their party!)
+    if (this.inLobby && msg.indexOf('to join their party!') !== -1 && msg.indexOf(':') === -1) {
+      const beforeHas = msg.substring(0, msg.indexOf('has')-1);
+      const parts = beforeHas.split(' ');
+      const inviter = parts[0].indexOf('[') !== -1 ? cleanName(parts[1]) : cleanName(parts[0]);
+      this.emit('partyInvite', inviter);
       return;
     }
 
@@ -131,7 +143,16 @@ export class MinecraftChatLogger extends EventEmitter {
     if (msg.indexOf('joined the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
       let pjoin = msg.split(' ')[0];
       if (pjoin.indexOf('[') !== -1) pjoin = msg.split(' ')[1];
-      this.emit('partyUpdated', [cleanName(pjoin)]);
+      const joined = cleanName(pjoin);
+      this.partyMembers.add(joined);
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+
+    // "You left the party" -> clear entire party
+    if (msg.indexOf('You left the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
+      this.partyMembers.clear();
+      this.emit('partyCleared');
       return;
     }
 
@@ -139,6 +160,8 @@ export class MinecraftChatLogger extends EventEmitter {
       let pleft = msg.split(' ')[0];
       if (pleft.indexOf('[') !== -1) pleft = msg.split(' ')[1];
       const leftPlayer = cleanName(pleft);
+      this.partyMembers.delete(leftPlayer);
+      this.emit('partyUpdated', Array.from(this.partyMembers));
       if (this.players.has(leftPlayer)) {
         this.players.delete(leftPlayer);
         this.emit('playersUpdated', Array.from(this.players));
