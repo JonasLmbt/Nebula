@@ -267,6 +267,7 @@ class HypixelCache {
         this.apiKey = apiKey;
         this.cache = new Map();
         this.uuidCache = new Map();
+        this.guildCache = new Map();
         this.queue = new Set();
         this.TTL = 10 * 60 * 1000; // 10 Minuten Cache-Zeit
         this.MAX_CONCURRENT = 3; // Max. parallele Requests
@@ -298,7 +299,29 @@ class HypixelCache {
         const data = await res.json();
         return data.player;
     }
-    async processBedwarsStats(player, requestedName) {
+    async fetchGuild(uuid) {
+        const cached = this.guildCache.get(uuid);
+        if (cached && Date.now() - cached.timestamp < this.TTL)
+            return cached.data;
+        try {
+            const res = await (0, node_fetch_1.default)(`https://api.hypixel.net/v2/guild?player=${uuid}`, {
+                headers: { 'API-Key': this.apiKey },
+            });
+            if (!res.ok) {
+                if (res.status === 429)
+                    throw new Error('Hypixel Rate-Limit (Guild)');
+                return null; // kein Guild gefunden oder anderer Fehler
+            }
+            const data = await res.json();
+            const guild = data.guild || null;
+            this.guildCache.set(uuid, { data: guild, timestamp: Date.now() });
+            return guild;
+        }
+        catch {
+            return null;
+        }
+    }
+    async processBedwarsStats(player, requestedName, guild) {
         const bw = player?.stats?.Bedwars || {};
         const stars = bw.Experience ? Math.floor(bw.Experience / 5000) : 0;
         const fk = bw.final_kills_bedwars ?? 0;
@@ -394,9 +417,9 @@ class HypixelCache {
                 const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
                 return Math.max(0, Math.floor(lvl));
             })(),
-            // Placeholders (not yet implemented backend fetch)
-            guildName: null,
-            guildTag: null,
+            // Guild Daten aus separatem Endpoint (falls vorhanden)
+            guildName: guild?.name ?? null,
+            guildTag: guild?.tag ?? null,
             mfkdr: null, // Monthly Final K/D Ratio
             mwlr: null, // Monthly Win/Loss Ratio
             mbblr: null, // Monthly Bed Break/Loss Ratio
@@ -433,7 +456,8 @@ class HypixelCache {
             const player = await this.fetchHypixelStats(uuid);
             if (!player)
                 throw new Error('Spieler nicht auf Hypixel gefunden');
-            const stats = await this.processBedwarsStats(player, name);
+            const guild = await this.fetchGuild(uuid);
+            const stats = await this.processBedwarsStats(player, name, guild);
             // Erfolgreichen Request cachen
             this.cache.set(normalizedName, {
                 data: stats,

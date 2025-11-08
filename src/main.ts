@@ -241,6 +241,7 @@ class HypixelCache {
     timestamp: number;
   }>();
   private uuidCache = new Map<string, string>();
+  private guildCache = new Map<string, { data: any; timestamp: number }>();
   private queue = new Set<string>();
   private readonly TTL = 10 * 60 * 1000; // 10 Minuten Cache-Zeit
   private readonly MAX_CONCURRENT = 3; // Max. parallele Requests
@@ -278,7 +279,27 @@ class HypixelCache {
     return data.player;
   }
 
-  private async processBedwarsStats(player: any, requestedName: string) {
+  private async fetchGuild(uuid: string) {
+    const cached = this.guildCache.get(uuid);
+    if (cached && Date.now() - cached.timestamp < this.TTL) return cached.data;
+    try {
+      const res = await fetch(`https://api.hypixel.net/v2/guild?player=${uuid}`, {
+        headers: { 'API-Key': this.apiKey },
+      });
+      if (!res.ok) {
+        if (res.status === 429) throw new Error('Hypixel Rate-Limit (Guild)');
+        return null; // kein Guild gefunden oder anderer Fehler
+      }
+      const data = await res.json() as { guild?: any };
+      const guild = data.guild || null;
+      this.guildCache.set(uuid, { data: guild, timestamp: Date.now() });
+      return guild;
+    } catch {
+      return null;
+    }
+  }
+
+  private async processBedwarsStats(player: any, requestedName: string, guild: any | null) {
     const bw = player?.stats?.Bedwars || {};
     const stars = bw.Experience ? Math.floor(bw.Experience / 5000) : 0;
     const fk = bw.final_kills_bedwars ?? 0;
@@ -376,9 +397,9 @@ class HypixelCache {
         const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
         return Math.max(0, Math.floor(lvl));
       })(),
-      // Placeholders (not yet implemented backend fetch)
-      guildName: null,
-      guildTag: null,
+      // Guild Daten aus separatem Endpoint (falls vorhanden)
+      guildName: guild?.name ?? null,
+      guildTag: guild?.tag ?? null,
       mfkdr: null, // Monthly Final K/D Ratio
       mwlr: null,  // Monthly Win/Loss Ratio
       mbblr: null, // Monthly Bed Break/Loss Ratio
@@ -419,8 +440,8 @@ class HypixelCache {
       }
   const player = await this.fetchHypixelStats(uuid);
       if (!player) throw new Error('Spieler nicht auf Hypixel gefunden');
-
-      const stats = await this.processBedwarsStats(player, name);
+  const guild = await this.fetchGuild(uuid);
+  const stats = await this.processBedwarsStats(player, name, guild);
       
       // Erfolgreichen Request cachen
       this.cache.set(normalizedName, {
