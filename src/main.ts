@@ -410,8 +410,14 @@ class HypixelCache {
         await new Promise(r => setTimeout(r, 150));
       }
 
-      const uuid = await this.getUUID(name);
-      const player = await this.fetchHypixelStats(uuid);
+      let uuid: string | null = null;
+      try {
+        uuid = await this.getUUID(name);
+      } catch (e) {
+        // Name nicht auf Mojang gefunden -> als Nick behandeln
+        return { name, level: 0, ws: 0, fkdr: 0, wlr: 0, bblr: 0, fk: 0, wins: 0, rankTag: null, rankColor: null, unresolved: true };
+      }
+  const player = await this.fetchHypixelStats(uuid);
       if (!player) throw new Error('Spieler nicht auf Hypixel gefunden');
 
       const stats = await this.processBedwarsStats(player, name);

@@ -201,7 +201,8 @@
   .stat-settings-btn:hover{opacity:1;background:rgba(255,255,255,0.05)}
 
   /* Dynamic stat layout editor */
-  .layout-editor{margin-top:16px;padding:14px;background:var(--panel);border-radius:12px;display:flex;flex-direction:column;gap:14px}
+  /* unify background: remove nested panel look */
+  .layout-editor{margin-top:16px;padding:14px;background:transparent;border:1px dashed rgba(255,255,255,0.12);border-radius:12px;display:flex;flex-direction:column;gap:14px}
   .layout-editor h3{margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
   .layout-palette{display:flex;flex-wrap:wrap;gap:8px}
   .stat-pill{padding:6px 10px;background:rgba(255,255,255,0.07);border-radius:24px;font-size:12px;font-weight:500;cursor:grab;user-select:none;display:flex;align-items:center;gap:6px;position:relative}
@@ -940,7 +941,9 @@
   function renderPlayerRow(player, wasNick, dynamicStats) {
     console.log('[DEBUG] renderPlayerRow', player?.name, player);
     const levelHTML = updatePlayerLevel(player);
-    const realName = player.name;
+  const realName = player.name;
+  // Spieler konnte ggf. nicht geladen werden (error placeholder) -> als Nick markieren
+  const isUnresolved = player.error || player.unresolved;
     const originalNick = originalNicks[realName.toLowerCase()] || getNickFromReal(realName);
     const hasNick = !!originalNick;
     const showNick = hasNick && nickDisplayMode === 'nick';
@@ -962,10 +965,10 @@
       `<td class="lvl">${levelHTML}</td>`,
       `<td class="name">
         ${(() => {
-          if (showNick) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
+          if (showNick || isUnresolved) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
           return player.rankTag ? `<span class="rank-tag" style="color:${player.rankColor || '#ffffff'}">${player.rankTag}</span>` : '';
         })()}
-        ${showNick ? `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>` : (player.rankColor ? `<span class="player-name" style="color:${player.rankColor}">${esc(displayName)}</span>` : `${esc(displayName)}`)}
+        ${showNick || isUnresolved ? `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>` : (player.rankColor ? `<span class="player-name" style="color:${player.rankColor}">${esc(displayName)}</span>` : `${esc(displayName)}`)}
         ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
       </td>`,
       dynamicCells
@@ -1680,6 +1683,7 @@
           ${dynamicStats.map(s => {
             const stat = STATS[s];
             const sortable = stat.type === 'number';
+            // Im Overlay: Kürzel anzeigen
             const label = stat.short || stat.name;
             return `<th class="metric-h" ${sortable ? `data-sort-key="${s}"` : ''}>${label}</th>`;
           }).join('')}
@@ -1801,7 +1805,8 @@
       if (!palette) return;
       const used = new Set(statSettings.layout.filter(Boolean));
       const stats = Object.keys(STATS).filter(k => !['level','name'].includes(k));
-  palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].short || STATS[k].name}</div>`).join('');
+  // In den Einstellungen bitte ausgeschriebene Namen anzeigen
+  palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].name}</div>`).join('');
       palette.querySelectorAll('.stat-pill[draggable="true"]').forEach(pill => {
         pill.addEventListener('dragstart', e => {
           e.dataTransfer.setData('text/stat', pill.dataset.stat);
@@ -1814,7 +1819,8 @@
       const layout = statSettings.layout;
       slotsEl.innerHTML = layout.map((stat, i) => {
         if (!stat) return `<div class="slot" data-slot="${i}" data-empty="1">Empty</div>`;
-  const label = STATS[stat]?.short || STATS[stat]?.name || stat;
+  // In den Einstellungen die ausgeschriebenen Namen nutzen
+  const label = STATS[stat]?.name || stat;
   return `<div class="slot filled" data-slot="${i}" data-stat="${stat}">${label}<button class="slot-remove" title="Remove">×</button></div>`;
       }).join('');
       slotsEl.querySelectorAll('.slot').forEach(slot => {
