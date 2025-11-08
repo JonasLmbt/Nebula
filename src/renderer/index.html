@@ -968,7 +968,12 @@
           if (showNick || isUnresolved) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
           return player.rankTag ? `<span class="rank-tag" style="color:${player.rankColor || '#ffffff'}">${player.rankTag}</span>` : '';
         })()}
-        ${showNick || isUnresolved ? `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>` : (player.rankColor ? `<span class="player-name" style="color:${player.rankColor}">${esc(displayName)}</span>` : `${esc(displayName)}`)}
+        ${(() => {
+          if (showNick || isUnresolved) return `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>`;
+          if (player.rankTag) return `<span class="player-name" style="color:${player.rankColor || '#ffffff'}">${esc(displayName)}</span>`;
+          // Unranked -> grau wie Stone Prestige
+          return `<span class="player-name" style="color:#AAAAAA">${esc(displayName)}</span>`;
+        })()}
         ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
       </td>`,
       dynamicCells
@@ -1211,12 +1216,26 @@
     ipcRenderer.on('chat:players', (_e, newPlayers) => {
       try {
         if (!Array.isArray(newPlayers)) return;
-        // Treat as /who list → source 'who'
+        // Diff alte /who-Einträge entfernen (nur wenn nicht durch andere Quellen gehalten)
+        const incomingSet = new Set(newPlayers.map(p => String(p).toLowerCase()));
+        for (const [key, sources] of Array.from(playerSources.entries())) {
+          if (sources.has('who') && !incomingSet.has(key)) {
+            // Entferne nur die 'who' Quelle; andere Quellen halten den Spieler ggf. weiter
+            sources.delete('who');
+            if (sources.size === 0) {
+              removePlayer(key);
+            } else {
+              playerSources.set(key, sources);
+            }
+          }
+        }
+        // Jetzt neue Spieler hinzufügen / who Quelle setzen
         newPlayers.forEach(player => {
           if (!player || typeof player !== 'string') return;
           addPlayer(player, 'who');
         });
-
+        renderTable();
+        updateOverlaySize();
       } catch (err) {
         console.error('Error handling chat:players', err);
       }
