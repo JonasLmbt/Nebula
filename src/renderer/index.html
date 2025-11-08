@@ -669,7 +669,7 @@
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
-            Client & Account
+            Client & Minecraft Account
           </h2>
 
           <div class="settings-subsection">
@@ -708,7 +708,7 @@
           <div class="settings-subsection">
             <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
               <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
-              Username
+              Minecraft Ingame Name (IGN)
             </h3>
             <div class="settings-row" style="margin-top:4px;">
               <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
@@ -1047,6 +1047,42 @@
               </div>
               <div style="margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.5">
                 Cloud sync automatically backs up your settings, nicks, and color rules. Changes sync across all your devices when logged in.
+              </div>
+            </div>
+          </div>
+
+          <!-- Auth Code Input Card (shown during login) -->
+          <div class="profile-card" id="authCodeCard" style="display:none;border:2px solid var(--accent);background:linear-gradient(145deg,rgba(102,234,255,0.05),rgba(102,234,255,0.02))">
+            <div class="profile-section">
+              <h3 style="color:var(--accent)">
+                <svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg>
+                Complete Discord Login
+              </h3>
+              <div style="padding:16px;background:rgba(0,0,0,0.3);border-radius:10px;margin-top:12px">
+                <div style="font-size:14px;line-height:1.8;margin-bottom:16px">
+                  <b style="color:var(--accent)">Steps:</b><br>
+                  1️⃣ Authorize Nebula in the browser tab that opened<br>
+                  2️⃣ After authorizing, copy the <b>complete URL</b> from the address bar<br>
+                  3️⃣ Paste it in the field below and click "Login"
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+                  The URL should start with: <code style="background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;font-size:11px">http://localhost:3000/auth/discord/callback?code=...</code>
+                </div>
+                <input 
+                  type="text" 
+                  id="authCodeInput" 
+                  placeholder="Paste the complete redirect URL here..."
+                  style="width:100%;padding:12px;background:rgba(0,0,0,0.4);border:2px solid rgba(102,234,255,0.3);border-radius:8px;color:var(--text);font-size:13px;margin-bottom:12px;font-family:monospace"
+                />
+                <div style="display:flex;gap:10px">
+                  <button id="submitAuthCode" class="btn primary" style="flex:1;padding:12px;font-weight:600">
+                    <svg class="icon" style="width:16px;height:16px" aria-hidden="true"><use href="#i-discord"/></svg>
+                    Complete Login
+                  </button>
+                  <button id="cancelAuthCode" class="btn" style="padding:12px 20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3493,38 +3529,22 @@
             return;
           }
 
-          // Show waiting message
-          showNotification('Complete the Discord login in your browser. After authorizing, copy the FULL URL from the address bar and paste it here.');
+          // Show auth code input card instead of prompt
+          const authCodeCard = document.getElementById('authCodeCard');
+          if (authCodeCard) {
+            authCodeCard.style.display = 'block';
+            authCodeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Focus the input field
+            setTimeout(() => {
+              const input = document.getElementById('authCodeInput');
+              if (input) input.focus();
+            }, 500);
+          }
           
-          // For now, show a prompt for manual URL entry (temporary until backend callback is ready)
-          setTimeout(() => {
-            const input = prompt('Paste the complete redirect URL from your browser:\n(Starts with http://localhost:3000/...)');
-            if (input && input.trim()) {
-              // Extract code from URL
-              let code = input.trim();
-              
-              // If user pasted full URL, extract code parameter
-              if (code.includes('?code=')) {
-                const urlParams = new URLSearchParams(code.split('?')[1]);
-                code = urlParams.get('code') || code;
-              } else if (code.includes('&code=')) {
-                // Handle if code is not first parameter
-                const urlParams = new URLSearchParams(code.split('?')[1] || code);
-                code = urlParams.get('code') || code;
-              }
-              
-              if (code && code.length > 10) { // Basic validation
-                handleDiscordCallback(code);
-              } else {
-                showNotification('Invalid code or URL. Please try again.');
-                discordLoginBtn.disabled = false;
-                discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-              }
-            } else {
-              discordLoginBtn.disabled = false;
-              discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-            }
-          }, 1000);
+          // Reset button state
+          discordLoginBtn.disabled = false;
+          discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Waiting for authorization...</span>';
           
         } catch (err) {
           console.error('Discord login error:', err);
@@ -3538,6 +3558,8 @@
     // Handle Discord auth code
     async function handleDiscordCallback(code) {
       const loginBtn = document.getElementById('discordLoginBtn');
+      const submitBtn = document.getElementById('submitAuthCode');
+      const authCard = document.getElementById('authCodeCard');
       
       try {
         if (loginBtn) {
@@ -3548,10 +3570,18 @@
         
         if (result.error) {
           showNotification('Authentication failed: ' + result.error);
+          
+          // Reset all buttons and show auth card again
           if (loginBtn) {
             loginBtn.disabled = false;
             loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
           }
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Complete Login';
+          }
+          if (authCard) authCard.style.display = 'block';
+          
           return;
         }
 
@@ -3567,18 +3597,29 @@
         
         showNotification(`Successfully logged in as ${userProfile.tag}!`);
         
-        // Reset button
+        // Reset buttons
         if (loginBtn) {
           loginBtn.disabled = false;
           loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Complete Login';
         }
       } catch (err) {
         console.error('Discord callback handling error:', err);
         showNotification('Failed to complete Discord login');
+        
+        // Reset all buttons and show auth card again
         if (loginBtn) {
           loginBtn.disabled = false;
           loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
         }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Complete Login';
+        }
+        if (authCard) authCard.style.display = 'block';
       }
     }
 
@@ -3595,6 +3636,64 @@
           localStorage.removeItem('lastSyncTime');
           updateProfileUI();
           showNotification('Logged out successfully');
+        }
+      });
+    }
+
+    // Auth Code Submit Handler
+    const submitAuthCodeBtn = document.getElementById('submitAuthCode');
+    const authCodeInput = document.getElementById('authCodeInput');
+    const cancelAuthCodeBtn = document.getElementById('cancelAuthCode');
+    const authCodeCard = document.getElementById('authCodeCard');
+
+    if (submitAuthCodeBtn && authCodeInput) {
+      submitAuthCodeBtn.addEventListener('click', () => {
+        const input = authCodeInput.value.trim();
+        if (!input) {
+          showNotification('Please paste the redirect URL');
+          return;
+        }
+
+        // Extract code from URL
+        let code = input;
+        
+        if (code.includes('?code=')) {
+          const urlParams = new URLSearchParams(code.split('?')[1]);
+          code = urlParams.get('code') || code;
+        } else if (code.includes('&code=')) {
+          const urlParams = new URLSearchParams(code.split('?')[1] || code);
+          code = urlParams.get('code') || code;
+        }
+        
+        if (code && code.length > 10) {
+          submitAuthCodeBtn.disabled = true;
+          submitAuthCodeBtn.textContent = 'Authenticating...';
+          handleDiscordCallback(code);
+          
+          // Hide auth card after submitting
+          if (authCodeCard) authCodeCard.style.display = 'none';
+          authCodeInput.value = '';
+        } else {
+          showNotification('Invalid code or URL. Please check and try again.');
+        }
+      });
+
+      // Allow Enter key to submit
+      authCodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          submitAuthCodeBtn.click();
+        }
+      });
+    }
+
+    if (cancelAuthCodeBtn && authCodeCard) {
+      cancelAuthCodeBtn.addEventListener('click', () => {
+        authCodeCard.style.display = 'none';
+        if (authCodeInput) authCodeInput.value = '';
+        const loginBtn = document.getElementById('discordLoginBtn');
+        if (loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
         }
       });
     }

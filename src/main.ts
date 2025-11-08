@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './chat-logger';
@@ -558,13 +559,35 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || ''; // Optional for public clients
 const DISCORD_REDIRECT_URI = 'http://localhost:3000/auth/discord/callback'; // Your backend callback URL
 
+// PKCE (Proof Key for Code Exchange) - required for Public Client apps
+let currentCodeVerifier: string | null = null;
+
+// Generate PKCE code_verifier and code_challenge
+function generatePKCE() {
+  // Generate random code_verifier (43-128 chars, base64url)
+  const verifier = crypto.randomBytes(32).toString('base64url');
+  
+  // Create code_challenge (SHA256 hash of verifier, base64url encoded)
+  const challenge = crypto.createHash('sha256')
+    .update(verifier)
+    .digest('base64url');
+  
+  return { code_verifier: verifier, code_challenge: challenge };
+}
+
 // Open Discord OAuth2 URL in browser
 ipcMain.handle('auth:discord:login', async () => {
   if (!DISCORD_CLIENT_ID) {
     return { error: 'Discord Client ID not configured. Please add DISCORD_CLIENT_ID to .env file.' };
   }
 
-  const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
+  // Generate PKCE parameters for this auth session
+  const { code_verifier, code_challenge } = generatePKCE();
+  currentCodeVerifier = code_verifier;
+  
+  console.log('[Discord] Generated PKCE challenge for auth session');
+
+  const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify&code_challenge=${code_challenge}&code_challenge_method=S256`;
   
   try {
     await shell.openExternal(authUrl);
@@ -581,19 +604,32 @@ ipcMain.handle('auth:discord:exchange', async (_e, code: string) => {
     return { error: 'Discord Client ID not configured in .env' };
   }
 
+  if (!currentCodeVerifier) {
+    return { error: 'No PKCE code_verifier found. Please restart the login flow.' };
+  }
+
   try {
-    // Build token request body
+    // Build token request body with PKCE code_verifier
     const tokenParams: any = {
       client_id: DISCORD_CLIENT_ID,
       grant_type: 'authorization_code',
       code,
       redirect_uri: DISCORD_REDIRECT_URI,
+      code_verifier: currentCodeVerifier, // PKCE parameter (required for Public Client)
     };
 
-    // Add client_secret only if provided (required for confidential clients)
-    if (DISCORD_CLIENT_SECRET) {
+    // IMPORTANT: Only add client_secret if explicitly set and non-empty
+    // Public Client apps should NOT include client_secret
+    if (DISCORD_CLIENT_SECRET && DISCORD_CLIENT_SECRET.trim().length > 0) {
       tokenParams.client_secret = DISCORD_CLIENT_SECRET;
     }
+
+    console.log('[Discord] Token exchange params:', {
+      client_id: DISCORD_CLIENT_ID,
+      has_secret: !!DISCORD_CLIENT_SECRET,
+      redirect_uri: DISCORD_REDIRECT_URI,
+      code_length: code.length
+    });
 
     // Exchange code for access token
     const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
@@ -606,7 +642,8 @@ ipcMain.handle('auth:discord:exchange', async (_e, code: string) => {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Discord token exchange failed:', errorText);
+      console.error('[Discord] Token exchange failed:', errorText);
+      console.error('[Discord] Request params:', new URLSearchParams(tokenParams).toString());
       return { error: `Failed to exchange Discord auth code: ${errorText}` };
     }
 
@@ -654,8 +691,31 @@ ipcMain.handle('auth:discord:exchange', async (_e, code: string) => {
         expiresIn: tokenData.expires_in,
       },
     };
+    
+    // Clear code_verifier after successful exchange
+    currentCodeVerifier = null;
+    
+    return {
+      success: true,
+      user: {
+        id: userData.id,
+        username: userData.username,
+        discriminator: userData.discriminator,
+        avatar: userData.avatar 
+          ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+          : null,
+        tag: `${userData.username}#${userData.discriminator}`,
+      },
+      tokens: {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresIn: tokenData.expires_in,
+      },
+    };
   } catch (err) {
     console.error('Discord auth exchange error:', err);
+    // Clear code_verifier on error too
+    currentCodeVerifier = null;
     return { error: String(err) };
   }
 });
