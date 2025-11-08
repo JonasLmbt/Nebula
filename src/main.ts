@@ -358,7 +358,30 @@ class HypixelCache {
       wlr: +(wins / Math.max(1, losses)).toFixed(2),
       bblr: +bblr.toFixed(2),
       fk,
+      fd,
       wins,
+      losses,
+      bedsBroken: bw.beds_broken_bedwars ?? 0,
+      bedsLost: bw.beds_lost_bedwars ?? 0,
+      kills: bw.kills_bedwars ?? 0,
+      deaths: bw.deaths_bedwars ?? 0,
+      // Derived efficiencies
+      winsPerLevel: +(wins / Math.max(1, stars)).toFixed(2),
+      fkPerLevel: +(fk / Math.max(1, stars)).toFixed(2),
+      bedwarsScore: +((fk / Math.max(1, fd)) * (wins / Math.max(1, losses)) * (stars / 100)).toFixed(2),
+      // Network Level (approximate formula from Hypixel experience curve)
+      networkLevel: (() => {
+        const exp = player?.networkExp ?? player?.networkExperience ?? 0;
+        // Hypixel formula: level = (Math.sqrt(2*exp + 30625) / 50) - 2.5
+        const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
+        return Math.max(0, Math.floor(lvl));
+      })(),
+      // Placeholders (not yet implemented backend fetch)
+      guildName: null,
+      guildTag: null,
+      mfkdr: null, // Monthly Final K/D Ratio
+      mwlr: null,  // Monthly Win/Loss Ratio
+      mbblr: null, // Monthly Bed Break/Loss Ratio
       rankTag: rankInfo.tag,
       rankColor: rankInfo.color,
     };

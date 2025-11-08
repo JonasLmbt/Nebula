@@ -216,23 +216,29 @@
 
   /* Modal / Color rules */
   .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9000}
-  .modal.open{display:flex;align-items:center;justify-content:center}
-  .modal-content{background:var(--bg);border-radius:12px;width:90%;max-width:500px;max-height:90vh;overflow-y:auto}
-  .modal-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between}
-  .modal-header h3{margin:0;font-size:16px;font-weight:600}
-  .modal-close{background:transparent;border:0;color:var(--muted);font-size:24px;cursor:pointer}
-  .modal-body{padding:20px}
-
-  .color-rules{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-  .color-rule{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:6px}
-  .rule-operator{width:60px}
-  .rule-value{width:80px}
-  .color-picker{display:flex;align-items:center;gap:8px;flex:1}
-  .color-preview{width:20px;height:20px;border-radius:4px}
-  .rule-delete{background:transparent;border:0;color:var(--muted);cursor:pointer;opacity:.7}
-  .rule-delete:hover{opacity:1;color:var(--bad)}
-  .add-rule-btn{width:100%;padding:8px;background:rgba(255,255,255,0.05);border:0;color:var(--text);border-radius:6px;cursor:pointer}
-  .add-rule-btn:hover{background:rgba(255,255,255,0.08)}
+  .modal.open{display:flex;align-items:center;justify-content:center;animation:fadeIn .25s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .modal-content{background:linear-gradient(145deg,rgba(25,28,32,0.95),rgba(30,34,38,0.95));backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.08);box-shadow:0 8px 32px -8px rgba(0,0,0,0.6);border-radius:16px;width:92%;max-width:560px;max-height:88vh;overflow:auto;display:flex;flex-direction:column}
+  .modal-header{padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+  .modal-header h3{margin:0;font-size:17px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .modal-header h3 .stat-full-name{opacity:.6;font-weight:400;font-size:13px}
+  .modal-close{background:rgba(255,255,255,0.04);border:0;color:var(--muted);font-size:20px;cursor:pointer;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .modal-close:hover{background:rgba(255,255,255,0.08);color:#fff}
+  .modal-body{padding:22px 24px;display:flex;flex-direction:column;gap:20px}
+  .color-rules{display:flex;flex-direction:column;gap:10px;margin:0}
+  .color-rule{display:grid;grid-template-columns:70px 90px 90px 1fr 40px;align-items:center;gap:10px;background:rgba(255,255,255,0.03);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);position:relative;transition:.15s}
+  .color-rule:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.09)}
+  .rule-operator,.rule-value{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:8px;padding:6px 8px;font-size:13px}
+  .rule-operator:focus,.rule-value:focus{outline:2px solid var(--accent);outline-offset:2px}
+  .color-picker{display:flex;align-items:center;gap:8px}
+  .color-preview{width:34px;height:24px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.3)}
+  .color-input{width:90px;height:32px;padding:0;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer}
+  .color-input::-webkit-color-swatch{border:0;border-radius:6px}
+  .color-input::-webkit-color-swatch-wrapper{padding:4px}
+  .rule-delete{background:rgba(255,255,255,0.05);border:0;color:var(--muted);cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;transition:.15s}
+  .rule-delete:hover{background:rgba(255,0,0,0.25);color:#fff}
+  .add-rule-btn{width:100%;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.15);color:var(--text);border-radius:12px;cursor:pointer;font-weight:500;letter-spacing:.5px}
+  .add-rule-btn:hover{background:rgba(255,255,255,0.07);border-style:solid}
 
   /* Settings navigation */
   .settings-nav{display:flex;flex-direction:column;gap:1px;background:var(--panel);border-radius:12px;overflow:hidden}
@@ -725,11 +731,10 @@
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
-            Columns
+            Columns Settings
           </h2>
         
         <div class="layout-editor" id="statLayoutEditor">
-          <h3><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg> Overlay Columns</h3>
           <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning. Click on a filled slot to configure color rules.</div>
           <div class="layout-palette" id="layoutPalette"></div>
           <div class="layout-slots" id="layoutSlots"></div>
@@ -908,12 +913,25 @@
         const exp = player?.stats?.Bedwars?.Experience ?? player?.experience;
         return exp != null ? Math.floor(getBedWarsLevel(Number(exp))) : 0;
       }
+      case 'networkLevel': return getNumeric(player?.networkLevel ?? 0);
       case 'ws': return getNumeric(player?.ws ?? 0);
       case 'fkdr': return getNumeric(player?.fkdr ?? 0);
       case 'wlr': return getNumeric(player?.wlr ?? 0);
       case 'bblr': return getNumeric(player?.bblr ?? 0);
       case 'fk': return getNumeric(player?.fk ?? 0);
+      case 'fd': return getNumeric(player?.fd ?? 0);
       case 'wins': return getNumeric(player?.wins ?? 0);
+      case 'losses': return getNumeric(player?.losses ?? 0);
+      case 'bedsBroken': return getNumeric(player?.bedsBroken ?? 0);
+      case 'bedsLost': return getNumeric(player?.bedsLost ?? 0);
+      case 'kills': return getNumeric(player?.kills ?? 0);
+      case 'deaths': return getNumeric(player?.deaths ?? 0);
+      case 'winsPerLevel': return getNumeric(STATS.winsPerLevel.calc(player));
+      case 'fkPerLevel': return getNumeric(STATS.fkPerLevel.calc(player));
+      case 'bedwarsScore': return getNumeric(STATS.bedwarsScore.calc(player));
+      case 'mfkdr': return getNumeric(player?.mfkdr ?? NaN);
+      case 'mwlr': return getNumeric(player?.mwlr ?? NaN);
+      case 'mbblr': return getNumeric(player?.mbblr ?? NaN);
       default: return 0;
     }
   }
@@ -931,9 +949,14 @@
     const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
     const dynamicCells = selectedStats.map(key => {
       if (key === 'level' || key === 'name') return '';
-      const val = player[key];
-      const colorClass = getColorForValue(key, typeof val === 'number' ? val : Number(val));
-      return `<td class="metric ${colorClass}">${fmt(val)}</td>`;
+      let val = player[key];
+      // Support calc functions for derived stats if backend didn't send field
+      const statDef = STATS[key];
+      if ((val == null || (typeof val === 'number' && isNaN(val))) && statDef && typeof statDef.calc === 'function') {
+        try { val = statDef.calc(player); } catch { val = null; }
+      }
+      const colorStyle = getColorForValue(key, typeof val === 'number' ? val : Number(val));
+      return `<td class="metric" ${colorStyle}>${fmt(val)}</td>`;
     }).join('');
     const orderedCells = [
       `<td class="lvl">${levelHTML}</td>`,
@@ -1534,14 +1557,42 @@
 
     // Stat column definitions
     const STATS = {
-      level: { name: 'Level', type: 'number', colorRules: true },
-      name: { name: 'Name', type: 'text' },
-      ws: { name: 'Win Streak', type: 'number', colorRules: true },
-      fkdr: { name: 'Final K/D Ratio', type: 'number', colorRules: true },
-      wlr: { name: 'Win/Loss Ratio', type: 'number', colorRules: true },
-      bblr: { name: 'Bed Break/Loss Ratio', type: 'number', colorRules: true },
-      fk: { name: 'Final Kills', type: 'number', colorRules: true },
-      wins: { name: 'Wins', type: 'number', colorRules: true }
+      // Core identity
+      level: { name: 'Level', short: 'Lvl', type: 'number', colorRules: true },
+      name: { name: 'Name', short: 'Name', type: 'text' },
+      networkLevel: { name: 'Network Level', short: 'Nwl', type: 'number', colorRules: true },
+
+      // Streaks
+      ws: { name: 'Win Streak', short: 'WS', type: 'number', colorRules: true },
+
+      // Ratios
+      fkdr: { name: 'Final K/D Ratio', short: 'FKDR', type: 'number', colorRules: true },
+      wlr: { name: 'Win/Loss Ratio', short: 'WLR', type: 'number', colorRules: true },
+      bblr: { name: 'Bed Break/Loss Ratio', short: 'BBLR', type: 'number', colorRules: true },
+      mfkdr: { name: 'Monthly Final K/D Ratio', short: 'MFKDR', type: 'number', colorRules: true },
+      mwlr: { name: 'Monthly Win/Loss Ratio', short: 'MWLR', type: 'number', colorRules: true },
+      mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'MBBLR', type: 'number', colorRules: true },
+
+      // Totals
+      fk: { name: 'Final Kills', short: 'FK', type: 'number', colorRules: true },
+      fd: { name: 'Final Deaths', short: 'FD', type: 'number', colorRules: true },
+      wins: { name: 'Wins', short: 'Wins', type: 'number', colorRules: true },
+      losses: { name: 'Losses', short: 'Losses', type: 'number', colorRules: true },
+      bedsBroken: { name: 'Beds Broken', short: 'BB', type: 'number', colorRules: true },
+      bedsLost: { name: 'Beds Lost', short: 'BL', type: 'number', colorRules: true },
+      kills: { name: 'Kills', short: 'K', type: 'number', colorRules: true },
+      deaths: { name: 'Deaths', short: 'D', type: 'number', colorRules: true },
+
+      // Per-Level metrics (derived)
+      winsPerLevel: { name: 'Wins per Level', short: 'W/Lvl', type: 'number', colorRules: true, calc: (p) => +( (p.wins ?? 0) / Math.max(1, p.level ?? 0) ).toFixed(2) },
+      fkPerLevel: { name: 'Final Kills per Level', short: 'FK/Lvl', type: 'number', colorRules: true, calc: (p) => +( (p.fk ?? 0) / Math.max(1, p.level ?? 0) ).toFixed(2) },
+
+      // Derived score
+      bedwarsScore: { name: 'Bedwars Score', short: 'Score', type: 'number', colorRules: true, calc: (p) => +(((p.fkdr ?? 0) * (p.wlr ?? 0) * ((p.level ?? 0)/100))).toFixed(2) },
+
+      // Guild (meta)
+      guildName: { name: 'Guild Name', short: 'Guild', type: 'text' },
+      guildTag: { name: 'Guild Tag', short: 'Tag', type: 'text' },
     };
 
     // Load/save stat settings
@@ -1551,26 +1602,57 @@
       layout: ['ws','fkdr','wlr','bblr','fk','wins',null,null,null,null],
       colorRules: {
         level: [
-          { op: '>=', value: 300, color: 'good' },
-          { op: '>=', value: 100, color: 'warn' }
+          { op: '>=', value: 300, color: '#00ff00' },
+          { op: '>=', value: 100, color: '#ffff00' }
         ],
         fkdr: [
-          { op: '>=', value: 5, color: 'bad' },
-          { op: '>=', value: 3, color: 'warn' }
+          { op: '>=', value: 100, color: '#ff00ff' },
+          { op: '>=', value: 50, color: '#ff69b4' },
+          { op: '>=', value: 30, color: '#dc143c' },
+          { op: '>=', value: 20, color: '#ff7f50' },
+          { op: '>=', value: 10, color: '#ffa500' },
+          { op: '>=', value: 7, color: '#ffff00' },
+          { op: '>=', value: 5, color: '#00ff00' },
+          { op: '>=', value: 3, color: '#00ff00' },
+          { op: '>=', value: 1, color: '#ffffff' },
+          { op: '>=', value: 0, color: '#808080' }
         ],
         wlr: [
-          { op: '>=', value: 5, color: 'bad' },
-          { op: '>=', value: 3, color: 'warn' }
+          { op: '>=', value: 5, color: '#ff0000' },
+          { op: '>=', value: 3, color: '#ffff00' }
         ],
         ws: [
-          { op: '>=', value: 100, color: 'bad' },
-          { op: '>=', value: 50, color: 'warn' }
+          { op: '>=', value: 100, color: '#ff0000' },
+          { op: '>=', value: 50, color: '#ffff00' }
         ]
       }
     }));
     if (!Array.isArray(statSettings.layout)) {
-      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins',null,null,null,null];
+      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins','bedwarsScore','winsPerLevel','fkPerLevel',null];
     }
+
+    // Migration: convert legacy color names to hex once on load
+    (function migrateColorRules() {
+      const map = { good: '#00ff00', warn: '#ffff00', bad: '#ff0000' };
+      try {
+        if (statSettings && statSettings.colorRules) {
+          let changed = false;
+          for (const key of Object.keys(statSettings.colorRules)) {
+            const arr = statSettings.colorRules[key];
+            if (!Array.isArray(arr)) continue;
+            for (const rule of arr) {
+              if (rule && typeof rule.color === 'string' && map[rule.color]) {
+                rule.color = map[rule.color];
+                changed = true;
+              }
+            }
+          }
+          if (changed) {
+            localStorage.setItem('statSettings', JSON.stringify(statSettings));
+          }
+        }
+      } catch {}
+    })();
 
     function saveStatSettings() {
       localStorage.setItem('statSettings', JSON.stringify(statSettings));
@@ -1598,7 +1680,8 @@
           ${dynamicStats.map(s => {
             const stat = STATS[s];
             const sortable = stat.type === 'number';
-            return `<th class="metric-h" ${sortable ? `data-sort-key="${s}"` : ''}>${stat.name}</th>`;
+            const label = stat.short || stat.name;
+            return `<th class="metric-h" ${sortable ? `data-sort-key="${s}"` : ''}>${label}</th>`;
           }).join('')}
           <th></th>
         </tr>`;
@@ -1636,7 +1719,13 @@
 
       function renderRules() {
         const rules = statSettings.colorRules[column] || [];
-        rulesList.innerHTML = rules.map((rule, i) => `
+        rulesList.innerHTML = rules.map((rule, i) => {
+          // Migration: convert old CSS variable names to hex colors
+          let color = rule.color;
+          if (color === 'good') color = '#00ff00';
+          if (color === 'warn') color = '#ffff00';
+          if (color === 'bad') color = '#ff0000';
+          return `
           <div class="color-rule" data-index="${i}">
             <select class="rule-operator">
               <option value=">=" ${rule.op === '>=' ? 'selected' : ''}>≥</option>
@@ -1644,16 +1733,13 @@
             </select>
             <input type="number" class="rule-value" value="${rule.value}" step="0.1">
             <div class="color-picker">
-              <div class="color-preview" style="background: var(--${rule.color})"></div>
-              <select class="color-select">
-                <option value="good" ${rule.color === 'good' ? 'selected' : ''}>Good (Green)</option>
-                <option value="warn" ${rule.color === 'warn' ? 'selected' : ''}>Warning (Yellow)</option>
-                <option value="bad" ${rule.color === 'bad' ? 'selected' : ''}>Danger (Red)</option>
-              </select>
+              <div class="color-preview" style="background: ${color}"></div>
+              <input type="color" class="color-input" value="${color}">
             </div>
             <button class="rule-delete">×</button>
           </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Bind rule events
         rulesList.querySelectorAll('.color-rule').forEach(rule => {
@@ -1669,9 +1755,9 @@
             saveStatSettings();
           });
 
-          rule.querySelector('.color-select').addEventListener('change', e => {
+          rule.querySelector('.color-input').addEventListener('change', e => {
             statSettings.colorRules[column][i].color = e.target.value;
-            rule.querySelector('.color-preview').style.background = `var(--${e.target.value})`;
+            rule.querySelector('.color-preview').style.background = e.target.value;
             saveStatSettings();
           });
 
@@ -1693,7 +1779,7 @@
         statSettings.colorRules[column].push({
           op: '>=',
           value: 0,
-          color: 'good'
+          color: '#00ff00'
         });
         saveStatSettings();
         renderRules();
@@ -1715,7 +1801,7 @@
       if (!palette) return;
       const used = new Set(statSettings.layout.filter(Boolean));
       const stats = Object.keys(STATS).filter(k => !['level','name'].includes(k));
-      palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].name}</div>`).join('');
+  palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].short || STATS[k].name}</div>`).join('');
       palette.querySelectorAll('.stat-pill[draggable="true"]').forEach(pill => {
         pill.addEventListener('dragstart', e => {
           e.dataTransfer.setData('text/stat', pill.dataset.stat);
@@ -1728,7 +1814,8 @@
       const layout = statSettings.layout;
       slotsEl.innerHTML = layout.map((stat, i) => {
         if (!stat) return `<div class="slot" data-slot="${i}" data-empty="1">Empty</div>`;
-        return `<div class="slot filled" data-slot="${i}" data-stat="${stat}">${STATS[stat]?.name || stat}<button class="slot-remove" title="Remove">×</button></div>`;
+  const label = STATS[stat]?.short || STATS[stat]?.name || stat;
+  return `<div class="slot filled" data-slot="${i}" data-stat="${stat}">${label}<button class="slot-remove" title="Remove">×</button></div>`;
       }).join('');
       slotsEl.querySelectorAll('.slot').forEach(slot => {
         slot.addEventListener('dragover', e => {
@@ -2160,8 +2247,12 @@
       if (!rules) return '';
 
       for (const rule of rules) {
-        if (rule.op === '>=' && value >= rule.value) return rule.color;
-        if (rule.op === '<' && value < rule.value) return rule.color;
+        if (rule.op === '>=' && value >= rule.value) {
+          return `style="color:${rule.color}"`;
+        }
+        if (rule.op === '<' && value < rule.value) {
+          return `style="color:${rule.color}"`;
+        }
       }
       return '';
     }

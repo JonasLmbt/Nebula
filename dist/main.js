@@ -309,57 +309,62 @@ class HypixelCache {
         const bblr = (bw.beds_broken_bedwars ?? 0) / Math.max(1, bw.beds_lost_bedwars ?? 1);
         // Determine rank/prefix and a display color
         const getRankInfo = (p) => {
-            // Priority: prefix (custom), then package/rank fields
-            const prefix = p?.prefix; // sometimes contains formatted prefix with § codes
+            // Precedence (Hypixel specifics): custom prefix > special rank field (rank) > monthlyPackageRank (SUPERSTAR) > newPackageRank > packageRank
+            // The previous implementation chose newPackageRank first, causing MVP++ (SUPERSTAR) and YOUTUBER to degrade to MVP+.
+            const prefix = p?.prefix; // may contain § color codes + brackets
+            const rank = p?.rank; // staff / youtube ranks live here (e.g. YOUTUBER, ADMIN)
+            const monthly = p?.monthlyPackageRank; // SUPERSTAR for MVP++
+            const newPkg = p?.newPackageRank; // MVP_PLUS etc.
+            const pkg = p?.packageRank; // legacy
             const displayname = p?.displayname;
             const stripColor = (s) => s ? s.replace(/§[0-9a-fk-or]/gi, '').trim() : s;
-            // If displayname itself contains a bracketed tag, prefer that (after stripping color codes)
+            // If prefix exists, prefer it entirely (extract bracketed portion if present)
+            if (prefix) {
+                const raw = stripColor(prefix);
+                const m = raw.match(/\[(.+?)\]/);
+                return { tag: m ? `[${m[1]}]` : raw, color: '#FFFFFF' };
+            }
+            // Displayname may itself have leading bracket tag (rare custom formatting)
             if (displayname) {
                 const dn = stripColor(displayname);
                 const match = dn.match(/^\s*\[(.+?)\]/);
                 if (match)
                     return { tag: `[${match[1]}]`, color: '#FFFFFF' };
             }
-            const rankField = p?.newPackageRank || p?.monthlyPackageRank || p?.packageRank || p?.rank || null;
-            // stripColor already defined above
-            if (prefix) {
-                const raw = stripColor(prefix);
-                // If prefix contains a bracketed tag like [MVP++], extract that
-                const m = raw.match(/\[(.+?)\]/);
-                if (m)
-                    return { tag: `[${m[1]}]`, color: '#FFFFFF' };
-                return { tag: raw, color: '#FFFFFF' };
-            }
-            if (!rankField)
-                return { tag: null, color: null };
-            const r = String(rankField).toUpperCase();
+            // Helper mapping
             const map = {
                 VIP: { tag: '[VIP]', color: '#55FF55' },
                 VIP_PLUS: { tag: '[VIP+]', color: '#55FF55' },
                 MVP: { tag: '[MVP]', color: '#55FFFF' },
                 MVP_PLUS: { tag: '[MVP+]', color: '#55FFFF' },
-                MVP_PLUS_PLUS: { tag: '[MVP++]', color: '#FFAA00' },
-                SUPERSTAR: { tag: '[MVP++]', color: '#FFAA00' },
-                YT: { tag: '[YOUTUBE]', color: '#FF5555' },
+                SUPERSTAR: { tag: '[MVP++]', color: '#FFAA00' }, // MVP++ monthly
+                MVP_PLUS_PLUS: { tag: '[MVP++]', color: '#FFAA00' }, // sometimes appears explicitly
                 YOUTUBER: { tag: '[YOUTUBE]', color: '#FF5555' },
+                YT: { tag: '[YOUTUBE]', color: '#FF5555' },
                 ADMIN: { tag: '[ADMIN]', color: '#FF5555' },
                 OWNER: { tag: '[OWNER]', color: '#FF5555' },
                 MOD: { tag: '[MOD]', color: '#55AAFF' },
                 HELPER: { tag: '[HELPER]', color: '#55AAFF' }
             };
-            if (map[r])
-                return map[r];
-            // Handle common patterns
-            if (r.includes('VIP'))
-                return map['VIP'];
-            if (r.includes('SUPERSTAR') || r.includes('MVP_PLUS_PLUS') || r.includes('PLUS_PLUS'))
-                return map['MVP_PLUS_PLUS'];
-            if (r.includes('MVP') && r.includes('PLUS'))
-                return map['MVP_PLUS'];
-            if (r.includes('MVP'))
-                return map['MVP'];
-            // Fallback: present the raw rank
-            return { tag: `[${r}]`, color: '#FFFFFF' };
+            // Evaluate rank fields by precedence
+            const candidates = [rank, monthly, newPkg, pkg].filter(Boolean).map((r) => String(r).toUpperCase());
+            for (const c of candidates) {
+                if (map[c])
+                    return map[c];
+                // Pattern handling inside loop to allow early precedence
+                if (c.includes('SUPERSTAR') || c.includes('MVP_PLUS_PLUS') || c.includes('PLUS_PLUS'))
+                    return map['SUPERSTAR'];
+                if (c.includes('VIP'))
+                    return map['VIP'];
+                if (c.includes('MVP') && c.includes('PLUS'))
+                    return map['MVP_PLUS'];
+                if (c === 'MVP')
+                    return map['MVP'];
+                if (c === 'YOUTUBER' || c === 'YT')
+                    return map['YOUTUBER'];
+            }
+            // No rank detected (NORMAL)
+            return { tag: null, color: null };
         };
         const rankInfo = getRankInfo(player ?? {});
         return {
@@ -371,7 +376,30 @@ class HypixelCache {
             wlr: +(wins / Math.max(1, losses)).toFixed(2),
             bblr: +bblr.toFixed(2),
             fk,
+            fd,
             wins,
+            losses,
+            bedsBroken: bw.beds_broken_bedwars ?? 0,
+            bedsLost: bw.beds_lost_bedwars ?? 0,
+            kills: bw.kills_bedwars ?? 0,
+            deaths: bw.deaths_bedwars ?? 0,
+            // Derived efficiencies
+            winsPerLevel: +(wins / Math.max(1, stars)).toFixed(2),
+            fkPerLevel: +(fk / Math.max(1, stars)).toFixed(2),
+            bedwarsScore: +((fk / Math.max(1, fd)) * (wins / Math.max(1, losses)) * (stars / 100)).toFixed(2),
+            // Network Level (approximate formula from Hypixel experience curve)
+            networkLevel: (() => {
+                const exp = player?.networkExp ?? player?.networkExperience ?? 0;
+                // Hypixel formula: level = (Math.sqrt(2*exp + 30625) / 50) - 2.5
+                const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
+                return Math.max(0, Math.floor(lvl));
+            })(),
+            // Placeholders (not yet implemented backend fetch)
+            guildName: null,
+            guildTag: null,
+            mfkdr: null, // Monthly Final K/D Ratio
+            mwlr: null, // Monthly Win/Loss Ratio
+            mbblr: null, // Monthly Bed Break/Loss Ratio
             rankTag: rankInfo.tag,
             rankColor: rankInfo.color,
         };
