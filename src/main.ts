@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import fetch from 'node-fetch';
@@ -546,5 +546,152 @@ ipcMain.handle('window:setBounds', (_e, bounds: { width?: number; height?: numbe
     return true;
   } catch {
     return false;
+  }
+});
+
+// --- Discord OAuth2 Authentication ---
+// Note: For production, set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in .env
+// Create your Discord app at: https://discord.com/developers/applications
+
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const DISCORD_REDIRECT_URI = 'http://localhost:3000/auth/discord/callback'; // Your backend callback URL
+
+// Open Discord OAuth2 URL in browser
+ipcMain.handle('auth:discord:login', async () => {
+  if (!DISCORD_CLIENT_ID) {
+    return { error: 'Discord Client ID not configured. Please add DISCORD_CLIENT_ID to .env file.' };
+  }
+
+  const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
+  
+  try {
+    await shell.openExternal(authUrl);
+    return { success: true, message: 'Discord login opened in browser. Complete the login and return here.' };
+  } catch (err) {
+    console.error('Failed to open Discord auth URL:', err);
+    return { error: 'Failed to open browser for Discord login.' };
+  }
+});
+
+// Exchange Discord auth code for tokens (called by renderer after redirect)
+ipcMain.handle('auth:discord:exchange', async (_e, code: string) => {
+  if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+    return { error: 'Discord credentials not configured in .env' };
+  }
+
+  try {
+    // Exchange code for access token
+    const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: DISCORD_REDIRECT_URI,
+      }).toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Discord token exchange failed:', errorText);
+      return { error: 'Failed to exchange Discord auth code' };
+    }
+
+    const tokenData = await tokenResponse.json() as { 
+      access_token: string; 
+      refresh_token: string; 
+      expires_in: number;
+      token_type: string;
+    };
+
+    // Fetch user info
+    const userResponse = await fetch('https://discord.com/api/users/@me', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
+    });
+
+    if (!userResponse.ok) {
+      return { error: 'Failed to fetch Discord user info' };
+    }
+
+    const userData = await userResponse.json() as {
+      id: string;
+      username: string;
+      discriminator: string;
+      avatar: string | null;
+      email?: string;
+    };
+
+    // Return user data and tokens
+    return {
+      success: true,
+      user: {
+        id: userData.id,
+        username: userData.username,
+        discriminator: userData.discriminator,
+        avatar: userData.avatar 
+          ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
+          : null,
+        tag: `${userData.username}#${userData.discriminator}`,
+      },
+      tokens: {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        expiresIn: tokenData.expires_in,
+      },
+    };
+  } catch (err) {
+    console.error('Discord auth exchange error:', err);
+    return { error: String(err) };
+  }
+});
+
+// Refresh Discord access token
+ipcMain.handle('auth:discord:refresh', async (_e, refreshToken: string) => {
+  if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+    return { error: 'Discord credentials not configured' };
+  }
+
+  try {
+    const response = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: DISCORD_CLIENT_ID,
+        client_secret: DISCORD_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }).toString(),
+    });
+
+    if (!response.ok) {
+      return { error: 'Failed to refresh Discord token' };
+    }
+
+    const data = await response.json() as {
+      access_token: string;
+      refresh_token: string;
+      expires_in: number;
+    };
+
+    return {
+      success: true,
+      tokens: {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
+      },
+    };
+  } catch (err) {
+    console.error('Discord token refresh error:', err);
+    return { error: String(err) };
   }
 });

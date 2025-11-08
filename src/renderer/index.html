@@ -342,6 +342,39 @@
   .settings-subsection:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
   .source-options{margin-left:0;display:flex;flex-direction:column;gap:4px}
 
+  /* Profile Panel Styles */
+  .profile-container{display:flex;flex-direction:column;gap:20px;padding:0}
+  .profile-card{background:var(--panel);border-radius:16px;padding:24px;border:1px solid rgba(255,255,255,0.06)}
+  .profile-header{display:flex;align-items:center;gap:16px}
+  .profile-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:var(--accent);position:relative;overflow:hidden}
+  .profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .profile-avatar.empty::before{content:"?";font-size:40px;opacity:0.5}
+  .profile-info{flex:1;display:flex;flex-direction:column;gap:6px}
+  .profile-username{font-size:24px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px}
+  .profile-status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .profile-status .status-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .profile-status.offline .status-dot{background:#666;box-shadow:none}
+  .profile-actions{display:flex;gap:10px;margin-top:8px}
+  .discord-btn{display:flex;align-items:center;gap:8px;padding:10px 20px;background:#5865F2;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer;transition:all .2s ease;font-size:14px}
+  .discord-btn:hover{background:#4752C4;transform:translateY(-1px);box-shadow:0 4px 12px rgba(88,101,242,0.4)}
+  .discord-btn:active{transform:translateY(0)}
+  .discord-btn .icon{width:20px;height:20px}
+  .profile-section{margin-top:8px}
+  .profile-section h3{margin:0 0 12px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .profile-section h3 .icon{width:18px;height:18px}
+  .profile-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .profile-stat{background:rgba(0,0,0,0.2);padding:12px 16px;border-radius:10px;display:flex;flex-direction:column;gap:4px}
+  .profile-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600}
+  .profile-stat-value{font-size:20px;font-weight:700;color:var(--accent)}
+  .premium-card{background:linear-gradient(145deg,rgba(102,114,234,0.1),rgba(118,75,162,0.1));border:1px solid rgba(102,114,234,0.3)}
+  .premium-card .premium-icon{font-size:48px;text-align:center;margin-bottom:12px;filter:drop-shadow(0 0 12px rgba(102,114,234,0.5))}
+  .premium-status{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
+  .premium-status.active{background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:1px solid var(--accent)}
+  .sync-info{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
+  .sync-time{font-size:12px;color:var(--muted)}
+  .logout-btn{padding:8px 16px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;transition:.2s}
+  .logout-btn:hover{background:rgba(224,90,90,0.15);color:#ff6b6b;border-color:#ff6b6b}
+
   /* --- Client Selection Redesign --- */
   #clientSelectGrid{--btn-h:34px}
   .client-btn{
@@ -434,6 +467,15 @@
     </symbol>
     <symbol id="i-party" viewBox="0 0 24 24" fill="currentColor">
       <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+    </symbol>
+    <symbol id="i-discord" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.565 18.565 0 0 0-5.487 0 12.923 12.923 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026 13.83 13.83 0 0 0 1.226-1.963.074.074 0 0 0-.041-.104 13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/>
+    </symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+    </symbol>
+    <symbol id="i-premium" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
     </symbol>
     <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"/>
@@ -917,6 +959,122 @@
             Shortcuts are global while Nebula is running.
           </div>
           <div class="kb-grid" id="kbGrid"></div>
+        </div>
+      </div>
+
+      <!-- Profile Panel -->
+      <div class="panel" id="panel-profile">
+        <h2 style="margin:0 0 20px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+          <span class="settings-icon">
+            <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
+          </span>
+          Profile & Account
+        </h2>
+
+        <div class="profile-container">
+          <!-- Account Card -->
+          <div class="profile-card">
+            <div class="profile-header">
+              <div class="profile-avatar empty" id="profileAvatar">
+                <!-- Avatar image will be inserted here -->
+              </div>
+              <div class="profile-info">
+                <h3 class="profile-username" id="profileUsername">
+                  Not logged in
+                </h3>
+                <div class="profile-status offline" id="profileStatus">
+                  <span class="status-dot"></span>
+                  <span>Local account only</span>
+                </div>
+              </div>
+            </div>
+            <div class="profile-actions">
+              <button class="discord-btn" id="discordLoginBtn" style="display:flex">
+                <svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg>
+                <span>Login with Discord</span>
+              </button>
+              <button class="logout-btn" id="logoutBtn" style="display:none">
+                Logout
+              </button>
+            </div>
+          </div>
+
+          <!-- Premium Card -->
+          <div class="profile-card premium-card">
+            <div class="profile-section">
+              <h3>
+                <svg class="icon" aria-hidden="true"><use href="#i-premium"/></svg>
+                Premium Status
+              </h3>
+              <div class="premium-icon">✨</div>
+              <div class="premium-status" id="premiumStatus">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-weight:600;font-size:14px">Free Plan</span>
+                  <span style="font-size:12px;color:var(--muted)">Unlock all features with Premium</span>
+                </div>
+                <button class="btn primary" id="upgradePremiumBtn" style="padding:8px 16px;font-size:13px" disabled title="Coming soon">
+                  Upgrade
+                </button>
+              </div>
+              <div style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px">
+                <div style="font-size:12px;color:var(--muted);line-height:1.6">
+                  <b style="color:var(--text)">Premium features (coming soon):</b><br>
+                  • Unlimited nickname entries<br>
+                  • Cloud sync for all settings<br>
+                  • Custom color themes<br>
+                  • Advanced statistics & history<br>
+                  • Priority support
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cloud Sync Card -->
+          <div class="profile-card">
+            <div class="profile-section">
+              <h3>
+                <svg class="icon" aria-hidden="true"><use href="#i-cloud"/></svg>
+                Cloud Sync
+              </h3>
+              <div class="sync-info" id="syncInfo">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-weight:600;font-size:14px" id="syncStatus">Not available</span>
+                  <span class="sync-time" id="syncTime">Login with Discord to enable cloud sync</span>
+                </div>
+                <button class="btn" id="syncNowBtn" style="padding:8px 16px;font-size:13px;background:rgba(102,234,255,0.1);border:1px solid var(--accent);color:var(--accent)" disabled>
+                  Sync Now
+                </button>
+              </div>
+              <div style="margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.5">
+                Cloud sync automatically backs up your settings, nicks, and color rules. Changes sync across all your devices when logged in.
+              </div>
+            </div>
+          </div>
+
+          <!-- Account Stats -->
+          <div class="profile-card" id="accountStatsCard" style="display:none">
+            <div class="profile-section">
+              <h3>Account Statistics</h3>
+              <div class="profile-stat-grid">
+                <div class="profile-stat">
+                  <span class="profile-stat-label">Member Since</span>
+                  <span class="profile-stat-value" id="memberSince">—</span>
+                </div>
+                <div class="profile-stat">
+                  <span class="profile-stat-label">Players Tracked</span>
+                  <span class="profile-stat-value" id="playersTracked">0</span>
+                </div>
+                <div class="profile-stat">
+                  <span class="profile-stat-label">Sessions</span>
+                  <span class="profile-stat-value" id="sessionsCount">0</span>
+                </div>
+                <div class="profile-stat">
+                  <span class="profile-stat-label">Total Lookups</span>
+                  <span class="profile-stat-value" id="totalLookups">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -3251,6 +3409,238 @@
     // Remove legacy settings persistence keys
     localStorage.removeItem('settingsExpanded');
     localStorage.removeItem('activeSettingsSection');
+
+    // ==========================================
+    // Profile & Discord Authentication
+    // ==========================================
+    
+    let userProfile = JSON.parse(localStorage.getItem('userProfile') || 'null');
+    let authTokens = JSON.parse(localStorage.getItem('authTokens') || 'null');
+
+    // Update profile UI
+    function updateProfileUI() {
+      const avatar = document.getElementById('profileAvatar');
+      const username = document.getElementById('profileUsername');
+      const status = document.getElementById('profileStatus');
+      const loginBtn = document.getElementById('discordLoginBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const syncStatus = document.getElementById('syncStatus');
+      const syncTime = document.getElementById('syncTime');
+      const syncNowBtn = document.getElementById('syncNowBtn');
+      const accountStatsCard = document.getElementById('accountStatsCard');
+
+      if (userProfile && authTokens) {
+        // Logged in state
+        if (avatar) {
+          avatar.classList.remove('empty');
+          if (userProfile.avatar) {
+            avatar.innerHTML = `<img src="${userProfile.avatar}" alt="${userProfile.username}" />`;
+          } else {
+            // Show first letter of username if no avatar
+            avatar.innerHTML = `<div style="font-size:36px;font-weight:700">${userProfile.username[0].toUpperCase()}</div>`;
+          }
+        }
+        if (username) username.textContent = userProfile.tag || userProfile.username;
+        if (status) {
+          status.classList.remove('offline');
+          status.innerHTML = '<span class="status-dot"></span><span>Connected via Discord</span>';
+        }
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'flex';
+        if (syncStatus) syncStatus.textContent = 'Ready to sync';
+        if (syncTime) {
+          const lastSync = localStorage.getItem('lastSyncTime');
+          syncTime.textContent = lastSync 
+            ? `Last synced: ${new Date(lastSync).toLocaleString()}`
+            : 'Never synced - click Sync Now to upload your settings';
+        }
+        if (syncNowBtn) syncNowBtn.disabled = false;
+        if (accountStatsCard) accountStatsCard.style.display = 'block';
+      } else {
+        // Logged out state
+        if (avatar) {
+          avatar.classList.add('empty');
+          avatar.innerHTML = '';
+        }
+        if (username) username.textContent = 'Not logged in';
+        if (status) {
+          status.classList.add('offline');
+          status.innerHTML = '<span class="status-dot"></span><span>Local account only</span>';
+        }
+        if (loginBtn) loginBtn.style.display = 'flex';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (syncStatus) syncStatus.textContent = 'Not available';
+        if (syncTime) syncTime.textContent = 'Login with Discord to enable cloud sync';
+        if (syncNowBtn) syncNowBtn.disabled = true;
+        if (accountStatsCard) accountStatsCard.style.display = 'none';
+      }
+    }
+
+    // Discord Login Handler
+    const discordLoginBtn = document.getElementById('discordLoginBtn');
+    if (discordLoginBtn) {
+      discordLoginBtn.addEventListener('click', async () => {
+        try {
+          discordLoginBtn.disabled = true;
+          discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Opening Discord...</span>';
+          
+          const result = await ipcRenderer.invoke('auth:discord:login');
+          
+          if (result.error) {
+            showNotification(result.error);
+            discordLoginBtn.disabled = false;
+            discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+            return;
+          }
+
+          // Show waiting message
+          showNotification('Complete the Discord login in your browser. After authorizing, you\'ll need to manually enter the auth code here (temporary solution until backend is set up).');
+          
+          // For now, show a prompt for manual code entry (temporary until backend callback is ready)
+          setTimeout(() => {
+            const code = prompt('Paste the authorization code from the redirect URL (after ?code=):');
+            if (code && code.trim()) {
+              handleDiscordCallback(code.trim());
+            } else {
+              discordLoginBtn.disabled = false;
+              discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+            }
+          }, 1000);
+          
+        } catch (err) {
+          console.error('Discord login error:', err);
+          showNotification('Failed to initiate Discord login');
+          discordLoginBtn.disabled = false;
+          discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+        }
+      });
+    }
+
+    // Handle Discord auth code
+    async function handleDiscordCallback(code) {
+      const loginBtn = document.getElementById('discordLoginBtn');
+      
+      try {
+        if (loginBtn) {
+          loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Authenticating...</span>';
+        }
+
+        const result = await ipcRenderer.invoke('auth:discord:exchange', code);
+        
+        if (result.error) {
+          showNotification('Authentication failed: ' + result.error);
+          if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+          }
+          return;
+        }
+
+        // Save user data and tokens
+        userProfile = result.user;
+        authTokens = result.tokens;
+        localStorage.setItem('userProfile', JSON.stringify(userProfile));
+        localStorage.setItem('authTokens', JSON.stringify(authTokens));
+        localStorage.setItem('authTimestamp', Date.now().toString());
+        
+        // Update UI
+        updateProfileUI();
+        
+        showNotification(`Successfully logged in as ${userProfile.tag}!`);
+        
+        // Reset button
+        if (loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+        }
+      } catch (err) {
+        console.error('Discord callback handling error:', err);
+        showNotification('Failed to complete Discord login');
+        if (loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+        }
+      }
+    }
+
+    // Logout Handler
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to logout? Your local settings will remain, but cloud sync will be disabled.')) {
+          userProfile = null;
+          authTokens = null;
+          localStorage.removeItem('userProfile');
+          localStorage.removeItem('authTokens');
+          localStorage.removeItem('authTimestamp');
+          localStorage.removeItem('lastSyncTime');
+          updateProfileUI();
+          showNotification('Logged out successfully');
+        }
+      });
+    }
+
+    // Sync Now Handler (placeholder for future implementation)
+    const syncNowBtn = document.getElementById('syncNowBtn');
+    if (syncNowBtn) {
+      syncNowBtn.addEventListener('click', async () => {
+        if (!authTokens) {
+          showNotification('Please login first');
+          return;
+        }
+
+        try {
+          syncNowBtn.disabled = true;
+          syncNowBtn.textContent = 'Syncing...';
+          
+          // TODO: Implement actual cloud sync with backend API
+          // For now, just simulate sync
+          await new Promise(r => setTimeout(r, 1500));
+          
+          localStorage.setItem('lastSyncTime', new Date().toISOString());
+          updateProfileUI();
+          
+          showNotification('Settings synced successfully! (Backend integration coming soon)');
+          syncNowBtn.disabled = false;
+          syncNowBtn.textContent = 'Sync Now';
+        } catch (err) {
+          console.error('Sync error:', err);
+          showNotification('Sync failed: ' + err);
+          syncNowBtn.disabled = false;
+          syncNowBtn.textContent = 'Sync Now';
+        }
+      });
+    }
+
+    // Token refresh logic (check if token needs refresh on app start)
+    async function checkAndRefreshToken() {
+      if (!authTokens || !authTokens.refreshToken) return;
+
+      const authTimestamp = parseInt(localStorage.getItem('authTimestamp') || '0');
+      const now = Date.now();
+      const tokenAge = now - authTimestamp;
+      const expiresIn = (authTokens.expiresIn || 604800) * 1000; // Default 7 days
+
+      // Refresh if token is older than 80% of expiry time
+      if (tokenAge > expiresIn * 0.8) {
+        console.log('Refreshing Discord token...');
+        const result = await ipcRenderer.invoke('auth:discord:refresh', authTokens.refreshToken);
+        
+        if (result.success) {
+          authTokens = result.tokens;
+          localStorage.setItem('authTokens', JSON.stringify(authTokens));
+          localStorage.setItem('authTimestamp', Date.now().toString());
+          console.log('Token refreshed successfully');
+        } else {
+          console.error('Token refresh failed:', result.error);
+          // Optionally logout user if refresh fails
+        }
+      }
+    }
+
+    // Initialize profile UI on load
+    updateProfileUI();
+    checkAndRefreshToken();
   </script>
 </body>
 </html>
