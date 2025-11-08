@@ -1012,18 +1012,20 @@
                   <span style="font-weight:600;font-size:14px">Free Plan</span>
                   <span style="font-size:12px;color:var(--muted)">Unlock all features with Premium</span>
                 </div>
-                <button class="btn primary" id="upgradePremiumBtn" style="padding:8px 16px;font-size:13px" disabled title="Coming soon">
-                  Upgrade
+                <button class="btn primary" id="upgradePremiumBtn" style="padding:8px 16px;font-size:13px">
+                  <svg class="icon" aria-hidden="true"><use href="#i-premium"/></svg>
+                  <span>Upgrade</span>
                 </button>
               </div>
               <div style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px">
                 <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                  <b style="color:var(--text)">Premium features (coming soon):</b><br>
+                  <b style="color:var(--text)">Premium features:</b><br>
                   • Unlimited nickname entries<br>
-                  • Cloud sync for all settings<br>
-                  • Custom color themes<br>
-                  • Advanced statistics & history<br>
-                  • Priority support
+                  • Custom color themes & UI layouts<br>
+                  • Advanced statistics & session history<br>
+                  • Priority support & early features<br>
+                  • Export/Import settings backups<br><br>
+                  <b style="color:var(--accent)">Only €4.99/month</b>
                 </div>
               </div>
             </div>
@@ -3649,6 +3651,56 @@
         if (syncNowBtn) syncNowBtn.disabled = true;
         if (accountStatsCard) accountStatsCard.style.display = 'none';
       }
+
+      // Update Premium status (async for both logged in/out states)
+      updatePremiumStatus();
+    }
+
+    // Update Premium UI status
+    async function updatePremiumStatus() {
+      const premiumStatus = document.getElementById('premiumStatus');
+      const upgradePremiumBtn = document.getElementById('upgradePremiumBtn');
+      
+      if (!premiumStatus || !upgradePremiumBtn) return;
+
+      if (userProfile && authTokens) {
+        try {
+          const premiumData = await ipcRenderer.invoke('premium:checkStatus', userProfile.id);
+          
+          if (premiumData.isPremium) {
+            const expiresDate = new Date(premiumData.expiresAt).toLocaleDateString();
+            premiumStatus.innerHTML = `
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <span style="font-weight:600;font-size:14px;color:var(--accent)">✨ Premium Active</span>
+                <span style="font-size:12px;color:var(--muted)">Expires: ${expiresDate}</span>
+              </div>
+            `;
+            upgradePremiumBtn.textContent = 'Manage';
+            upgradePremiumBtn.disabled = false;
+          } else {
+            premiumStatus.innerHTML = `
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <span style="font-weight:600;font-size:14px">Free Plan</span>
+                <span style="font-size:12px;color:var(--muted)">Unlock all features with Premium</span>
+              </div>
+            `;
+            upgradePremiumBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-premium"/></svg><span>Upgrade</span>';
+            upgradePremiumBtn.disabled = false;
+          }
+        } catch (error) {
+          console.error('[Premium] Status check failed:', error);
+        }
+      } else {
+        // Logged out state
+        premiumStatus.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="font-weight:600;font-size:14px">Free Plan</span>
+            <span style="font-size:12px;color:var(--muted)">Login to upgrade to Premium</span>
+          </div>
+        `;
+        upgradePremiumBtn.textContent = 'Upgrade';
+        upgradePremiumBtn.disabled = true;
+      }
     }
 
     // Discord Login Handler
@@ -3871,6 +3923,69 @@
           syncNowBtn.textContent = 'Sync Now';
         }
       });
+    }
+
+    // Premium Upgrade Handler
+    const upgradePremiumBtn = document.getElementById('upgradePremiumBtn');
+    if (upgradePremiumBtn) {
+      upgradePremiumBtn.addEventListener('click', async () => {
+        if (!userProfile) {
+          showNotification('Please login with Discord first');
+          return;
+        }
+
+        try {
+          upgradePremiumBtn.disabled = true;
+          upgradePremiumBtn.textContent = 'Opening payment...';
+          
+          const result = await ipcRenderer.invoke('premium:createCheckout', userProfile.id);
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          showNotification('Payment page opened in browser. Complete your purchase and return to verify.');
+          
+          // Show verification dialog after a delay
+          setTimeout(() => {
+            showPremiumVerificationDialog();
+          }, 2000);
+          
+        } catch (err) {
+          console.error('Premium checkout error:', err);
+          showNotification('Failed to open payment: ' + (err.message || err));
+        } finally {
+          upgradePremiumBtn.disabled = false;
+          updatePremiumStatus(); // Reset button text
+        }
+      });
+    }
+
+    // Premium verification dialog
+    function showPremiumVerificationDialog() {
+      const token = prompt('Enter your purchase confirmation token from the payment page:');
+      
+      if (token && token.trim().length > 0) {
+        verifyPremiumPurchase(token.trim());
+      }
+    }
+
+    // Verify premium purchase
+    async function verifyPremiumPurchase(purchaseToken) {
+      try {
+        const result = await ipcRenderer.invoke('premium:verify', userProfile.id, purchaseToken);
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        showNotification('🎉 Premium activated successfully! Welcome to Nebula Premium!');
+        updateProfileUI(); // Refresh premium status
+        
+      } catch (err) {
+        console.error('Premium verification error:', err);
+        showNotification('Premium verification failed: ' + (err.message || err));
+      }
     }
 
     // Token refresh logic (check if token needs refresh on app start)

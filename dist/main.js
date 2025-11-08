@@ -755,3 +755,178 @@ electron_1.ipcMain.handle('auth:discord:refresh', async (_e, refreshToken) => {
         return { error: String(err) };
     }
 });
+// Get Firebase configuration for renderer process
+electron_1.ipcMain.handle('firebase:getConfig', async () => {
+    return {
+        apiKey: process.env.FIREBASE_API_KEY,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.FIREBASE_APP_ID
+    };
+});
+// Initialize Firebase in main process
+let firebaseApp = null;
+let firestore = null;
+async function initFirebaseMain() {
+    if (firebaseApp)
+        return true; // Already initialized
+    try {
+        const { initializeApp } = require('firebase/app');
+        const { getFirestore, doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
+        const firebaseConfig = {
+            apiKey: process.env.FIREBASE_API_KEY,
+            authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+            appId: process.env.FIREBASE_APP_ID
+        };
+        if (!firebaseConfig.apiKey) {
+            console.error('[Firebase Main] No API key found');
+            return false;
+        }
+        firebaseApp = initializeApp(firebaseConfig);
+        firestore = getFirestore(firebaseApp);
+        console.log('[Firebase Main] Initialized successfully');
+        return true;
+    }
+    catch (error) {
+        console.error('[Firebase Main] Initialization failed:', error);
+        return false;
+    }
+}
+// Firebase Cloud Sync Handlers
+electron_1.ipcMain.handle('firebase:upload', async (_e, userId, settings) => {
+    if (!await initFirebaseMain()) {
+        return { error: 'Firebase not initialized' };
+    }
+    try {
+        const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
+        const userDocRef = doc(firestore, 'users', userId);
+        await setDoc(userDocRef, {
+            settings,
+            updatedAt: serverTimestamp(),
+            version: '1.0.0'
+        });
+        console.log('[Firebase Main] Settings uploaded for user:', userId);
+        return { success: true };
+    }
+    catch (error) {
+        console.error('[Firebase Main] Upload failed:', error);
+        return { error: String(error) };
+    }
+});
+electron_1.ipcMain.handle('firebase:download', async (_e, userId) => {
+    if (!await initFirebaseMain()) {
+        return { error: 'Firebase not initialized' };
+    }
+    try {
+        const { doc, getDoc } = require('firebase/firestore');
+        const userDocRef = doc(firestore, 'users', userId);
+        const docSnap = await getDoc(userDocRef);
+        if (!docSnap.exists()) {
+            return { success: true, data: null };
+        }
+        const data = docSnap.data();
+        const timestamp = data.updatedAt ? data.updatedAt.toMillis() : 0;
+        console.log('[Firebase Main] Settings downloaded for user:', userId);
+        return {
+            success: true,
+            data: data.settings,
+            timestamp: timestamp
+        };
+    }
+    catch (error) {
+        console.error('[Firebase Main] Download failed:', error);
+        return { error: String(error) };
+    }
+});
+// ==========================================
+// Premium System
+// ==========================================
+// Premium subscription check via Firebase
+electron_1.ipcMain.handle('premium:checkStatus', async (_e, userId) => {
+    if (!await initFirebaseMain()) {
+        return { isPremium: false, error: 'Firebase not initialized' };
+    }
+    try {
+        const { doc, getDoc } = require('firebase/firestore');
+        const userDocRef = doc(firestore, 'premium', userId);
+        const docSnap = await getDoc(userDocRef);
+        if (!docSnap.exists()) {
+            return { isPremium: false };
+        }
+        const data = docSnap.data();
+        const expiresAt = data.expiresAt ? data.expiresAt.toMillis() : 0;
+        const now = Date.now();
+        return {
+            isPremium: expiresAt > now,
+            expiresAt: expiresAt,
+            plan: data.plan || 'premium',
+            status: data.status || 'active'
+        };
+    }
+    catch (error) {
+        console.error('[Premium] Status check failed:', error);
+        return { isPremium: false, error: String(error) };
+    }
+});
+// Create Stripe checkout session (placeholder - needs backend)
+electron_1.ipcMain.handle('premium:createCheckout', async (_e, userId) => {
+    // In production: This would call your backend API to create Stripe session
+    // For now: Open Stripe payment link or redirect to website
+    try {
+        const checkoutUrl = `https://your-backend.com/checkout?user=${userId}`;
+        // For demo: simulate opening checkout
+        console.log('[Premium] Would open checkout URL:', checkoutUrl);
+        // Open payment page in browser
+        await electron_1.shell.openExternal('https://buy.stripe.com/test_your_payment_link'); // Replace with real link
+        return { success: true, message: 'Payment page opened in browser' };
+    }
+    catch (error) {
+        console.error('[Premium] Checkout failed:', error);
+        return { error: String(error) };
+    }
+});
+// Verify premium purchase (webhook simulation)
+electron_1.ipcMain.handle('premium:verify', async (_e, userId, purchaseToken) => {
+    if (!await initFirebaseMain()) {
+        return { error: 'Firebase not initialized' };
+    }
+    try {
+        // In production: Verify purchase token with your backend/Stripe
+        // For demo: Accept any non-empty token
+        if (!purchaseToken || purchaseToken.length < 10) {
+            return { error: 'Invalid purchase token. For demo, use: "DEMO_PREMIUM_TOKEN_12345"' };
+        }
+        const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
+        // Add 1 month of premium
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+        const premiumDocRef = doc(firestore, 'premium', userId);
+        await setDoc(premiumDocRef, {
+            plan: 'premium',
+            status: 'active',
+            purchaseToken: purchaseToken,
+            purchasedAt: serverTimestamp(),
+            expiresAt: expiresAt,
+            features: {
+                unlimitedNicks: true,
+                customThemes: true,
+                advancedStats: true,
+                prioritySupport: true
+            }
+        });
+        console.log('[Premium] Activated for user:', userId);
+        return {
+            success: true,
+            expiresAt: expiresAt.getTime(),
+            message: 'Premium activated successfully!'
+        };
+    }
+    catch (error) {
+        console.error('[Premium] Verification failed:', error);
+        return { error: String(error) };
+    }
+});

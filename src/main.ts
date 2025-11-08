@@ -871,3 +871,106 @@ ipcMain.handle('firebase:download', async (_e, userId: string) => {
     return { error: String(error) };
   }
 });
+
+// ==========================================
+// Premium System
+// ==========================================
+
+// Premium subscription check via Firebase
+ipcMain.handle('premium:checkStatus', async (_e, userId: string) => {
+  if (!await initFirebaseMain()) {
+    return { isPremium: false, error: 'Firebase not initialized' };
+  }
+  
+  try {
+    const { doc, getDoc } = require('firebase/firestore');
+    
+    const userDocRef = doc(firestore, 'premium', userId);
+    const docSnap = await getDoc(userDocRef);
+    
+    if (!docSnap.exists()) {
+      return { isPremium: false };
+    }
+    
+    const data = docSnap.data();
+    const expiresAt = data.expiresAt ? data.expiresAt.toMillis() : 0;
+    const now = Date.now();
+    
+    return {
+      isPremium: expiresAt > now,
+      expiresAt: expiresAt,
+      plan: data.plan || 'premium',
+      status: data.status || 'active'
+    };
+  } catch (error) {
+    console.error('[Premium] Status check failed:', error);
+    return { isPremium: false, error: String(error) };
+  }
+});
+
+// Create Stripe checkout session (placeholder - needs backend)
+ipcMain.handle('premium:createCheckout', async (_e, userId: string) => {
+  // In production: This would call your backend API to create Stripe session
+  // For now: Open Stripe payment link or redirect to website
+  
+  try {
+    const checkoutUrl = `https://your-backend.com/checkout?user=${userId}`;
+    
+    // For demo: simulate opening checkout
+    console.log('[Premium] Would open checkout URL:', checkoutUrl);
+    
+    // Open payment page in browser
+    await shell.openExternal('https://buy.stripe.com/test_your_payment_link'); // Replace with real link
+    
+    return { success: true, message: 'Payment page opened in browser' };
+  } catch (error) {
+    console.error('[Premium] Checkout failed:', error);
+    return { error: String(error) };
+  }
+});
+
+// Verify premium purchase (webhook simulation)
+ipcMain.handle('premium:verify', async (_e, userId: string, purchaseToken: string) => {
+  if (!await initFirebaseMain()) {
+    return { error: 'Firebase not initialized' };
+  }
+  
+  try {
+    // In production: Verify purchase token with your backend/Stripe
+    // For demo: Accept any non-empty token
+    
+    if (!purchaseToken || purchaseToken.length < 10) {
+      return { error: 'Invalid purchase token. For demo, use: "DEMO_PREMIUM_TOKEN_12345"' };
+    }
+    
+    const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
+    
+    // Add 1 month of premium
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    
+    const premiumDocRef = doc(firestore, 'premium', userId);
+    await setDoc(premiumDocRef, {
+      plan: 'premium',
+      status: 'active',
+      purchaseToken: purchaseToken,
+      purchasedAt: serverTimestamp(),
+      expiresAt: expiresAt,
+      features: {
+        unlimitedNicks: true,
+        customThemes: true,
+        advancedStats: true,
+        prioritySupport: true
+      }
+    });
+    
+    console.log('[Premium] Activated for user:', userId);
+    return { 
+      success: true, 
+      expiresAt: expiresAt.getTime(),
+      message: 'Premium activated successfully!' 
+    };
+  } catch (error) {
+    console.error('[Premium] Verification failed:', error);
+    return { error: String(error) };
+  }
+});
