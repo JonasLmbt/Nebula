@@ -299,6 +299,35 @@
   .settings-subsection{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.06)}
   .settings-subsection:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
   .source-options{margin-left:0;display:flex;flex-direction:column;gap:4px}
+
+  /* --- Client Selection Redesign --- */
+  #clientSelectGrid{--btn-h:34px}
+  .client-btn{
+    position:relative;display:flex;align-items:center;justify-content:center;gap:6px;
+    background:linear-gradient(145deg,rgba(40,44,52,0.65),rgba(34,38,46,0.65));
+    border:1px solid rgba(255,255,255,0.08);color:var(--text);font-size:12px;font-weight:600;
+    padding:6px 10px;border-radius:8px;cursor:pointer;letter-spacing:.4px;min-height:var(--btn-h);
+    transition:.18s cubic-bezier(.25,.8,.25,1);backdrop-filter:blur(6px);
+  }
+  .client-btn:hover{border-color:var(--accent);color:#fff;box-shadow:0 0 0 3px rgba(102,234,255,0.15)}
+  .client-btn:active{transform:scale(.96)}
+  .client-btn.active{
+    background:linear-gradient(135deg,var(--accent) 0%,#41c4e6 100%);
+    color:#0b1e24;border-color:var(--accent);box-shadow:0 4px 14px -4px rgba(102,234,255,0.5);
+  }
+  .client-btn[data-detected="1"]:not(.active){
+    outline:2px solid var(--accent);outline-offset:2px;
+  }
+  .client-btn .badge{background:rgba(255,255,255,0.15);padding:2px 5px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.5px}
+  .client-btn.active .badge{background:rgba(0,0,0,0.25);color:#fff}
+  #clientStatus{margin-top:4px;font-size:12px;line-height:1.4;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06)}
+  #clientStatus.warn{background:rgba(224,193,77,0.15);border-color:rgba(224,193,77,0.4);color:#f3d98a}
+  #clientStatus.ok{background:rgba(67,209,127,0.18);border-color:rgba(67,209,127,0.45);color:#7bf3af}
+  #autoDetectBtn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:var(--text);font-weight:600}
+  #autoDetectBtn:hover{background:var(--accent);color:#04161c;border-color:var(--accent);box-shadow:0 4px 12px -2px rgba(102,234,255,0.5)}
+  #customPathRow input{font-size:12px}
+  #applyCustomPathBtn{background:linear-gradient(135deg,var(--accent) 0%,#41c4e6 100%);color:#06242b;font-weight:600}
+  #applyCustomPathBtn:hover{filter:brightness(1.07)}
   </style>
 </head>
 
@@ -332,6 +361,11 @@
     <symbol id="i-basic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4 7h12"/><circle cx="16" cy="7" r="2.5"/>
       <path d="M4 17h8"/><circle cx="10" cy="17" r="2.5"/>
+    </symbol>
+    <symbol id="i-client" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2"/>
+      <path d="M7 9h5M7 13h3M14 13h3"/>
+      <path d="M14 9h3"/>
     </symbol>
     <symbol id="i-appearance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="7"/><path d="M5 12h14M12 5v14"/>
@@ -551,29 +585,47 @@
           </h2>
 
           <div class="settings-subsection">
-            <h3 style="margin: 20px 0 12px; font-size: 16px; font-weight: 600;">Essential</h3>
+            <h3 style="margin: 20px 0 12px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+              <svg class="icon" aria-hidden="true"><use href="#i-client"/></svg>
+              Client Selection
+            </h3>
             
             <!-- Log File Dropdown -->
-            <div class="settings-row">
-              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                <label class="settings-label" style="margin: 0;">Log File</label>
-                <select id="logFileSelect" class="settings-select" style="width: 100%;">
-                  <option value="badlion">Badlion Client</option>
-                  <option value="lunar">Lunar Client</option>
-                  <option value="vanilla">Vanilla/Other</option>
-                  <option value="custom">Custom Path...</option>
-                </select>
-                <small style="color: var(--muted); font-size: 12px;">Make sure that the log file is set correctly.</small>
+            <div class="settings-subrow" style="display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
+                <label class="settings-label" style="margin:0;">Minecraft Client</label>
+                <button id="autoDetectBtn" type="button" style="margin-left:auto;background:var(--row);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Auto-Detect</button>
               </div>
+              <div id="clientSelectGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;width:100%;">
+                <button class="client-btn" data-client="badlion"><span class="badge">BL</span> Badlion</button>
+                <button class="client-btn" data-client="lunar"><span class="badge">LC</span> Lunar</button>
+                <button class="client-btn" data-client="vanilla"><span class="badge">VN</span> Vanilla</button>
+                <button class="client-btn" data-client="pvplounge"><span class="badge">PL</span> PvPLounge</button>
+                <button class="client-btn" data-client="labymod"><span class="badge">LM</span> LabyMod</button>
+                <button class="client-btn" data-client="feather"><span class="badge">FT</span> Feather</button>
+                <button class="client-btn" data-client="custom"><span class="badge">C</span> Custom...</button>
+              </div>
+              <div id="customPathRow" style="display:none;flex-direction:column;gap:4px;">
+                <input id="customLogPathInput" type="text" placeholder="Absolute Pfad zur latest.log" style="width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:12px;" />
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <button id="applyCustomPathBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Apply Path</button>
+                  <small style="color:var(--muted);font-size:11px;">Pfad ändern setzt Spieler-/Party-Listen zurück.</small>
+                </div>
+              </div>
+              <div id="clientStatus" class="ok">Noch kein Client ausgewählt.</div>
             </div>
+            <h3 style="margin: 28px 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+              <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
+              Username
+            </h3>
 
             <!-- Username Input -->
-            <div class="settings-row">
+            <div class="settings-row" style="margin-top:4px;">
               <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
               <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                <label class="settings-label" style="margin: 0;">Username</label>
-                <input id="usernameInput" type="text" placeholder="Your Minecraft username" class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
+                <input id="usernameInput" type="text" placeholder="Minecraft IGN eingeben..." class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
+                <small style="color:var(--muted);font-size:11px;">Wird genutzt für Erwähnungen im Chat & automatische Listenaufnahme.</small>
               </div>
             </div>
           </div>
@@ -681,6 +733,10 @@
               <label class="settings-checkbox">
                 <input type="checkbox" id="chatRemoveOnServerChange" checked />
                 <span>Remove All on Server Change</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="chatAddOnMention" checked />
+                <span>Players who mention your name are auto-added</span>
               </label>
               <div style="margin-top:12px;">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
@@ -1458,11 +1514,14 @@
         }
       } catch (err) {
         console.error('Error handling chat:message', err);
-    // Username mention → add player with 'username' source
+    // Username mention → add player if enabled under chat settings
     ipcRenderer.on('chat:usernameMention', (_e, name) => {
       try {
         if (!name || typeof name !== 'string') return;
-        addPlayer(name, 'username');
+        if (!sourcesSettings?.chat?.enabled) return;
+        if (sourcesSettings?.chat?.addOnMention) {
+          addPlayer(name, 'chat');
+        }
       } catch (err) {
         console.error('Error handling chat:usernameMention', err);
       }
@@ -2219,9 +2278,10 @@
 
     // --- Basic Settings
     const defaultBasic = {
-      logFile: 'badlion',
-      customLogPath: '',
-      username: ''
+      logFile: 'badlion', // selected client key OR 'custom'
+      customLogPath: '', // manual path if logFile === 'custom'
+      username: '',
+      lastDetected: { client: '', path: '' }
     };
 
     let basicSettings = JSON.parse(localStorage.getItem('basicSettings') || JSON.stringify(defaultBasic));
@@ -2246,17 +2306,122 @@
       }
 
     // Bind Basic inputs
-    const logFileSelect = document.getElementById('logFileSelect');
+    // Client selection elements
+    const clientGrid = document.getElementById('clientSelectGrid');
+    const clientStatusEl = document.getElementById('clientStatus');
+    const autoDetectBtn = document.getElementById('autoDetectBtn');
+    const customRow = document.getElementById('customPathRow');
+    const customPathInput = document.getElementById('customLogPathInput');
+    const applyCustomBtn = document.getElementById('applyCustomPathBtn');
     const usernameInput = document.getElementById('usernameInput');
 
-    if (logFileSelect) {
-      logFileSelect.value = basicSettings.logFile || 'badlion';
-      logFileSelect.addEventListener('change', () => {
-        basicSettings.logFile = logFileSelect.value;
+    function updateClientButtons() {
+      if (!clientGrid) return;
+      const selected = basicSettings.logFile || 'badlion';
+      clientGrid.querySelectorAll('button.client-btn').forEach(btn => {
+        const key = btn.getAttribute('data-client');
+        if (key === selected) btn.classList.add('active'); else btn.classList.remove('active');
+        // mark detected (if different from selected and not custom)
+        if (basicSettings.lastDetected?.client === key && key !== selected) {
+          btn.setAttribute('data-detected','1');
+        } else {
+          btn.removeAttribute('data-detected');
+        }
+      });
+      if (selected === 'custom') {
+        if (customRow) customRow.style.display = 'flex';
+      } else {
+        if (customRow) customRow.style.display = 'none';
+      }
+    }
+
+    function updateClientStatus(extra) {
+      if (!clientStatusEl) return;
+      clientStatusEl.classList.remove('warn','ok');
+      let line = '';
+      const sel = basicSettings.logFile;
+      if (sel === 'custom') {
+        line = `Custom Pfad aktiv: ${basicSettings.customLogPath || '(leer)'}`;
+      } else {
+        line = `Aktiver Client: ${sel}`;
+      }
+      if (basicSettings.lastDetected?.client && basicSettings.lastDetected.client !== sel) {
+        line += ` • Zuletzt erkannt: ${basicSettings.lastDetected.client}`;
+        clientStatusEl.classList.add('warn');
+      } else if (basicSettings.lastDetected?.client === sel) {
+        clientStatusEl.classList.add('ok');
+      }
+      if (extra) line += ` • ${extra}`;
+      clientStatusEl.textContent = line;
+    }
+
+    if (clientGrid) {
+      clientGrid.addEventListener('click', (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement) || !target.classList.contains('client-btn')) return;
+        const key = target.getAttribute('data-client');
+        if (!key) return;
+        basicSettings.logFile = key;
         saveBasicSettings();
-        // TODO: wenn custom, zeige Datei-Dialog oder Input-Feld
+        updateClientButtons();
+        updateClientStatus();
+        try {
+          if (key === 'custom') {
+            // do nothing yet; wait for Apply
+          } else {
+            require('electron').ipcRenderer.send('set:client', key);
+          }
+        } catch {}
+      });
+      updateClientButtons();
+      updateClientStatus();
+    }
+
+    if (applyCustomBtn && customPathInput) {
+      applyCustomBtn.addEventListener('click', () => {
+        const p = (customPathInput.value || '').trim();
+        basicSettings.customLogPath = p;
+        saveBasicSettings();
+        updateClientStatus();
+        if (basicSettings.logFile === 'custom' && p) {
+          try { require('electron').ipcRenderer.send('set:logPath', p); } catch {}
+        }
       });
     }
+
+    if (autoDetectBtn) {
+      autoDetectBtn.addEventListener('click', async () => {
+        try {
+          const res = await require('electron').ipcRenderer.invoke('chat:autoDetect');
+          if (Array.isArray(res) && res.length === 2) {
+            basicSettings.lastDetected = { client: res[0], path: res[1] };
+            // If user hasn't manually chosen custom, adopt detected client
+            if (basicSettings.logFile !== 'custom') {
+              basicSettings.logFile = res[0];
+              try { require('electron').ipcRenderer.send('set:client', res[0]); } catch {}
+            }
+            saveBasicSettings();
+            updateClientButtons();
+            updateClientStatus('Auto-Detect erfolgreich');
+          } else {
+            updateClientStatus('Keine Logs gefunden');
+          }
+        } catch (err) {
+          updateClientStatus('Auto-Detect Fehler');
+        }
+      });
+    }
+
+    // Listen for backend log path changes to reflect status
+    try {
+      require('electron').ipcRenderer.on('chat:logPathChanged', (_e, payload) => {
+        if (payload?.client && basicSettings.logFile !== 'custom') {
+          // Sync chosen client if backend auto switched due to detection
+          if (!basicSettings.logFile) basicSettings.logFile = payload.client;
+        }
+        updateClientStatus('Pfad gewechselt');
+      });
+    } catch {}
 
     if (usernameInput) {
       usernameInput.value = basicSettings.username || '';
@@ -2304,6 +2469,7 @@
       chat: {
         enabled: true,
         removeOnServerChange: true,
+        addOnMention: true,
         strings: []
       }
     };
@@ -2333,6 +2499,7 @@
     
     const sourceChatToggle = document.getElementById('sourceChatToggle');
     const chatRemoveOnServerChange = document.getElementById('chatRemoveOnServerChange');
+  const chatAddOnMention = document.getElementById('chatAddOnMention');
   const chatStringList = document.getElementById('chatStringList');
   const addChatStringBtn = document.getElementById('addChatString');
 
@@ -2437,6 +2604,14 @@
       chatRemoveOnServerChange.checked = sourcesSettings.chat.removeOnServerChange;
       chatRemoveOnServerChange.addEventListener('change', () => {
         sourcesSettings.chat.removeOnServerChange = chatRemoveOnServerChange.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (chatAddOnMention) {
+      chatAddOnMention.checked = sourcesSettings.chat.addOnMention;
+      chatAddOnMention.addEventListener('change', () => {
+        sourcesSettings.chat.addOnMention = chatAddOnMention.checked;
         saveSourcesSettings();
       });
     }

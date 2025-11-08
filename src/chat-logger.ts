@@ -1,63 +1,134 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import EventEmitter from 'events';
 import { Tail } from 'tail';
 
-const CLIENT_PATHS: Record<string, string> = {
-  vanilla: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
+// Base client log path templates (Windows; macOS variants would be added similarly if needed)
+const BASE_CLIENT_PATHS: Record<string, string> = {
   badlion: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'blclient', 'minecraft', 'latest.log'),
-  lunar: path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8.9', 'logs', 'latest.log'),
+  vanilla: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
   pvplounge: path.join(process.env.APPDATA || '', '.pvplounge', 'logs', 'latest.log'),
   labymod: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'fml-client-latest.log'),
   feather: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
 };
 
-function detectClientLogPath(manual?: string): string | undefined {
-  if (manual) return fs.existsSync(manual) ? manual : undefined;
-
-  let newest: { path: string | undefined; mtime: number } = { path: undefined, mtime: 0 };
-  for (const p of Object.values(CLIENT_PATHS)) {
+// Lunar has multiple possible folders depending on version
+function detectLunarPath(): string | undefined {
+  const candidates = [
+    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8', 'logs', 'latest.log'),
+    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8.9', 'logs', 'latest.log'),
+    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', 'multiver', 'logs', 'latest.log'),
+  ];
+  let newest: { p?: string; m: number } = { p: undefined, m: 0 };
+  for (const p of candidates) {
     try {
       if (fs.existsSync(p)) {
         const s = fs.statSync(p);
         const m = s.mtimeMs || s.mtime.getTime();
-        if (m > newest.mtime) {
-          newest = { path: p, mtime: m };
-        }
+        if (m > newest.m) newest = { p, m };
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch {/* ignore */}
   }
+  return newest.p;
+}
 
-  return newest.path;
+function buildClientPaths(): Record<string, string> {
+  const lunar = detectLunarPath();
+  return { ...BASE_CLIENT_PATHS, ...(lunar ? { lunar } : {}) };
+}
+
+function autoDetectLatest(paths: Record<string,string>): [string, string] | undefined {
+  let best: { client?: string; path?: string; m: number } = { m: 0 };
+  for (const [client, p] of Object.entries(paths)) {
+    try {
+      if (fs.existsSync(p)) {
+        const s = fs.statSync(p);
+        const m = s.mtimeMs || s.mtime.getTime();
+        if (m > best.m) best = { client, path: p, m };
+      }
+    } catch {/* ignore */}
+  }
+  return best.client && best.path ? [best.client, best.path] : undefined;
 }
 
 export class MinecraftChatLogger extends EventEmitter {
   private tail?: Tail;
   private logPath?: string;
+  private clientPaths: Record<string,string> = buildClientPaths();
   public players = new Set<string>();
   public partyMembers = new Set<string>();
   public inLobby = false;
   public username?: string;
+  public chosenClient?: string; // explicit chosen client key
+  public detectedClient?: string; // latest modified client key
 
-  constructor(opts?: { manualPath?: string; username?: string }) {
+  constructor(opts?: { client?: string; manualPath?: string; username?: string }) {
     super();
-  this.username = opts?.username;
-    this.logPath = detectClientLogPath(opts?.manualPath);
+    this.username = opts?.username;
+    this.chosenClient = opts?.client;
+    // Manual path wins; else chosen client; else auto-detect latest
+    if (opts?.manualPath) {
+      this.logPath = fs.existsSync(opts.manualPath) ? opts.manualPath : undefined;
+    } else if (this.chosenClient && this.clientPaths[this.chosenClient]) {
+      this.logPath = this.clientPaths[this.chosenClient];
+    } else {
+      const auto = autoDetectLatest(this.clientPaths);
+      if (auto) {
+        this.detectedClient = auto[0];
+        this.logPath = auto[1];
+      }
+    }
     if (!this.logPath) {
       setImmediate(() => this.emit('error', new Error('No Minecraft log file found')));
       return;
     }
+    this.startTail(this.logPath);
+  }
 
+  private refreshClientPaths() {
+    this.clientPaths = buildClientPaths();
+  }
+
+  public setClient(client: string) {
+    this.refreshClientPaths();
+    if (!client || !this.clientPaths[client]) return;
+    this.chosenClient = client;
+    const newPath = this.clientPaths[client];
+    if (newPath !== this.logPath) {
+      this.switchLogPath(newPath);
+    }
+  }
+
+  public autoDetect() {
+    this.refreshClientPaths();
+    const auto = autoDetectLatest(this.clientPaths);
+    if (auto) {
+      this.detectedClient = auto[0];
+      if (!this.chosenClient) this.switchLogPath(auto[1]);
+      return auto;
+    }
+    return undefined;
+  }
+
+  private startTail(p: string) {
     try {
-      this.tail = new Tail(this.logPath, { useWatchFile: true, nLines: 1, fsWatchOptions: { interval: 200 } });
+      this.tail = new Tail(p, { useWatchFile: true, nLines: 1, fsWatchOptions: { interval: 200 } });
       this.tail.on('line', this.handleLine.bind(this));
       this.tail.on('error', (err: any) => this.emit('error', err));
     } catch (e) {
       setImmediate(() => this.emit('error', e));
     }
+  }
+
+  public switchLogPath(newPath: string) {
+    if (!newPath || newPath === this.logPath) return;
+    this.stop();
+    this.logPath = newPath;
+    this.players.clear();
+    this.partyMembers.clear();
+    this.inLobby = false;
+    this.startTail(newPath);
+    this.emit('logPathChanged', { path: newPath, client: this.chosenClient || this.detectedClient });
   }
 
   private stripColorCodes(s: string) {
@@ -78,6 +149,8 @@ export class MinecraftChatLogger extends EventEmitter {
         return name.substring(name.indexOf(']') + 1).trim();
       }
       return name.trim();
+    };
+
     // Server change detection
     if (msg.includes('Sending you to') && !msg.includes(':')) {
       this.players.clear();
@@ -92,8 +165,6 @@ export class MinecraftChatLogger extends EventEmitter {
       this.emit('lobbyJoined');
       return;
     }
-
-    };
 
     // /who output: ONLINE: player1, player2, player3
     if (msg.indexOf('ONLINE:') !== -1 && msg.indexOf(',') !== -1) {
@@ -276,7 +347,7 @@ export class MinecraftChatLogger extends EventEmitter {
   }
 
   stop() {
-    try { this.tail?.unwatch(); } catch (e) { /* noop */ }
+    try { this.tail?.unwatch(); } catch {/* noop */ }
   }
 }
 

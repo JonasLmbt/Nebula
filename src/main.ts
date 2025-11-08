@@ -85,12 +85,15 @@ app.whenReady().then(() => {
     });
     chat.on('serverChange', () => {
       if (win) win.webContents.send('chat:serverChange');
+    });
     chat.on('lobbyJoined', () => {
       if (win) win.webContents.send('chat:lobbyJoined');
     });
     chat.on('usernameMention', (name: string) => {
       if (win) win.webContents.send('chat:usernameMention', name);
     });
+    chat.on('logPathChanged', (payload: { path: string; client?: string }) => {
+      if (win) win.webContents.send('chat:logPathChanged', payload);
     });
     chat.on('error', (err) => console.error('ChatLogger error:', err));
 
@@ -100,6 +103,25 @@ app.whenReady().then(() => {
         chat.username = username;
         console.log('Updated ChatLogger username:', username);
       }
+    });
+    ipcMain.on('set:logPath', (_e, newPath: string) => {
+      try {
+        if (chat && typeof newPath === 'string' && newPath.trim().length) {
+          chat.switchLogPath(newPath.trim());
+          console.log('Switched ChatLogger log path:', newPath);
+        }
+      } catch (err) { console.error('Failed to switch log path', err); }
+    });
+    ipcMain.on('set:client', (_e, client: string) => {
+      try {
+        if (chat && typeof client === 'string' && client.trim()) {
+          chat.setClient(client.trim());
+          console.log('Selected ChatLogger client:', client);
+        }
+      } catch (err) { console.error('Failed to set client', err); }
+    });
+    ipcMain.handle('chat:autoDetect', () => {
+      try { return chat.autoDetect(); } catch { return undefined; }
     });
   } catch (e) {
     console.error('Failed to start ChatLogger', e);
