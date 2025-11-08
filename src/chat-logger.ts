@@ -40,9 +40,11 @@ export class MinecraftChatLogger extends EventEmitter {
   public players = new Set<string>();
   public partyMembers = new Set<string>();
   public inLobby = false;
+  public username?: string;
 
-  constructor(opts?: { manualPath?: string }) {
+  constructor(opts?: { manualPath?: string; username?: string }) {
     super();
+  this.username = opts?.username;
     this.logPath = detectClientLogPath(opts?.manualPath);
     if (!this.logPath) {
       setImmediate(() => this.emit('error', new Error('No Minecraft log file found')));
@@ -76,6 +78,21 @@ export class MinecraftChatLogger extends EventEmitter {
         return name.substring(name.indexOf(']') + 1).trim();
       }
       return name.trim();
+    // Server change detection
+    if (msg.includes('Sending you to') && !msg.includes(':')) {
+      this.players.clear();
+      this.inLobby = false;
+      this.emit('serverChange');
+      return;
+    }
+
+    // Lobby join detection
+    if ((msg.includes('joined the lobby!') || msg.includes('rewards!')) && !msg.includes(':')) {
+      this.inLobby = true;
+      this.emit('lobbyJoined');
+      return;
+    }
+
     };
 
     // /who output: ONLINE: player1, player2, player3
@@ -85,19 +102,20 @@ export class MinecraftChatLogger extends EventEmitter {
 
       const who = msg.substring(8)
         .split(', ')
-        .map(cleanName)
-        .filter(Boolean);
+        .map(s => cleanName(s))
+        .filter((s): s is string => !!s);
 
-      this.players.clear();
-      who.forEach(p => this.players.add(p));
+  this.players.clear();
+  who.forEach(p => { if (p) this.players.add(p); });
       this.emit('playersUpdated', Array.from(this.players));
       return;
     }
 
     // Player left/quit/disconnected
     if ((msg.indexOf('has quit') !== -1 || msg.indexOf('disconnected') !== -1) && msg.indexOf(':') === -1) {
-      const leftPlayer = cleanName(msg.split(' ')[0]);
-      if (this.players.has(leftPlayer)) {
+      const [firstToken] = msg.split(' ');
+      const leftPlayer = cleanName(firstToken || '');
+      if (leftPlayer && this.players.has(leftPlayer)) {
         this.players.delete(leftPlayer);
         this.emit('playersUpdated', Array.from(this.players));
       }
@@ -106,10 +124,11 @@ export class MinecraftChatLogger extends EventEmitter {
 
     // Final kill (remove player from active list)
     if (msg.indexOf('FINAL KILL') !== -1 && msg.indexOf(':') === -1) {
-      const killedPlayer = cleanName(msg.split(' ')[0]);
+      const [killToken] = msg.split(' ');
+      const killedPlayer = cleanName(killToken || '');
       // Emit specific event for final kill
       this.emit('finalKill', killedPlayer);
-      if (this.players.has(killedPlayer)) {
+      if (killedPlayer && this.players.has(killedPlayer)) {
         this.players.delete(killedPlayer);
         this.emit('playersUpdated', Array.from(this.players));
       }
@@ -122,11 +141,67 @@ export class MinecraftChatLogger extends EventEmitter {
       const members = tmsg.split(' ')
         .map(s => s.trim())
         .filter(m => /^[a-zA-Z0-9_]+$/.test(m))  // Valid Minecraft usernames only
-        .map(cleanName);
+        .map(s => cleanName(s))
+        .filter((s): s is string => !!s);
 
       // Update party members set
-      members.forEach(m => this.partyMembers.add(m));
+  members.forEach(m => { if (m) this.partyMembers.add(m); });
       this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+
+    // Party invite: "[RANK] Name has invited you to join their party!" (robust regex)
+    if (msg.includes('has invited you to join their party!') && msg.indexOf(':') === -1) {
+      const inviteMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has invited you to join their party!$/);
+      if (inviteMatch) {
+        const inviter = cleanName(inviteMatch[1]);
+        if (inviter) this.emit('partyInvite', inviter);
+        return;
+      }
+      // Fallback: try cutting before "has invited"
+      const cutIdx = msg.indexOf('has invited');
+      if (cutIdx > 0) {
+        const inviterRaw = msg.substring(0, cutIdx).trim();
+        const inviter = cleanName(inviterRaw.includes(']') ? inviterRaw.substring(inviterRaw.lastIndexOf(']') + 1).trim() : inviterRaw);
+        if (inviter) this.emit('partyInvite', inviter);
+        return;
+      }
+    }
+
+    // Self join: "You have joined [RANK] LeaderName's party!"
+    if (msg.startsWith('You have joined ') && msg.includes("'s party!") && msg.indexOf(':') === -1) {
+      // Clear previous party roster
+      this.partyMembers.clear();
+      // Extract segment between 'joined ' and "'s party!"
+      const afterJoined = msg.substring('You have joined '.length, msg.indexOf("'s party!"));
+      // Remove rank tag
+      const leader = cleanName(afterJoined.includes(']') ? afterJoined.substring(afterJoined.lastIndexOf(']') + 1).trim() : afterJoined.trim());
+      if (leader) this.partyMembers.add(leader);
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+
+    // Roster line after join: "You'll be partying with: [RANK] Member1, [RANK] Member2" (adds other members)
+    if (msg.startsWith("You'll be partying with:") && msg.indexOf(':') === "You'll be partying with:".length - 1) {
+      const listPart = msg.substring(msg.indexOf(':') + 1).trim();
+      const rawMembers = listPart.split(',').map(s => s.trim()).filter(Boolean);
+      rawMembers.forEach(r => {
+        const m = cleanName(r.includes(']') ? r.substring(r.lastIndexOf(']') + 1).trim() : r);
+        if (m) this.partyMembers.add(m);
+      });
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+
+    // Other player joins: "[RANK] Name joined the party!" or "Name joined the party!"
+    if ((msg.endsWith(' joined the party!') || msg.endsWith(' joined the party.') || msg.includes(' joined the party!')) && msg.indexOf(':') === -1 && !msg.startsWith('You ')) {
+      // token before ' joined'
+      const beforeJoined = msg.substring(0, msg.indexOf(' joined')).trim();
+      const joinedName = cleanName(beforeJoined.includes(']') ? beforeJoined.substring(beforeJoined.lastIndexOf(']') + 1).trim() : beforeJoined);
+      if (joinedName) {
+        this.partyMembers.add(joinedName);
+        this.emit('partyUpdated', Array.from(this.partyMembers));
+      }
       return;
     }
 
@@ -143,8 +218,8 @@ export class MinecraftChatLogger extends EventEmitter {
     if (msg.indexOf('joined the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
       let pjoin = msg.split(' ')[0];
       if (pjoin.indexOf('[') !== -1) pjoin = msg.split(' ')[1];
-      const joined = cleanName(pjoin);
-      this.partyMembers.add(joined);
+      const joined = cleanName(pjoin || '');
+      if (joined) this.partyMembers.add(joined);
       this.emit('partyUpdated', Array.from(this.partyMembers));
       return;
     }
@@ -159,10 +234,10 @@ export class MinecraftChatLogger extends EventEmitter {
     if (msg.indexOf('left the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
       let pleft = msg.split(' ')[0];
       if (pleft.indexOf('[') !== -1) pleft = msg.split(' ')[1];
-      const leftPlayer = cleanName(pleft);
-      this.partyMembers.delete(leftPlayer);
+      const leftPlayer = cleanName(pleft || '');
+      if (leftPlayer) this.partyMembers.delete(leftPlayer);
       this.emit('partyUpdated', Array.from(this.partyMembers));
-      if (this.players.has(leftPlayer)) {
+      if (leftPlayer && this.players.has(leftPlayer)) {
         this.players.delete(leftPlayer);
         this.emit('playersUpdated', Array.from(this.players));
       }
@@ -184,13 +259,17 @@ export class MinecraftChatLogger extends EventEmitter {
       if (!text) return;
 
       // Extract probable player name from prefix
-      let name = prefix;
+      let extracted = prefix;
       if (prefix.includes(']')) {
-        name = prefix.substring(prefix.lastIndexOf(']') + 1).trim();
+        extracted = prefix.substring(prefix.lastIndexOf(']') + 1).trim();
       }
-      name = cleanName(name);
-      if (name && /^[A-Za-z0-9_]{3,16}$/.test(name)) {
-        this.emit('message', { name, text });
+      const playerName = cleanName(extracted || '');
+      if (playerName && /^[A-Za-z0-9_]{3,16}$/.test(playerName)) {
+        this.emit('message', { name: playerName, text });
+        // Check if message mentions the user's username
+        if (this.username && text.toLowerCase().includes(this.username.toLowerCase())) {
+          this.emit('usernameMention', playerName);
+        }
       }
       return;
     }

@@ -630,18 +630,29 @@
             </div>
 
             <div class="source-options" id="partySourceOptions">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span>
-                <span style="font-weight: 500;">Auto-Refresh</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyRemoveOnMemberLeave" checked />
+                  <span>Remove member on leave</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyRemoveAllOnLeaveOrDisband" checked />
+                  <span>Clear all on party leave/disband</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyShowInviteTemp" checked />
+                  <span>Show invited player (temp)</span>
+                </label>
+                <label class="settings-checkbox" title="(Planned premium) Automatic refresh of party list on server change" style="opacity:.5;cursor:not-allowed">
+                  <input type="checkbox" id="partyRefreshServerChange" disabled />
+                  <span>Auto-Refresh server change</span>
+                </label>
+                <label class="settings-checkbox" title="(Planned premium) Automatic refresh after game end" style="opacity:.5;cursor:not-allowed">
+                  <input type="checkbox" id="partyRefreshGameEnd" disabled />
+                  <span>Auto-Refresh game end</span>
+                </label>
               </div>
-              <label class="settings-checkbox" style="margin-left: 32px;">
-                <input type="checkbox" id="partyRefreshServerChange" />
-                <span>On Server Change</span>
-              </label>
-              <label class="settings-checkbox" style="margin-left: 32px;">
-                <input type="checkbox" id="partyRefreshGameEnd" />
-                <span>On Game End</span>
-              </label>
+              <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Party options control how players with the party source are retained or removed.</small>
             </div>
           </div>
 
@@ -671,14 +682,14 @@
                 <input type="checkbox" id="chatRemoveOnServerChange" checked />
                 <span>Remove All on Server Change</span>
               </label>
-              
-              <div style="margin-top: 12px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <div style="margin-top:12px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                   <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
-                  <label class="settings-label" style="margin: 0;">Strings</label>
+                  <label class="settings-label" style="margin:0;">Trigger Strings</label>
+                  <button id="addChatString" type="button" style="margin-left:auto;background:var(--row);border:0;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">+ Add</button>
                 </div>
-                <textarea id="chatStrings" rows="3" placeholder="Enter chat strings (one per line)" class="settings-textarea" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 13px; font-family: monospace; resize: vertical;"></textarea>
-                <small style="display: block; color: var(--muted); margin-top: 4px; font-size: 12px;">Automatically add players who send a message containing one of the provided strings. Case-insensitive.</small>
+                <div id="chatStringList" style="display:flex;flex-direction:column;gap:6px;"></div>
+                <small style="display:block;color:var(--muted);margin-top:6px;font-size:11px;">Players are added when their message contains any trigger (case-insensitive).</small>
               </div>
             </div>
           </div>
@@ -1266,10 +1277,25 @@
     ipcRenderer.on('chat:party', (_e, members) => {
       try {
         if (!Array.isArray(members)) return;
+        const incoming = new Set(members.filter(m => typeof m === 'string').map(m => m.toLowerCase()));
+        // Add new members
         members.forEach(member => {
           if (!member || typeof member !== 'string') return;
           addPlayer(member, 'party');
         });
+        // Remove party source for players no longer in party
+        if (sourcesSettings?.party?.removeOnMemberLeave) {
+          for (const [key, sources] of Array.from(playerSources.entries())) {
+            if (sources.has('party') && !incoming.has(key)) {
+              sources.delete('party');
+              if (sources.size === 0) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources);
+              }
+            }
+          }
+        }
         renderTable();
         updateOverlaySize();
       } catch (err) {
@@ -1281,8 +1307,9 @@
     ipcRenderer.on('chat:partyInvite', (_e, inviter) => {
       try {
         if (!inviter || typeof inviter !== 'string') return;
-        // Add as temporary 'invite' source so it appears briefly
-        addPlayer(inviter, 'invite');
+        if (sourcesSettings?.party?.showInviteTemp) {
+          addPlayer(inviter, 'invite');
+        }
       } catch (err) {
         console.error('Error handling chat:partyInvite', err);
       }
@@ -1291,14 +1318,15 @@
     // Party cleared (You left the party)
     ipcRenderer.on('chat:partyCleared', () => {
       try {
-        // Remove all party sources
-        for (const [key, sources] of Array.from(playerSources.entries())) {
-          if (sources.has('party')) {
-            sources.delete('party');
-            if (sources.size === 0) {
-              removePlayer(key);
-            } else {
-              playerSources.set(key, sources);
+        if (sourcesSettings?.party?.removeAllOnLeaveOrDisband) {
+          for (const [key, sources] of Array.from(playerSources.entries())) {
+            if (sources.has('party')) {
+              sources.delete('party');
+              if (sources.size === 0) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources);
+              }
             }
           }
         }
@@ -1430,6 +1458,92 @@
         }
       } catch (err) {
         console.error('Error handling chat:message', err);
+    // Username mention → add player with 'username' source
+    ipcRenderer.on('chat:usernameMention', (_e, name) => {
+      try {
+        if (!name || typeof name !== 'string') return;
+        addPlayer(name, 'username');
+      } catch (err) {
+        console.error('Error handling chat:usernameMention', err);
+      }
+    });
+
+    // Server change → remove who/chat/username sources if enabled
+    ipcRenderer.on('chat:serverChange', () => {
+      try {
+        if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange) return;
+        const allKeys = Array.from(playerSources.keys());
+        allKeys.forEach(key => {
+          const sources = playerSources.get(key);
+          if (!sources) return;
+          let changed = false;
+          if (sourcesSettings?.game?.removeOnServerChange && sources.has('who')) {
+            sources.delete('who');
+            changed = true;
+          }
+          if (sourcesSettings?.chat?.removeOnServerChange) {
+            if (sources.has('chat')) {
+              sources.delete('chat');
+              changed = true;
+            }
+            if (sources.has('username')) {
+              sources.delete('username');
+              changed = true;
+            }
+          }
+          if (changed) {
+            if (sources.size === 0) {
+              removePlayer(key);
+            } else {
+              playerSources.set(key, sources);
+            }
+          }
+        });
+        renderTable();
+        updateOverlaySize();
+      } catch (err) {
+        console.error('Error handling chat:serverChange', err);
+      }
+    });
+
+    // Lobby join → remove who/chat/username sources if enabled
+    ipcRenderer.on('chat:lobbyJoined', () => {
+      try {
+        if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange) return;
+        const allKeys = Array.from(playerSources.keys());
+        allKeys.forEach(key => {
+          const sources = playerSources.get(key);
+          if (!sources) return;
+          let changed = false;
+          if (sourcesSettings?.game?.removeOnServerChange && sources.has('who')) {
+            sources.delete('who');
+            changed = true;
+          }
+          if (sourcesSettings?.chat?.removeOnServerChange) {
+            if (sources.has('chat')) {
+              sources.delete('chat');
+              changed = true;
+            }
+            if (sources.has('username')) {
+              sources.delete('username');
+              changed = true;
+            }
+          }
+          if (changed) {
+            if (sources.size === 0) {
+              removePlayer(key);
+            } else {
+              playerSources.set(key, sources);
+            }
+          }
+        });
+        renderTable();
+        updateOverlaySize();
+      } catch (err) {
+        console.error('Error handling chat:lobbyJoined', err);
+      }
+    });
+
       }
     });
 
@@ -2120,6 +2234,8 @@
         if (basicSettings.username && basicSettings.username.trim()) {
           addPlayer(basicSettings.username.trim(), 'username');
         }
+        // Inform main process / ChatLogger about username for mention detection
+        try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
     }
 
       function updateSidebarUsername() {
@@ -2162,6 +2278,8 @@
         addPlayer(basicSettings.username.trim(), 'username');
         renderTable();
       }
+      // Send initial username to main on load
+      try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
 
     // --- Sources Settings
     const defaultSources = {
@@ -2174,8 +2292,11 @@
       },
       party: {
         enabled: true,
-        autoRefreshServerChange: false, // premium
-        autoRefreshGameEnd: false // premium
+        removeOnMemberLeave: true,
+        removeAllOnLeaveOrDisband: true,
+        showInviteTemp: true,
+        autoRefreshServerChange: false, // premium placeholder
+        autoRefreshGameEnd: false // premium placeholder
       },
       partyInvites: {
         enabled: true
@@ -2202,14 +2323,18 @@
     const gameRemoveOnServerChange = document.getElementById('gameRemoveOnServerChange');
     
     const sourcePartyToggle = document.getElementById('sourcePartyToggle');
-    const partyRefreshServerChange = document.getElementById('partyRefreshServerChange');
-    const partyRefreshGameEnd = document.getElementById('partyRefreshGameEnd');
+  const partyRemoveOnMemberLeave = document.getElementById('partyRemoveOnMemberLeave');
+  const partyRemoveAllOnLeaveOrDisband = document.getElementById('partyRemoveAllOnLeaveOrDisband');
+  const partyShowInviteTemp = document.getElementById('partyShowInviteTemp');
+  const partyRefreshServerChange = document.getElementById('partyRefreshServerChange');
+  const partyRefreshGameEnd = document.getElementById('partyRefreshGameEnd');
     
     const sourcePartyInvitesToggle = document.getElementById('sourcePartyInvitesToggle');
     
     const sourceChatToggle = document.getElementById('sourceChatToggle');
     const chatRemoveOnServerChange = document.getElementById('chatRemoveOnServerChange');
-    const chatStrings = document.getElementById('chatStrings');
+  const chatStringList = document.getElementById('chatStringList');
+  const addChatStringBtn = document.getElementById('addChatString');
 
     if (sourceGameToggle) {
       sourceGameToggle.checked = sourcesSettings.game.enabled;
@@ -2259,21 +2384,37 @@
       });
     }
 
-    // Party auto-refresh are premium (disabled for now)
-    if (partyRefreshServerChange) {
-      partyRefreshServerChange.checked = sourcesSettings.party.autoRefreshServerChange;
-      partyRefreshServerChange.addEventListener('change', () => {
-        sourcesSettings.party.autoRefreshServerChange = partyRefreshServerChange.checked;
+    if (partyRemoveOnMemberLeave) {
+      partyRemoveOnMemberLeave.checked = !!sourcesSettings.party.removeOnMemberLeave;
+      partyRemoveOnMemberLeave.addEventListener('change', () => {
+        sourcesSettings.party.removeOnMemberLeave = partyRemoveOnMemberLeave.checked;
         saveSourcesSettings();
       });
     }
 
-    if (partyRefreshGameEnd) {
-      partyRefreshGameEnd.checked = sourcesSettings.party.autoRefreshGameEnd;
-      partyRefreshGameEnd.addEventListener('change', () => {
-        sourcesSettings.party.autoRefreshGameEnd = partyRefreshGameEnd.checked;
+    if (partyRemoveAllOnLeaveOrDisband) {
+      partyRemoveAllOnLeaveOrDisband.checked = !!sourcesSettings.party.removeAllOnLeaveOrDisband;
+      partyRemoveAllOnLeaveOrDisband.addEventListener('change', () => {
+        sourcesSettings.party.removeAllOnLeaveOrDisband = partyRemoveAllOnLeaveOrDisband.checked;
         saveSourcesSettings();
       });
+    }
+
+    if (partyShowInviteTemp) {
+      partyShowInviteTemp.checked = !!sourcesSettings.party.showInviteTemp;
+      partyShowInviteTemp.addEventListener('change', () => {
+        sourcesSettings.party.showInviteTemp = partyShowInviteTemp.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    // Party auto-refresh are premium (disabled for now)
+    // Premium placeholders (disabled)
+    if (partyRefreshServerChange) {
+      partyRefreshServerChange.checked = sourcesSettings.party.autoRefreshServerChange;
+    }
+    if (partyRefreshGameEnd) {
+      partyRefreshGameEnd.checked = sourcesSettings.party.autoRefreshGameEnd;
     }
 
     if (sourcePartyInvitesToggle) {
@@ -2300,13 +2441,62 @@
       });
     }
 
-    if (chatStrings) {
-      chatStrings.value = (sourcesSettings.chat.strings || []).join('\n');
-      chatStrings.addEventListener('input', () => {
-        sourcesSettings.chat.strings = chatStrings.value.split('\n').map(s => s.trim()).filter(Boolean);
+    function renderChatStrings() {
+      if (!chatStringList) return;
+      chatStringList.innerHTML = '';
+      (sourcesSettings.chat.strings || []).forEach((str, idx) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '6px';
+        row.innerHTML = `
+          <input type="text" value="${str.replace(/"/g,'&quot;')}" data-idx="${idx}" style="flex:1;padding:6px 8px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text);font-size:12px;" />
+          <button type="button" data-remove="${idx}" style="background:rgba(255,255,255,0.08);border:0;color:var(--text);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;">Remove</button>`;
+        chatStringList.appendChild(row);
+      });
+    }
+
+    function syncChatStringsFromDOM() {
+      if (!chatStringList) return;
+      const inputs = Array.from(chatStringList.querySelectorAll('input[type="text"]'));
+      const values = [];
+      for (var j=0;j<inputs.length;j++) {
+        var el = inputs[j];
+        var val = el && el.value != null ? String(el.value).trim() : '';
+        if (val.length>0) values.push(val);
+      }
+      sourcesSettings.chat.strings = values;
+      saveSourcesSettings();
+    }
+
+    if (addChatStringBtn) {
+      addChatStringBtn.addEventListener('click', () => {
+        sourcesSettings.chat.strings.push('');
+        renderChatStrings();
         saveSourcesSettings();
       });
     }
+
+    if (chatStringList) {
+      chatStringList.addEventListener('input', function(e) {
+        var tgt = e && e.target ? e.target : null;
+        if (tgt && tgt.tagName === 'INPUT') {
+          syncChatStringsFromDOM();
+        }
+      });
+      chatStringList.addEventListener('click', function(e) {
+        var t = e && e.target ? e.target : null;
+        if (t && t.dataset && t.dataset.remove) {
+          var idx = parseInt(t.dataset.remove, 10);
+          sourcesSettings.chat.strings.splice(idx,1);
+          renderChatStrings();
+          saveSourcesSettings();
+        }
+      });
+    }
+
+    // Initial render for chat strings
+    renderChatStrings();
 
     // Update table rendering to use stat settings
     function getColorForValue(column, value) {

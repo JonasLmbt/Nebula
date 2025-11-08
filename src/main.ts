@@ -64,7 +64,7 @@ app.whenReady().then(() => {
 
   // Start chat logger to detect local Minecraft chat and forward player lists to renderer
   try {
-    const chat = new MinecraftChatLogger();
+  let chat = new MinecraftChatLogger();
     chat.on('playersUpdated', (players: string[]) => {
       if (win) win.webContents.send('chat:players', players);
     });
@@ -83,10 +83,24 @@ app.whenReady().then(() => {
     chat.on('message', (payload: { name: string; text: string }) => {
       if (win) win.webContents.send('chat:message', payload);
     });
+    chat.on('serverChange', () => {
+      if (win) win.webContents.send('chat:serverChange');
     chat.on('lobbyJoined', () => {
       if (win) win.webContents.send('chat:lobbyJoined');
     });
+    chat.on('usernameMention', (name: string) => {
+      if (win) win.webContents.send('chat:usernameMention', name);
+    });
+    });
     chat.on('error', (err) => console.error('ChatLogger error:', err));
+
+    // Allow renderer to update username
+    ipcMain.on('set:username', (_e, username: string) => {
+      if (chat) {
+        chat.username = username;
+        console.log('Updated ChatLogger username:', username);
+      }
+    });
   } catch (e) {
     console.error('Failed to start ChatLogger', e);
   }
