@@ -126,14 +126,22 @@ electron_1.app.whenReady().then(() => {
         chat.on('serverChange', () => {
             if (win)
                 win.webContents.send('chat:serverChange');
-            chat.on('lobbyJoined', () => {
-                if (win)
-                    win.webContents.send('chat:lobbyJoined');
-            });
-            chat.on('usernameMention', (name) => {
-                if (win)
-                    win.webContents.send('chat:usernameMention', name);
-            });
+        });
+        chat.on('lobbyJoined', () => {
+            if (win)
+                win.webContents.send('chat:lobbyJoined');
+        });
+        chat.on('gameStart', () => {
+            if (win)
+                win.webContents.send('chat:gameStart');
+        });
+        chat.on('usernameMention', (name) => {
+            if (win)
+                win.webContents.send('chat:usernameMention', name);
+        });
+        chat.on('logPathChanged', (payload) => {
+            if (win)
+                win.webContents.send('chat:logPathChanged', payload);
         });
         chat.on('error', (err) => console.error('ChatLogger error:', err));
         // Allow renderer to update username
@@ -141,6 +149,36 @@ electron_1.app.whenReady().then(() => {
             if (chat) {
                 chat.username = username;
                 console.log('Updated ChatLogger username:', username);
+            }
+        });
+        electron_1.ipcMain.on('set:logPath', (_e, newPath) => {
+            try {
+                if (chat && typeof newPath === 'string' && newPath.trim().length) {
+                    chat.switchLogPath(newPath.trim());
+                    console.log('Switched ChatLogger log path:', newPath);
+                }
+            }
+            catch (err) {
+                console.error('Failed to switch log path', err);
+            }
+        });
+        electron_1.ipcMain.on('set:client', (_e, client) => {
+            try {
+                if (chat && typeof client === 'string' && client.trim()) {
+                    chat.setClient(client.trim());
+                    console.log('Selected ChatLogger client:', client);
+                }
+            }
+            catch (err) {
+                console.error('Failed to set client', err);
+            }
+        });
+        electron_1.ipcMain.handle('chat:autoDetect', () => {
+            try {
+                return chat.autoDetect();
+            }
+            catch {
+                return undefined;
             }
         });
     }
@@ -292,7 +330,7 @@ class HypixelCache {
         this.uuidCache = new Map();
         this.guildCache = new Map();
         this.queue = new Set();
-        this.TTL = 10 * 60 * 1000; // 10 Minuten Cache-Zeit
+        this.TTL = 10 * 60 * 1000; // 10 minutes cache TTL
         this.MAX_CONCURRENT = 3; // Max. parallele Requests
     }
     async getUUID(name) {
@@ -301,11 +339,11 @@ class HypixelCache {
             return cached;
         const res = await (0, node_fetch_1.default)(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
         if (!res.ok)
-            throw new Error('UUID nicht gefunden');
+            throw new Error('UUID not found');
         const data = await res.json();
         const uuid = data?.id;
         if (!uuid)
-            throw new Error('Ungültige UUID-Response');
+            throw new Error('Invalid UUID response');
         this.uuidCache.set(name.toLowerCase(), uuid);
         return uuid;
     }
@@ -315,7 +353,7 @@ class HypixelCache {
         });
         if (!res.ok) {
             if (res.status === 429) {
-                throw new Error('Hypixel Rate-Limit erreicht - bitte warte kurz');
+                throw new Error('Hypixel rate limit reached - please wait');
             }
             throw new Error(`Hypixel API: ${res.status}`);
         }
@@ -332,8 +370,8 @@ class HypixelCache {
             });
             if (!res.ok) {
                 if (res.status === 429)
-                    throw new Error('Hypixel Rate-Limit (Guild)');
-                return null; // kein Guild gefunden oder anderer Fehler
+                    throw new Error('Hypixel rate limit (guild)');
+                return null; // no guild found or other error
             }
             const data = await res.json();
             const guild = data.guild || null;
@@ -440,7 +478,7 @@ class HypixelCache {
                 const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
                 return Math.max(0, Math.floor(lvl));
             })(),
-            // Guild Daten aus separatem Endpoint (falls vorhanden)
+            // Guild data from separate endpoint (if available)
             guildName: guild?.name ?? null,
             guildTag: guild?.tag ?? null,
             mfkdr: null, // Monthly Final K/D Ratio
@@ -478,10 +516,10 @@ class HypixelCache {
             }
             const player = await this.fetchHypixelStats(uuid);
             if (!player)
-                throw new Error('Spieler nicht auf Hypixel gefunden');
+                throw new Error('Player not found on Hypixel');
             const guild = await this.fetchGuild(uuid);
             const stats = await this.processBedwarsStats(player, name, guild);
-            // Erfolgreichen Request cachen
+            // Cache successful request
             this.cache.set(normalizedName, {
                 data: stats,
                 timestamp: Date.now()
@@ -489,7 +527,7 @@ class HypixelCache {
             return stats;
         }
         catch (err) {
-            // Rate-Limit oder andere API-Fehler
+            // Rate limit or other API errors
             return { error: String(err.message || err) };
         }
         finally {
@@ -506,7 +544,7 @@ const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
 // --- IPC: Bedwars Stats Fetch (jetzt mit Cache)
 electron_1.ipcMain.handle('bedwars:stats', async (_e, name) => {
     if (!process.env.HYPIXEL_KEY) {
-        return { error: 'HYPIXEL_KEY fehlt in der Umgebung. Bitte .env Datei prüfen.' };
+        return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
     }
     return hypixel.getStats(name);
 });

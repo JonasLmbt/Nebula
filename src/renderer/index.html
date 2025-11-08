@@ -158,7 +158,7 @@
   .settings-content.active{display:block}
 
   /* Nicks */
-  .nicks-list{background:var(--panel);border-radius:12px;overflow:hidden}
+  .nicks-list{background:var(--panel);border-radius:12px;overflow:hidden;margin-top:12px}
   .nick-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04)}
   .nick-row:last-child{border:0}
   .nick-name{flex:1;margin-right:14px;font-weight:500}
@@ -227,6 +227,13 @@
   .modal-close{background:rgba(255,255,255,0.04);border:0;color:var(--muted);font-size:20px;cursor:pointer;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:.15s}
   .modal-close:hover{background:rgba(255,255,255,0.08);color:#fff}
   .modal-body{padding:22px 24px;display:flex;flex-direction:column;gap:20px}
+  
+  /* Simple notification modal (for alerts) */
+  .notification-modal .modal-content{max-width:400px;text-align:center}
+  .notification-modal .modal-body{padding:28px 24px;align-items:center}
+  .notification-modal .message{font-size:15px;line-height:1.6;color:var(--text)}
+  .notification-modal .ok-btn{margin-top:16px;padding:10px 24px;background:var(--accent);color:#0b1e24;border:0;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;transition:.15s}
+  .notification-modal .ok-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
   .color-rules{display:flex;flex-direction:column;gap:10px;margin:0}
   .color-rule{display:grid;grid-template-columns:70px 90px 90px 1fr 40px;align-items:center;gap:10px;background:rgba(255,255,255,0.03);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);position:relative;transition:.15s}
   .color-rule:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.09)}
@@ -277,6 +284,41 @@
   .settings-select:focus{border-color:var(--accent)}
   .settings-textarea{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:13px;outline:0;resize:vertical}
   .settings-textarea:focus{border-color:var(--accent)}
+  /* Unified accent checkbox (used in Sources + Appearance) */
+  .accent-checkbox{
+    -webkit-appearance:none;appearance:none;width:20px;height:20px;margin:2px 0 0 0;cursor:pointer;flex-shrink:0;
+    border:2px solid var(--accent);border-radius:6px;background:rgba(255,255,255,0.05);position:relative;transition:.18s;
+    display:inline-block;
+  }
+  .accent-checkbox:hover{box-shadow:0 0 0 3px rgba(102,234,255,0.18)}
+  .accent-checkbox:focus{outline:2px solid var(--accent);outline-offset:2px}
+  .accent-checkbox:checked{background:var(--accent);border-color:var(--accent);}
+  .accent-checkbox:checked::after{content:"";display:none}
+  /* Apply same accent style automatically to all settings checkboxes without needing the class */
+  .settings-checkbox input[type="checkbox"]{
+    -webkit-appearance:none;appearance:none;width:20px;height:20px;margin:2px 0 0 0;cursor:pointer;flex-shrink:0;
+    border:2px solid var(--accent);border-radius:6px;background:rgba(255,255,255,0.05);position:relative;transition:.18s;display:inline-block;
+  }
+  .settings-checkbox input[type="checkbox"]:hover{box-shadow:0 0 0 3px rgba(102,234,255,0.18)}
+  .settings-checkbox input[type="checkbox"]:focus{outline:2px solid var(--accent);outline-offset:2px}
+  .settings-checkbox input[type="checkbox"]:checked{background:var(--accent);border-color:var(--accent)}
+  .settings-checkbox input[type="checkbox"]:checked::after{content:"";display:none}
+  /* Accent range sliders */
+  input[type="range"]{ -webkit-appearance:none; appearance:none; width:100%; height:6px; background:rgba(255,255,255,0.12); border-radius:4px; outline:none; cursor:pointer; }
+  input[type="range"]:focus{outline:2px solid var(--accent);outline-offset:2px}
+  input[type="range"]::-webkit-slider-runnable-track{height:6px;background:rgba(255,255,255,0.12);border-radius:4px}
+  input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); border:2px solid #04161c; margin-top:-5px; box-shadow:0 0 0 3px rgba(102,234,255,0.25); transition:.15s }
+  input[type="range"]:hover::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(102,234,255,0.35)}
+  input[type="range"]::-moz-range-track{height:6px;background:rgba(255,255,255,0.12);border-radius:4px}
+  input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #04161c;box-shadow:0 0 0 3px rgba(102,234,255,0.25)}
+  input[type="range"]::-ms-track{height:6px;background:transparent;border-color:transparent;color:transparent}
+  input[type="range"]::-ms-fill-lower,input[type="range"]::-ms-fill-upper{background:rgba(255,255,255,0.12);border-radius:4px}
+  input[type="range"]::-ms-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #04161c;box-shadow:0 0 0 3px rgba(102,234,255,0.25)}
+  /* Nick select (transparent + accent for value) */
+  .nick-select{background:transparent;border:1px solid rgba(255,255,255,0.12);color:var(--accent);padding:8px 10px;border-radius:8px;font-size:13px;backdrop-filter:blur(4px);cursor:pointer}
+  .nick-select:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,234,255,0.12)}
+  .nick-select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,234,255,0.2)}
+  .nick-select option{color:var(--text);background:#1f2230}
   
   /* Toggle switch */
   .toggle-switch{position:relative;width:44px;height:24px;display:inline-block}
@@ -452,51 +494,37 @@
           <span class="nav-label">Nicks</span>
         </button>
 
-        <div class="nav-sep"></div>
-
-        <button class="nav-item" data-panel="settings">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
-          <span class="nav-label">Settings</span>
-          <span class="nav-arrow">▾</span>
+  <!-- Direct settings entries (no submenu) -->
+        <button class="nav-item" data-panel="columns">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
+          <span class="nav-label">Columns</span>
         </button>
 
-        <!-- Untermenü für Settings -->
-        <div class="settings-submenu">
-          <button class="nav-item sub-item" data-panel="settings" data-settings="basic">
-            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
-            <span class="nav-label">Basic</span>
-          </button>
-          
-          <button class="nav-item sub-item" data-panel="settings" data-settings="appearance">
-            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
-            <span class="nav-label">Appearance</span>
-          </button>
-          
-          <button class="nav-item sub-item" data-panel="settings" data-settings="sources">
-            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
-            <span class="nav-label">Sources</span>
-          </button>
-          
-          <button class="nav-item sub-item" data-panel="settings" data-settings="columns">
-            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
-            <span class="nav-label">Columns</span>
-          </button>
-          
-          <button class="nav-item sub-item" data-panel="settings" data-settings="keyboard">
-            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
-            <span class="nav-label">Keyboard Shortcuts</span>
-          </button>
-        
-        </div>
-      
-      <div class="nav-sep"></div>
+  <!-- Removed separator between Nicks and Columns per request -->
 
-      <div class="sidebar-footer">
-        <div class="user-row">
-          <span class="user-icon"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
-          <span class="user-name" id="sidebarUsername">username</span>
-        </div>
-      </div>
+        <div class="nav-sep"></div>
+        <button class="nav-item" data-panel="sources">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
+          <span class="nav-label">Sources</span>
+        </button>
+        <button class="nav-item" data-panel="keyboard">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
+          <span class="nav-label">Keyboard Shortcuts</span>
+        </button>
+        <button class="nav-item" data-panel="appearance">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
+          <span class="nav-label">Appearance</span>
+        </button>
+        <button class="nav-item" data-panel="client">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-client"/></svg></span>
+          <span class="nav-label">Client Selection</span>
+        </button>
+        <div class="nav-sep"></div>
+        <button class="nav-item" data-panel="profile">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
+          <span class="nav-label">Profile</span>
+        </button>
+      
     </div>
   </aside>
 
@@ -531,22 +559,42 @@
     <!-- Nicks Panel -->
     <div class="panel" id="panel-nicks">
       <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
-        Nicks
+        <span class="settings-icon">
+          <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
+        </span>
+        Nickname Handling
       </h2>
-      <div class="nicks-help">Create a small nickname dictionary here: assign nicknames to their real player names. If a player with a registered nickname appears in the overlay, a <svg class="icon icon-inline" style="width:16px;height:16px;vertical-align:middle" aria-hidden="true" title="Nick recognised"><use href="#i-ghost"/></svg> icon is displayed. This helps you immediately classify statistics from nicked players correctly.</div>
-      <div class="nick-display-setting" style="margin:12px 0 16px;padding:10px 12px;border-radius:8px;background:var(--panel);display:flex;flex-direction:column;gap:8px">
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">
-          <span>Overlay name display</span>
-          <select id="nickDisplayMode" style="background:rgba(0,0,0,0.25);color:var(--text);border:0;padding:6px 8px;border-radius:6px;font-size:13px">
-            <option value="nick">Nickname (real stats)</option>
-            <option value="real">Real name</option>
+      <div
+        style="
+          padding:12px 14px;
+          border-radius:10px;
+          background:var(--panel);
+          display:flex;
+          flex-direction:column;
+          gap:12px;
+        "
+      >
+        <div style="font-size:13px;color:var(--text);line-height:1.5">
+          Manage how <b>nicked players</b> are displayed in the overlay. You can assign nicknames to their
+          real player names and decide how they should appear. When a registered nickname is detected, a
+          <svg class="icon icon-inline" style="width:16px;height:16px;vertical-align:-2px" aria-hidden="true" title="Nick recognised">
+            <use href="#i-ghost"/>
+          </svg>
+          icon appears next to the name so you recognize them instantly.
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px">
+          <select id="nickDisplayMode" class="nick-select">
+            <option value="nick">Show nickname (real stats)</option>
+            <option value="real">Show real name</option>
           </select>
         </label>
-        <div style="font-size:11px;color:var(--muted);line-height:1.4">
-          Choose whether to show the nick or the real name — stats always reflect the real player. The
-          <svg class="icon icon-inline" style="width:14px;height:14px" aria-hidden="true"><use href="#i-ghost"/></svg>
-          icon is always shown, and the tooltip reveals the other name.
+        <div style="font-size:11.5px;color:var(--muted);line-height:1.5">
+          The displayed name can be either the nickname or the real one —
+          <b>stats always reflect the real player</b>. The
+          <svg class="icon icon-inline" style="width:14px;height:14px;vertical-align:-2px" aria-hidden="true">
+            <use href="#i-ghost"/>
+          </svg>
+          icon is always shown; the tooltip reveals the alternate name.
         </div>
       </div>
       <!-- Add Nick Form -->
@@ -574,14 +622,12 @@
       <button class="add-btn" id="addNickBtn" title="Add nick">+</button>
     </div>
 
-    <!-- Settings Panel -->
-    <div class="panel" id="panel-settings">
-      <!-- Basic Settings -->
-      <div class="settings-content" data-section="basic">
+  <!-- Client & Account Panel (was part of Basic Settings) -->
+  <div class="panel" id="panel-client">
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
-            Basic Settings
+            Client & Account
           </h2>
 
           <div class="settings-subsection">
@@ -615,12 +661,13 @@
               </div>
               <div id="clientStatus" class="ok">No client selected yet.</div>
             </div>
-            <h3 style="margin: 28px 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+          </div>
+          <!-- Username subsection with divider like in Sources -->
+          <div class="settings-subsection">
+            <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
               <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
               Username
             </h3>
-
-            <!-- Username Input -->
             <div class="settings-row" style="margin-top:4px;">
               <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
               <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
@@ -629,11 +676,13 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
+    </div>
+  </div>
 
-      <!-- Sources Settings -->
-      <div class="settings-content" data-section="sources">
+  <!-- Sources Settings Panel -->
+  </div>
+
+  <div class="panel" id="panel-sources">
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
@@ -651,6 +700,10 @@
             </div>
 
             <div class="source-options" id="gameSourceOptions">
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="gameAddFromWho" checked />
+                  <span>Add from /who (ONLINE list)</span>
+                </label>
               <label class="settings-checkbox">
                 <input type="checkbox" id="gameAddFromChat" checked />
                 <span>Add From Chat</span>
@@ -660,7 +713,7 @@
                 <span>Remove on Final Death</span>
               </label>
               <label class="settings-checkbox">
-                <input type="checkbox" id="gameRemoveOnReconnect" checked />
+                <input type="checkbox" id="gameRemoveOnDisconnect" checked />
                 <span>Remove/Add on Disconnect/Reconnect</span>
                 <small style="display: block; color: var(--muted); margin-left: 24px; font-size: 12px;">Players who disconnect while respawning will not be removed.</small>
               </label>
@@ -682,78 +735,111 @@
             </div>
 
             <div class="source-options" id="partySourceOptions">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="partyRemoveOnMemberLeave" checked />
-                  <span>Remove member on leave</span>
-                </label>
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="partyRemoveAllOnLeaveOrDisband" checked />
-                  <span>Clear all on party leave/disband</span>
-                </label>
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="partyShowInviteTemp" checked />
-                  <span>Show invited player (temp)</span>
-                </label>
-                <label class="settings-checkbox" title="(Planned premium) Automatic refresh of party list on server change" style="opacity:.5;cursor:not-allowed">
-                  <input type="checkbox" id="partyRefreshServerChange" disabled />
-                  <span>Auto-Refresh server change</span>
-                </label>
-                <label class="settings-checkbox" title="(Planned premium) Automatic refresh after game end" style="opacity:.5;cursor:not-allowed">
-                  <input type="checkbox" id="partyRefreshGameEnd" disabled />
-                  <span>Auto-Refresh game end</span>
-                </label>
-              </div>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="partyRemoveOnMemberLeave" checked />
+                <span>Remove member on leave</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="partyRemoveAllOnLeaveOrDisband" checked />
+                <span>Clear all on party leave/disband</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="partyShowInviteTemp" checked />
+                <span>Show invited player (temp)</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="partyRefreshServerChange" />
+                <span>Auto-refresh on server change</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="partyRefreshGameEnd" />
+                <span>Auto-refresh after game end</span>
+              </label>
               <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Party options control how players with the party source are retained or removed.</small>
             </div>
           </div>
 
-          <!-- Party Invites Section -->
+          <!-- Manual Section -->
           <div class="settings-subsection">
             <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Party Invites</h3>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Manual</h3>
               <label class="toggle-switch">
-                <input type="checkbox" id="sourcePartyInvitesToggle" checked />
+                <input type="checkbox" id="sourceManualToggle" checked />
                 <span class="toggle-slider"></span>
               </label>
+            </div>
+            <div class="source-options" id="manualSourceOptions">
+              <label class="settings-checkbox">
+                <input type="checkbox" id="manualClearOnGameStart" />
+                <span>Remove all manually added players when a game starts</span>
+              </label>
+              <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Manual source refers to players added via the search bar.</small>
             </div>
           </div>
 
           <!-- Chat Section -->
           <div class="settings-subsection">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Chat</h3>
-              <label class="toggle-switch">
-                <input type="checkbox" id="sourceChatToggle" checked />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
+            <div class="settings-group">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Chat</h3>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sourceChatToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
 
-            <div class="source-options" id="chatSourceOptions">
-              <label class="settings-checkbox">
-                <input type="checkbox" id="chatRemoveOnServerChange" checked />
-                <span>Remove All on Server Change</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="chatAddOnMention" checked />
-                <span>Players who mention your name are auto-added</span>
-              </label>
-              <div style="margin-top:12px;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                  <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
-                  <label class="settings-label" style="margin:0;">Trigger Strings</label>
-                  <button id="addChatString" type="button" style="margin-left:auto;background:var(--row);border:0;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">+ Add</button>
+              <div class="source-options" id="chatSourceOptions">
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="chatRemoveOnServerChange" checked />
+                  <span>Remove All on Server Change</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="chatAddOnMention" checked />
+                  <span>Players who mention your name are auto-added</span>
+                </label>
+                <div style="margin-top:12px;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
+                    <label class="settings-label" style="margin:0;">Trigger Strings</label>
+                    <button id="addChatString" type="button" style="margin-left:auto;background:var(--row);border:0;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">+ Add</button>
+                  </div>
+                  <div id="chatStringList" style="display:flex;flex-direction:column;gap:6px;"></div>
+                  <small style="display:block;color:var(--muted);margin-top:6px;font-size:11px;">Players are added when their message contains any trigger (case-insensitive).</small>
                 </div>
-                <div id="chatStringList" style="display:flex;flex-direction:column;gap:6px;"></div>
-                <small style="display:block;color:var(--muted);margin-top:6px;font-size:11px;">Players are added when their message contains any trigger (case-insensitive).</small>
               </div>
             </div>
           </div>
-        </div>
+
+          <!-- Guild Section -->
+          <div class="settings-subsection">
+            <div class="settings-group">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Guild</h3>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sourceGuildToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="source-options" id="guildSourceOptions">
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="guildRemoveOnServerChange" checked />
+                  <span>Remove All on Server Change</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="guildOnlineOnly" checked />
+                  <span>Show only online guild members</span>
+                </label>
+                <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Guild members are added when you use /g list. Use this to quickly check guildmates' stats.</small>
+              </div>
+            </div>
+          </div>
       </div>
 
-      <!-- Appearance Settings -->
-      <div class="settings-content" data-section="appearance">
+  <!-- Appearance Settings Panel -->
+  </div>
+
+  <div class="panel" id="panel-appearance">
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
@@ -778,7 +864,7 @@
           <div class="settings-row">
             <label class="settings-label">Always On Top</label>
             <label style="display:flex;align-items:center;gap:8px">
-              <input id="alwaysOnTopToggle" type="checkbox" />
+              <input id="alwaysOnTopToggle" type="checkbox" class="accent-checkbox" />
             </label>
           </div>
 
@@ -786,7 +872,7 @@
           <div class="settings-row">
             <label class="settings-label">Auto-Resize Overlay</label>
             <label style="display:flex;align-items:center;gap:8px">
-              <input id="autoResizeToggle" type="checkbox" />
+              <input id="autoResizeToggle" type="checkbox" class="accent-checkbox" />
             </label>
           </div>
 
@@ -798,8 +884,10 @@
         </div>
       </div>
 
-      <!-- Columns Settings -->
-      <div class="settings-content active" data-section="columns">
+  <!-- Columns Settings Panel -->
+  </div>
+
+  <div class="panel" id="panel-columns">
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
@@ -810,12 +898,15 @@
           <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning. Click on a filled slot to configure color rules.</div>
           <div class="layout-palette" id="layoutPalette"></div>
           <div class="layout-slots" id="layoutSlots"></div>
+          <button id="addSlotBtn" style="margin-top:12px;padding:8px 16px;background:var(--accent);border:0;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;">+ Add Slot (max 12)</button>
         </div>
         </div>
       </div>
 
-      <!-- Keyboard Shortcuts Settings -->
-      <div class="settings-content" data-section="keyboard">
+  <!-- Keyboard Shortcuts Settings Panel -->
+  </div>
+
+  <div class="panel" id="panel-keyboard">
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
@@ -839,24 +930,21 @@
           <div class="modal-body">
             <div class="color-rules" id="colorRulesList">
               <!-- Regeln werden per JS eingefügt -->
-              <div class="color-rule">
-                <select class="rule-operator">
-                  <option value=">=">≥</option>
-                  <option value="<"><</option>
-                </select>
-                <input type="number" class="rule-value" step="0.1">
-                <div class="color-picker">
-                  <div class="color-preview"></div>
-                  <select class="color-select">
-                    <option value="good">Good (Green)</option>
-                    <option value="warn">Warning (Yellow)</option>
-                    <option value="bad">Danger (Red)</option>
-                  </select>
-                </div>
-                <button class="rule-delete">×</button>
-              </div>
             </div>
-            <button class="add-rule-btn">+ Add Rule</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="add-rule-btn" style="flex: 1;">+ Add Rule</button>
+              <button class="reset-rules-btn" id="resetRulesBtn" style="background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); color: var(--muted); padding: 12px 16px; border-radius: 12px; cursor: pointer; font-weight: 500; letter-spacing: 0.5px;">Reset to Default</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notification Modal (for alerts) -->
+      <div class="modal notification-modal" id="notificationModal">
+        <div class="modal-content">
+          <div class="modal-body">
+            <p class="message" id="notificationMessage"></p>
+            <button class="ok-btn" id="notificationOkBtn">OK</button>
           </div>
         </div>
       </div>
@@ -953,6 +1041,15 @@
   const finalHeight = Math.min(neededHeight, DEFAULT_HEIGHT);
 
         ipcRenderer.invoke('window:setBounds', { height: finalHeight });
+
+        // Auto-adjust width based on number of columns
+        const dynamicStats = statSettings.layout.filter(k => k && statSettings.visible.includes(k));
+        const totalCols = 2 + dynamicStats.length + 1; // lvl + name + stats + actions
+        const baseWidth = 280; // minimum for lvl+name+actions
+        const colWidth = 80; // average width per stat column
+        const calculatedWidth = baseWidth + (dynamicStats.length * colWidth);
+        const finalWidth = Math.max(calculatedWidth, 400); // minimum 400px
+        ipcRenderer.invoke('window:setBounds', { width: finalWidth });
       }, 100); // debounce
     }
 
@@ -965,9 +1062,74 @@
   const playerSources = new Map();
   // Cache for all loaded player objects (keyed by normalized name)
   let playerCache = {};
+  // Tracks whether a registered nick is CURRENTLY active (i.e. we saw the nick-form in /who or chat)
+  // key: realName(lower) -> boolean
+  const activeNickState = {};
   console.log('displayedPlayers initialized:', displayedPlayers);
   const originalNicks = {}; // realName(lower) -> originally eingegebener Nick
   let nickDisplayMode = localStorage.getItem('nickDisplayMode') || 'nick';
+  // Track whether we are in the pre-game lobby phase (after "Sending you to..." and before game start)
+  let preGameLobby = false;
+  let guildListMode = false; // Tracks if we're currently parsing guild list output
+
+  // Nick management (moved earlier to ensure availability before initial renders)
+  let nicks = JSON.parse(localStorage.getItem('nicks') || '[]');
+  function saveNicks() { localStorage.setItem('nicks', JSON.stringify(nicks)); }
+  function getRealName(name) {
+    const nick = nicks.find(n => n.nick.toLowerCase() === String(name).toLowerCase());
+    return nick ? nick.real : name;
+  }
+  function getNickFromReal(realName) {
+    const entry = nicks.find(n => n.real.toLowerCase() === String(realName).toLowerCase());
+    return entry ? entry.nick : undefined;
+  }
+  function isNick(name) { return nicks.some(n => n.nick.toLowerCase() === String(name).toLowerCase()); }
+
+  // Column definitions (labeling + optional derived calculators)
+  const STATS = {
+    // Core
+    level: { name: 'Level', short: 'Lvl', type: 'number' }, // No colorRules - uses prestige coloring
+    ws: { name: 'Win Streak', short: 'WS', type: 'number', colorRules: true },
+    fkdr: { name: 'Final K/D Ratio', short: 'FKDR', type: 'number', colorRules: true },
+    wlr: { name: 'Win/Loss Ratio', short: 'WLR', type: 'number', colorRules: true },
+    bblr: { name: 'Bed Break/Loss Ratio', short: 'BBLR', type: 'number', colorRules: true },
+    fk: { name: 'Final Kills', short: 'F. Kills', type: 'number', colorRules: true },
+    fd: { name: 'Final Deaths', short: 'F. Deaths', type: 'number', colorRules: true },
+    wins: { name: 'Wins', short: 'Wins', type: 'number', colorRules: true },
+    losses: { name: 'Losses', short: 'Losses', type: 'number', colorRules: true },
+    bedsBroken: { name: 'Beds Broken', short: 'Beds', type: 'number', colorRules: true },
+    bedsLost: { name: 'Beds Lost', short: 'Beds L.', type: 'number', colorRules: true },
+    kills: { name: 'Kills', short: 'Kills', type: 'number', colorRules: true },
+    deaths: { name: 'Deaths', short: 'Deaths', type: 'number', colorRules: true },
+
+    // Derived
+    winsPerLevel: { name: 'Wins per Level', short: 'Wins/Level', type: 'number', colorRules: true, calc: (p) => {
+      const lvl = (p && (typeof p.level === 'number' ? p.level : (p.stats?.Bedwars?.Experience != null ? Math.floor(getBedWarsLevel(Number(p.stats.Bedwars.Experience))) : 0))) || 0;
+      const wins = Number(p?.wins ?? 0);
+      return lvl > 0 ? wins / lvl : 0;
+    }},
+    fkPerLevel: { name: 'Final Kills per Level', short: 'FK/Level', type: 'number', colorRules: true, calc: (p) => {
+      const lvl = (p && (typeof p.level === 'number' ? p.level : (p.stats?.Bedwars?.Experience != null ? Math.floor(getBedWarsLevel(Number(p.stats.Bedwars.Experience))) : 0))) || 0;
+      const fk = Number(p?.fk ?? 0);
+      return lvl > 0 ? fk / lvl : 0;
+    }},
+    bedwarsScore: { name: 'Bedwars Score', short: 'Score', type: 'number', colorRules: true, calc: (p) => {
+      // Lightweight heuristic score
+      const ws = Number(p?.ws ?? 0);
+      const fkdr = Number(p?.fkdr ?? 0);
+      const wlr = Number(p?.wlr ?? 0);
+      return Math.round((fkdr * 100) + (wlr * 50) + ws);
+    }},
+
+    // Monthly (if provided by backend)
+    mfkdr: { name: 'Monthly Final K/D Ratio', short: 'Monthly FKDR', type: 'number', colorRules: true },
+    mwlr: { name: 'Monthly Win/Loss Ratio', short: 'Monthly WLR', type: 'number', colorRules: true },
+    mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'Monthly BBLR', type: 'number', colorRules: true },
+
+    // Meta
+    guildName: { name: 'Guild Name', short: 'Guild', type: 'text' },
+    guildTag: { name: 'Guild Tag', short: 'Tag', type: 'text' },
+  };
 
   // Sorting state
   let sortKey = null; // 'level' | 'ws' | 'fkdr' | 'wlr' | 'bblr' | 'fk' | 'wins'
@@ -976,6 +1138,26 @@
   function getNumeric(value) {
     const n = Number(value);
     return Number.isFinite(n) ? n : NaN;
+  }
+
+  // Apply color rules to stat values
+  function getColorForValue(column, value) {
+    const rules = statSettings.colorRules[column];
+    if (!rules || !Array.isArray(rules)) return '';
+    
+    // Ensure value is numeric
+    const numValue = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(numValue)) return '';
+
+    for (const rule of rules) {
+      if (rule.op === '>=' && numValue >= rule.value) {
+        return `style="color:${rule.color}"`;
+      }
+      if (rule.op === '<' && numValue < rule.value) {
+        return `style="color:${rule.color}"`;
+      }
+    }
+    return '';
   }
 
   function getSortValue(player, key) {
@@ -1018,9 +1200,12 @@
   const key = realName.toLowerCase();
   const sources = playerSources.get(key);
   const isPartyMember = sources && sources.has('party');
-    const originalNick = originalNicks[realName.toLowerCase()] || getNickFromReal(realName);
-    const hasNick = !!originalNick;
-    const showNick = hasNick && nickDisplayMode === 'nick';
+  const lowerReal = realName.toLowerCase();
+  const originalNick = originalNicks[lowerReal] || getNickFromReal(realName);
+  const hasNick = !!originalNick;
+  // Only show nickname if (a) mode is nick AND (b) we determined the player is actually nicked right now
+  const isActiveNick = !!activeNickState[lowerReal];
+  const showNick = hasNick && nickDisplayMode === 'nick' && isActiveNick;
     const displayName = showNick ? originalNick : realName;
     const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
     const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
@@ -1221,17 +1406,25 @@
     // Remove a player row and all state completely
     function removePlayer(name) {
       const row = rows.querySelector(`tr[data-name="${escAttr(name)}"]`);
-      const key = String(getRealName(name) || name).toLowerCase();
+      const key = String(getRealName(name) || name).trim().toLowerCase();
       if (row) row.remove();
       displayedPlayers.delete(key);
       playerSources.delete(key);
   nickedPlayers.delete(key);
       delete originalNicks[key];
+      try { delete activeNickState[key]; } catch {}
       updateOverlaySize();
     }
 
     // Add/track a source for a player
     function addPlayerSource(name, source) {
+      // Guard: check if source is disabled
+      if (source === 'manual' && !sourcesSettings?.manual?.enabled) return;
+      if (source === 'chat' && !sourcesSettings?.chat?.enabled) return;
+      if (source === 'party' && !sourcesSettings?.party?.enabled) return;
+      if (source === 'who' && !sourcesSettings?.game?.addFromWho) return;
+      if (source === 'guild' && !sourcesSettings?.guild?.enabled) return;
+      
       const key = String(getRealName(name) || name).toLowerCase();
       const set = playerSources.get(key) || new Set();
       set.add(source);
@@ -1276,9 +1469,23 @@
     }
 
     function addPlayer(name, source) {
+      name = String(name || '').trim();
       if (!name) return;
       addPlayerSource(name, source);
-      const key = String(getRealName(name) || name).toLowerCase();
+      const key = String(getRealName(name) || name).trim().toLowerCase();
+      // Update activeNickState heuristic: if user supplied the nick (not real) and it's registered, mark active.
+      try {
+        const registered = nicks.find(n => n.nick.toLowerCase() === name.toLowerCase());
+        if (registered) {
+          activeNickState[registered.real.toLowerCase()] = true;
+        } else {
+          // If they added the real name explicitly, mark inactive when previously unknown.
+          const reverse = nicks.find(n => n.real.toLowerCase() === name.toLowerCase());
+          if (reverse && activeNickState[reverse.real.toLowerCase()] == null) {
+            activeNickState[reverse.real.toLowerCase()] = false;
+          }
+        }
+      } catch {}
       if (!displayedPlayers.has(key)) {
         fetchPlayerStats(name).then(() => {
           updateOverlaySize();
@@ -1291,8 +1498,9 @@
     ipcRenderer.on('chat:players', (_e, newPlayers) => {
       try {
         if (!Array.isArray(newPlayers)) return;
+        if (!sourcesSettings?.game?.addFromWho) return; // feature disabled
   // Remove diffed old /who entries (only if not held by other sources)
-        const incomingSet = new Set(newPlayers.map(p => String(p).toLowerCase()));
+  const incomingSet = new Set(newPlayers.map(p => String(p).trim().toLowerCase()));
         for (const [key, sources] of Array.from(playerSources.entries())) {
           if (sources.has('who') && !incomingSet.has(key)) {
             // Remove only the 'who' source; other sources may still keep the player
@@ -1308,6 +1516,15 @@
         newPlayers.forEach(player => {
           if (!player || typeof player !== 'string') return;
           addPlayer(player, 'who');
+          // Active-nick Erkennung: Wenn der /who Name selbst ein registrierter Nick ist -> aktiv
+          const entry = nicks.find(n => n.nick.toLowerCase() === player.toLowerCase());
+          if (entry) {
+            activeNickState[entry.real.toLowerCase()] = true;
+          } else {
+            // Falls der Name ein Realname einer Registrierung ist -> markiere als nicht nicked
+            const rev = nicks.find(n => n.real.toLowerCase() === player.toLowerCase());
+            if (rev) activeNickState[rev.real.toLowerCase()] = false;
+          }
         });
         renderTable();
         updateOverlaySize();
@@ -1397,25 +1614,7 @@
     function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
     function fmt(n) { return (n == null || isNaN(n)) ? "—" : n; }
     
-    // Nick management
-    let nicks = JSON.parse(localStorage.getItem('nicks') || '[]');
-
-    function saveNicks() {
-      localStorage.setItem('nicks', JSON.stringify(nicks));
-    }
-
-    function getRealName(name) {
-      const nick = nicks.find(n => n.nick.toLowerCase() === name.toLowerCase());
-      return nick ? nick.real : name;
-    }
-    function getNickFromReal(realName) {
-      const entry = nicks.find(n => n.real.toLowerCase() === realName.toLowerCase());
-      return entry ? entry.nick : undefined;
-    }
-
-    function isNick(name) {
-      return nicks.some(n => n.nick.toLowerCase() === name.toLowerCase());
-    }
+    // Nick management (definition moved earlier)
 
     // Nicks Panel UI
     function renderNicks() {
@@ -1501,19 +1700,78 @@
     });
 
     // Chat strings → add player who matches any configured string (case-insensitive)
+    // Also handles guild list parsing
     ipcRenderer.on('chat:message', (_e, payload) => {
       try {
-        if (!payload || !sourcesSettings?.chat?.enabled) return;
+        if (!payload || typeof payload.text !== 'string') return;
         const { name, text } = payload;
-        if (!name || !text) return;
+        const msg = text;
+
+        // 1. Guild list parsing (always check, independent of chat settings)
+        // Detect guild list start: "Guild Name: ..."
+        if (msg.indexOf('Guild Name: ') === 0) {
+          guildListMode = true;
+          console.log('[Guild] Guild list mode activated');
+          return;
+        }
+
+        // Parse guild member lines (online: " ●  ", offline: " ?  ")
+        if (guildListMode && (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1)) {
+          const isOnline = msg.indexOf(' ●  ') !== -1;
+          
+          // Skip offline members if onlineOnly is enabled
+          if (!isOnline && sourcesSettings?.guild?.onlineOnly) {
+            return;
+          }
+
+          const separator = isOnline ? ' ●  ' : ' ?  ';
+          const members = msg.split(separator);
+
+          for (let member of members) {
+            member = member.trim();
+            if (!member) continue;
+
+            // Remove rank prefix if present (e.g., "[MVP+] PlayerName" → "PlayerName")
+            if (member[0] === '[') {
+              const spaceIdx = member.indexOf(' ');
+              if (spaceIdx !== -1) {
+                member = member.substring(spaceIdx + 1).trim();
+              }
+            }
+
+            if (member) {
+              addPlayer(member, 'guild');
+            }
+          }
+          return;
+        }
+
+        // Detect guild list end: "Total Members: ..."
+        if (guildListMode && msg.indexOf('Total Members:') === 0) {
+          guildListMode = false;
+          console.log('[Guild] Guild list mode deactivated');
+          return;
+        }
+
+        // 2. Chat trigger strings
+        if (!sourcesSettings?.chat?.enabled || !name) return;
         const patterns = (sourcesSettings.chat.strings || []).filter(Boolean).map(String);
-        if (!patterns.length) return;
-        const t = String(text).toLowerCase();
-        if (patterns.some(p => t.includes(String(p).toLowerCase()))) {
+        if (patterns.length) {
+          const t = String(text).toLowerCase();
+          if (patterns.some(p => t.includes(String(p).toLowerCase()))) {
+            addPlayer(name, 'chat');
+          }
+        }
+
+        // 3. Game setting: addFromChat (players speaking pre-game in lobby)
+        if (sourcesSettings?.game?.addFromChat && preGameLobby && name) {
           addPlayer(name, 'chat');
         }
       } catch (err) {
         console.error('Error handling chat:message', err);
+      }
+    });
+
     // Username mention → add player if enabled under chat settings
     ipcRenderer.on('chat:usernameMention', (_e, name) => {
       try {
@@ -1527,10 +1785,12 @@
       }
     });
 
-    // Server change → remove who/chat/username sources if enabled
+    // Server change → remove who/chat/username/guild sources if enabled
     ipcRenderer.on('chat:serverChange', () => {
       try {
-        if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange) return;
+        // Enter pre-game lobby phase on server change
+        preGameLobby = true;
+        if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange && !sourcesSettings?.guild?.removeOnServerChange) return;
         const allKeys = Array.from(playerSources.keys());
         allKeys.forEach(key => {
           const sources = playerSources.get(key);
@@ -1550,6 +1810,10 @@
               changed = true;
             }
           }
+          if (sourcesSettings?.guild?.removeOnServerChange && sources.has('guild')) {
+            sources.delete('guild');
+            changed = true;
+          }
           if (changed) {
             if (sources.size === 0) {
               removePlayer(key);
@@ -1568,6 +1832,8 @@
     // Lobby join → remove who/chat/username sources if enabled
     ipcRenderer.on('chat:lobbyJoined', () => {
       try {
+        // Leaving game back to lobby: disable pre-game chat auto-add
+        preGameLobby = false;
         if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange) return;
         const allKeys = Array.from(playerSources.keys());
         allKeys.forEach(key => {
@@ -1603,6 +1869,26 @@
       }
     });
 
+    // Game start → optionally clear manually added players
+    ipcRenderer.on('chat:gameStart', () => {
+      try {
+        // Game started: disable pre-game chat auto-add
+        preGameLobby = false;
+        if (!sourcesSettings?.manual?.clearOnGameStart) return;
+        for (const [key, sources] of Array.from(playerSources.entries())) {
+          if (sources.has('manual')) {
+            sources.delete('manual');
+            if (sources.size === 0) {
+              removePlayer(key);
+            } else {
+              playerSources.set(key, sources);
+            }
+          }
+        }
+        renderTable();
+        updateOverlaySize();
+      } catch (err) {
+        console.error('Error handling chat:gameStart', err);
       }
     });
 
@@ -1728,144 +2014,154 @@
 
     document.querySelectorAll(".grip").forEach(g => g.addEventListener("mousedown", onDown));
     
-    // --- Panel switching
+    // --- Panel switching (flat list)
     function showPanel(id) {
+      // Get current panel before switching
+      const currentPanel = document.querySelector('.panel.active')?.id?.replace('panel-', '');
+      
+      // If leaving columns panel, remove empty slots
+      if (currentPanel === 'columns' && id !== 'columns') {
+        const beforeLength = statSettings.layout.length;
+        statSettings.layout = statSettings.layout.filter(slot => slot !== null);
+        
+        // Ensure we always have at least 6 slots
+        while (statSettings.layout.length < 6) {
+          statSettings.layout.push(null);
+        }
+        
+        // Only save if something changed
+        if (beforeLength !== statSettings.layout.length) {
+          saveStatSettings();
+        }
+      }
+      
       document.querySelectorAll('.panel').forEach(p => {
         p.classList.toggle('active', p.id === `panel-${id}`);
       });
       localStorage.setItem('activePanel', id);
-
-  // Update only top-level navigation (Home, Nicks, Settings) – no sub-items
-      document.querySelectorAll('.nav > .nav-item:not(.sub-item)').forEach(b => {
+      document.querySelectorAll('.nav > .nav-item').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-panel') === id);
       });
-
-      updateOverlaySize(); // recalculate when panel switches
+      updateOverlaySize();
     }
 
-    // Update nav item click handler
-    document.querySelectorAll('.nav-item').forEach(btn => {
+    // Sidebar navigation (all direct panels now, no submenu)
+    document.querySelectorAll('.nav > .nav-item').forEach(btn => {
       btn.addEventListener('click', () => {
         const panel = btn.getAttribute('data-panel');
-        showPanel(panel);
+        if (panel) showPanel(panel);
       });
     });
 
-    // Immer mit Home starten
-    showPanel('home');
+  // Remove old settings submenu persistence (no longer needed)
+  localStorage.removeItem('settingsExpanded');
+  localStorage.removeItem('activeSettingsSection');
+  // Always start in home (Overlay) panel on launch
+  showPanel('home');
 
-    // Sorting header click handling
-    (function initSorting(){
-      const thead = document.querySelector('#table thead');
-      if (!thead) return;
-      thead.addEventListener('click', (e) => {
-        const th = e.target.closest('th');
-        if (!th || !th.dataset.sortKey) return;
-        const key = th.dataset.sortKey;
-        if (sortKey === key) {
-          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-        } else {
-          sortKey = key; sortDir = 'asc';
-        }
-        // visual state
-        document.querySelectorAll('#table thead th').forEach(h => h.classList.remove('sort-asc','sort-desc'));
-        th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-        renderTable();
-      });
-    })();
-
-    // Add new nick
-    document.getElementById('addNickBtn')?.addEventListener('click', () => {
-      const nick = prompt('Enter nick:');
-      if (!nick) return;
-      const real = prompt('Enter real name:');
-      if (!real) return;
-
-      if (!nicks.some(n => n.nick === nick)) {
-        nicks.push({nick, real});
-        saveNicks();
-        renderNicks();
-        renderTable();
-      }
-    });
-
-    // Initial render
-    renderNicks();
-
-    // Stat column definitions
-    const STATS = {
-      // Core identity
-      level: { name: 'Level', short: 'Lvl', type: 'number', colorRules: true },
-      name: { name: 'Name', short: 'Name', type: 'text' },
-      networkLevel: { name: 'Network Level', short: 'Nwl', type: 'number', colorRules: true },
-
-      // Streaks
-      ws: { name: 'Win Streak', short: 'WS', type: 'number', colorRules: true },
-
-      // Ratios
-      fkdr: { name: 'Final K/D Ratio', short: 'FKDR', type: 'number', colorRules: true },
-      wlr: { name: 'Win/Loss Ratio', short: 'WLR', type: 'number', colorRules: true },
-      bblr: { name: 'Bed Break/Loss Ratio', short: 'BBLR', type: 'number', colorRules: true },
-      mfkdr: { name: 'Monthly Final K/D Ratio', short: 'MFKDR', type: 'number', colorRules: true },
-      mwlr: { name: 'Monthly Win/Loss Ratio', short: 'MWLR', type: 'number', colorRules: true },
-      mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'MBBLR', type: 'number', colorRules: true },
-
-      // Totals
-      fk: { name: 'Final Kills', short: 'FK', type: 'number', colorRules: true },
-      fd: { name: 'Final Deaths', short: 'FD', type: 'number', colorRules: true },
-      wins: { name: 'Wins', short: 'Wins', type: 'number', colorRules: true },
-      losses: { name: 'Losses', short: 'Losses', type: 'number', colorRules: true },
-      bedsBroken: { name: 'Beds Broken', short: 'BB', type: 'number', colorRules: true },
-      bedsLost: { name: 'Beds Lost', short: 'BL', type: 'number', colorRules: true },
-      kills: { name: 'Kills', short: 'K', type: 'number', colorRules: true },
-      deaths: { name: 'Deaths', short: 'D', type: 'number', colorRules: true },
-
-      // Per-Level metrics (derived)
-      winsPerLevel: { name: 'Wins per Level', short: 'W/Lvl', type: 'number', colorRules: true, calc: (p) => +( (p.wins ?? 0) / Math.max(1, p.level ?? 0) ).toFixed(2) },
-      fkPerLevel: { name: 'Final Kills per Level', short: 'FK/Lvl', type: 'number', colorRules: true, calc: (p) => +( (p.fk ?? 0) / Math.max(1, p.level ?? 0) ).toFixed(2) },
-
-      // Derived score
-      bedwarsScore: { name: 'Bedwars Score', short: 'Score', type: 'number', colorRules: true, calc: (p) => +(((p.fkdr ?? 0) * (p.wlr ?? 0) * ((p.level ?? 0)/100))).toFixed(2) },
-
-      // Guild (meta)
-      guildName: { name: 'Guild Name', short: 'Guild', type: 'text' },
-      guildTag: { name: 'Guild Tag', short: 'Tag', type: 'text' },
+    // Default color rules for each stat
+    const DEFAULT_COLOR_RULES = {
+      fkdr: [
+        { op: '>=', value: 100, color: '#ff00ff' },
+        { op: '>=', value: 50, color: '#ff69b4' },
+        { op: '>=', value: 30, color: '#dc143c' },
+        { op: '>=', value: 20, color: '#ff7f50' },
+        { op: '>=', value: 10, color: '#ffa500' },
+        { op: '>=', value: 7, color: '#ffff00' },
+        { op: '>=', value: 5, color: '#00ff00' },
+        { op: '>=', value: 3, color: '#00ff00' },
+        { op: '>=', value: 1, color: '#ffffff' },
+        { op: '>=', value: 0, color: '#808080' }
+      ],
+      wlr: [
+        { op: '>=', value: 100, color: '#ff00ff' },
+        { op: '>=', value: 50, color: '#ff69b4' },
+        { op: '>=', value: 30, color: '#dc143c' },
+        { op: '>=', value: 20, color: '#ff7f50' },
+        { op: '>=', value: 10, color: '#ffa500' },
+        { op: '>=', value: 7, color: '#ffff00' },
+        { op: '>=', value: 5, color: '#00ff00' },
+        { op: '>=', value: 3, color: '#00ff00' },
+        { op: '>=', value: 1, color: '#ffffff' },
+        { op: '>=', value: 0, color: '#808080' }
+      ],
+      ws: [
+        { op: '>=', value: 100, color: '#ff0000' },
+        { op: '>=', value: 50, color: '#ffff00' }
+      ],
+      bedwarsScore: [
+        { op: '>=', value: 1000, color: '#ff00ff' },
+        { op: '>=', value: 500, color: '#ff0000' },
+        { op: '>=', value: 250, color: '#ffff00' },
+        { op: '>=', value: 0, color: '#ffffff' }
+      ],
+      bblr: [
+        { op: '>=', value: 10, color: '#ff00ff' },
+        { op: '>=', value: 5, color: '#00ff00' },
+        { op: '>=', value: 3, color: '#ffff00' },
+        { op: '>=', value: 1, color: '#ffffff' },
+        { op: '>=', value: 0, color: '#808080' }
+      ],
+      fk: [
+        { op: '>=', value: 50000, color: '#ff00ff' },
+        { op: '>=', value: 25000, color: '#ff0000' },
+        { op: '>=', value: 10000, color: '#ffa500' },
+        { op: '>=', value: 5000, color: '#ffff00' },
+        { op: '>=', value: 1000, color: '#00ff00' },
+        { op: '>=', value: 0, color: '#ffffff' }
+      ],
+      wins: [
+        { op: '>=', value: 10000, color: '#ff00ff' },
+        { op: '>=', value: 5000, color: '#ff0000' },
+        { op: '>=', value: 2500, color: '#ffa500' },
+        { op: '>=', value: 1000, color: '#ffff00' },
+        { op: '>=', value: 500, color: '#00ff00' },
+        { op: '>=', value: 0, color: '#ffffff' }
+      ]
     };
 
     // Load/save stat settings
     let statSettings = JSON.parse(localStorage.getItem('statSettings') || JSON.stringify({
       visible: Object.keys(STATS),
       order: Object.keys(STATS),
-      layout: ['ws','fkdr','wlr','bblr','fk','wins',null,null,null,null],
-      colorRules: {
-        level: [
-          { op: '>=', value: 300, color: '#00ff00' },
-          { op: '>=', value: 100, color: '#ffff00' }
-        ],
-        fkdr: [
-          { op: '>=', value: 100, color: '#ff00ff' },
-          { op: '>=', value: 50, color: '#ff69b4' },
-          { op: '>=', value: 30, color: '#dc143c' },
-          { op: '>=', value: 20, color: '#ff7f50' },
-          { op: '>=', value: 10, color: '#ffa500' },
-          { op: '>=', value: 7, color: '#ffff00' },
-          { op: '>=', value: 5, color: '#00ff00' },
-          { op: '>=', value: 3, color: '#00ff00' },
-          { op: '>=', value: 1, color: '#ffffff' },
-          { op: '>=', value: 0, color: '#808080' }
-        ],
-        wlr: [
-          { op: '>=', value: 5, color: '#ff0000' },
-          { op: '>=', value: 3, color: '#ffff00' }
-        ],
-        ws: [
-          { op: '>=', value: 100, color: '#ff0000' },
-          { op: '>=', value: 50, color: '#ffff00' }
-        ]
-      }
+      layout: ['ws','fkdr','wlr','bblr','fk','wins'], // 6 slots by default
+      colorRules: DEFAULT_COLOR_RULES
     }));
+    
+    // Migration: Ensure all STATS are in visible array (for users with old localStorage)
+    if (!statSettings.visible || !Array.isArray(statSettings.visible)) {
+      statSettings.visible = Object.keys(STATS);
+    } else {
+      // Add any missing stats to visible
+      const allStats = Object.keys(STATS);
+      for (const stat of allStats) {
+        if (!statSettings.visible.includes(stat)) {
+          statSettings.visible.push(stat);
+        }
+      }
+    }
+    
+    // Migration: Ensure order contains all stats
+    if (!statSettings.order || !Array.isArray(statSettings.order)) {
+      statSettings.order = Object.keys(STATS);
+    } else {
+      const allStats = Object.keys(STATS);
+      for (const stat of allStats) {
+        if (!statSettings.order.includes(stat)) {
+          statSettings.order.push(stat);
+        }
+      }
+    }
+    
     if (!Array.isArray(statSettings.layout)) {
-      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins','bedwarsScore','winsPerLevel','fkPerLevel',null];
+      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins'];
+    }
+    // Ensure layout has between 6 and 12 slots
+    while (statSettings.layout.length < 6) {
+      statSettings.layout.push(null);
+    }
+    if (statSettings.layout.length > 12) {
+      statSettings.layout = statSettings.layout.slice(0, 12);
     }
 
     // Migration: convert legacy color names to hex once on load
@@ -1927,7 +2223,11 @@
       const tbody = document.getElementById('rows');
       if (!tbody) return;
       tbody.innerHTML = '';
-      let entries = Array.from(displayedPlayers).map(n => [n, playerCache[n]]).filter(([,p]) => Boolean(p));
+        // Ensure uniqueness & latest player object wins
+        const seen = new Set();
+        const entriesRaw = Array.from(displayedPlayers).map(n => [n, playerCache[n]]).filter(([,p]) => Boolean(p));
+        const entries = [];
+        for (const [n,p] of entriesRaw) { if (!seen.has(n)) { seen.add(n); entries.push([n,p]); } }
       if (sortKey) {
         const dir = sortDir === 'asc' ? 1 : -1;
         entries.sort(([, a], [, b]) => {
@@ -1943,7 +2243,36 @@
         renderPlayerRow(player, wasNick, dynamicStats);
       }
       bindMenus();
+      bindSortHeaders(); // Bind click handlers for sorting
       updateOverlaySize();
+    }
+
+    // Bind sort handlers to table headers
+    function bindSortHeaders() {
+      const headers = document.querySelectorAll('thead th[data-sort-key]');
+      headers.forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.getAttribute('data-sort-key');
+          if (!key) return;
+          
+          // Toggle sort direction if clicking same column, else default to descending
+          if (sortKey === key) {
+            sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortKey = key;
+            sortDir = 'desc'; // Default to descending for new column
+          }
+          
+          // Update visual indicators
+          document.querySelectorAll('thead th').forEach(h => {
+            h.classList.remove('sort-asc', 'sort-desc');
+          });
+          th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+          
+          // Re-render table with new sort
+          renderTable();
+        });
+      });
     }
 
     // Color rules modal
@@ -2023,6 +2352,19 @@
         renderRules();
       };
 
+      // Reset to default button
+      document.getElementById('resetRulesBtn').onclick = () => {
+        if (DEFAULT_COLOR_RULES[column]) {
+          // Deep copy default rules
+          statSettings.colorRules[column] = JSON.parse(JSON.stringify(DEFAULT_COLOR_RULES[column]));
+        } else {
+          // No defaults for this stat, clear all rules
+          statSettings.colorRules[column] = [];
+        }
+        saveStatSettings();
+        renderRules();
+      };
+
       // Close modal
       modal.querySelector('.modal-close').onclick = () => {
         modal.classList.remove('open');
@@ -2032,6 +2374,37 @@
     // Initialize settings
     renderStatLayoutPalette();
     renderStatLayoutSlots();
+    renderNicks(); // Initialize Nicks panel list on load
+
+    // Notification modal helper
+    function showNotification(message) {
+      const modal = document.getElementById('notificationModal');
+      const messageEl = document.getElementById('notificationMessage');
+      const okBtn = document.getElementById('notificationOkBtn');
+      
+      messageEl.textContent = message;
+      modal.classList.add('open');
+      
+      const closeModal = () => {
+        modal.classList.remove('open');
+        okBtn.removeEventListener('click', closeModal);
+      };
+      
+      okBtn.addEventListener('click', closeModal);
+    }
+
+    // Add slot button
+    const addSlotBtn = document.getElementById('addSlotBtn');
+    if (addSlotBtn) {
+      addSlotBtn.addEventListener('click', () => {
+        if (statSettings.layout.length < 12) {
+          statSettings.layout.push(null);
+          saveStatSettings();
+        } else {
+          showNotification('Maximum 12 slots reached');
+        }
+      });
+    }
 
     // --- Layout Editor Functions ---
     function renderStatLayoutPalette() {
@@ -2039,12 +2412,41 @@
       if (!palette) return;
       const used = new Set(statSettings.layout.filter(Boolean));
       const stats = Object.keys(STATS).filter(k => !['level','name'].includes(k));
+      
+      console.log('[DEBUG] renderStatLayoutPalette - Total STATS:', Object.keys(STATS).length);
+      console.log('[DEBUG] renderStatLayoutPalette - Filtered stats (no level/name):', stats.length, stats);
+      console.log('[DEBUG] renderStatLayoutPalette - Currently used in layout:', Array.from(used));
+      
   // In den Einstellungen bitte ausgeschriebene Namen anzeigen
   palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].name}</div>`).join('');
+      
       palette.querySelectorAll('.stat-pill[draggable="true"]').forEach(pill => {
         pill.addEventListener('dragstart', e => {
           e.dataTransfer.setData('text/stat', pill.dataset.stat);
         });
+      });
+      
+      // Allow dropping stats back to palette (removes them from layout)
+      palette.addEventListener('dragover', e => {
+        e.preventDefault();
+        palette.style.backgroundColor = 'rgba(102,234,255,0.08)';
+      });
+      
+      palette.addEventListener('dragleave', () => {
+        palette.style.backgroundColor = '';
+      });
+      
+      palette.addEventListener('drop', e => {
+        e.preventDefault();
+        palette.style.backgroundColor = '';
+        
+        const sourceSlotIdx = e.dataTransfer.getData('text/sourceSlot');
+        if (sourceSlotIdx) {
+          // Dragging from a slot to palette - remove it
+          const idx = parseInt(sourceSlotIdx);
+          statSettings.layout[idx] = null;
+          saveStatSettings();
+        }
       });
     }
     function renderStatLayoutSlots() {
@@ -2055,39 +2457,105 @@
         if (!stat) return `<div class="slot" data-slot="${i}" data-empty="1">Empty</div>`;
   // In den Einstellungen die ausgeschriebenen Namen nutzen
   const label = STATS[stat]?.name || stat;
-  return `<div class="slot filled" data-slot="${i}" data-stat="${stat}">${label}<button class="slot-remove" title="Remove">×</button></div>`;
+  return `<div class="slot filled" data-slot="${i}" data-stat="${stat}" draggable="true">${label}<button class="slot-remove" title="Remove">×</button></div>`;
       }).join('');
+      
       slotsEl.querySelectorAll('.slot').forEach(slot => {
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let isDragging = false;
+        
+        // Dragstart for filled slots (allows dragging out or swapping)
+        if (!slot.dataset.empty) {
+          slot.addEventListener('dragstart', e => {
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            isDragging = true;
+            const stat = slot.dataset.stat;
+            e.dataTransfer.setData('text/stat', stat);
+            e.dataTransfer.setData('text/sourceSlot', slot.dataset.slot);
+            slot.style.opacity = '0.4';
+          });
+          
+          slot.addEventListener('dragend', e => {
+            slot.style.opacity = '1';
+            isDragging = false;
+          });
+        }
+        
         slot.addEventListener('dragover', e => {
           e.preventDefault();
           slot.classList.add('drag-over');
         });
-        slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+        
+        slot.addEventListener('dragleave', () => {
+          slot.classList.remove('drag-over');
+        });
+        
         slot.addEventListener('drop', e => {
           e.preventDefault();
           slot.classList.remove('drag-over');
+          
           const stat = e.dataTransfer.getData('text/stat');
+          const sourceSlotIdx = e.dataTransfer.getData('text/sourceSlot');
           if (!stat) return;
-          // Remove existing occurrence
-          const idxExisting = statSettings.layout.indexOf(stat);
-          if (idxExisting !== -1) statSettings.layout[idxExisting] = null;
-          // Put into this slot
-          const idx = parseInt(slot.dataset.slot);
-          statSettings.layout[idx] = stat;
+          
+          const targetIdx = parseInt(slot.dataset.slot);
+          
+          // Case 1: Dragging from palette to slot
+          if (!sourceSlotIdx) {
+            // Remove existing occurrence
+            const idxExisting = statSettings.layout.indexOf(stat);
+            if (idxExisting !== -1) statSettings.layout[idxExisting] = null;
+            // Put into this slot
+            statSettings.layout[targetIdx] = stat;
+            saveStatSettings();
+            return;
+          }
+          
+          // Case 2: Dragging from slot to slot (swap)
+          const sourceIdx = parseInt(sourceSlotIdx);
+          if (sourceIdx === targetIdx) return; // Same slot, do nothing
+          
+          // Swap the two slots
+          const temp = statSettings.layout[targetIdx];
+          statSettings.layout[targetIdx] = statSettings.layout[sourceIdx];
+          statSettings.layout[sourceIdx] = temp;
           saveStatSettings();
         });
+        
         // Click on filled slot: open color rules (if stat supports it)
+        // Only trigger if NOT dragging (detect by minimal movement)
         if (!slot.dataset.empty && slot.dataset.stat) {
           const statKey = slot.dataset.stat;
+          let mouseDownX = 0;
+          let mouseDownY = 0;
+          
+          slot.addEventListener('mousedown', e => {
+            // Ignore if clicking remove button
+            if (e.target.closest('.slot-remove')) return;
+            mouseDownX = e.clientX;
+            mouseDownY = e.clientY;
+          });
+          
           if (STATS[statKey]?.colorRules) {
             slot.style.cursor = 'pointer';
             slot.addEventListener('click', e => {
               // Ignore click if user clicked remove button
               if (e.target.closest('.slot-remove')) return;
-              showColorRules(statKey);
+              
+              // Calculate movement since mousedown
+              const deltaX = Math.abs(e.clientX - mouseDownX);
+              const deltaY = Math.abs(e.clientY - mouseDownY);
+              
+              // Only treat as click if movement was minimal (< 5px)
+              if (deltaX < 5 && deltaY < 5) {
+                showColorRules(statKey);
+              }
             });
           }
         }
+        
         const removeBtn = slot.querySelector('.slot-remove');
         if (removeBtn) {
           removeBtn.addEventListener('click', (e) => {
@@ -2450,6 +2918,7 @@
     const defaultSources = {
       game: {
         enabled: true,
+        addFromWho: true,
         addFromChat: true,
         removeOnDeath: true,
         removeOnReconnect: true,
@@ -2471,10 +2940,29 @@
         removeOnServerChange: true,
         addOnMention: true,
         strings: []
+      },
+      guild: {
+        enabled: true,
+        removeOnServerChange: true,
+        onlineOnly: true
+      },
+      manual: {
+        enabled: true,
+        clearOnGameStart: false
       }
     };
 
+    // Load saved settings and merge with defaults to ensure all keys exist
     let sourcesSettings = JSON.parse(localStorage.getItem('sourcesSettings') || JSON.stringify(defaultSources));
+    // Merge defaults (ensures new settings fields exist even if saved data is old)
+    sourcesSettings = {
+      game: { ...defaultSources.game, ...(sourcesSettings.game || {}) },
+      party: { ...defaultSources.party, ...(sourcesSettings.party || {}) },
+      partyInvites: { ...defaultSources.partyInvites, ...(sourcesSettings.partyInvites || {}) },
+      chat: { ...defaultSources.chat, ...(sourcesSettings.chat || {}) },
+      guild: { ...defaultSources.guild, ...(sourcesSettings.guild || {}) },
+      manual: { ...defaultSources.manual, ...(sourcesSettings.manual || {}) }
+    };
 
     function saveSourcesSettings() {
       localStorage.setItem('sourcesSettings', JSON.stringify(sourcesSettings));
@@ -2483,9 +2971,10 @@
 
     // Bind Sources inputs
     const sourceGameToggle = document.getElementById('sourceGameToggle');
+  const gameAddFromWho = document.getElementById('gameAddFromWho');
     const gameAddFromChat = document.getElementById('gameAddFromChat');
     const gameRemoveOnDeath = document.getElementById('gameRemoveOnDeath');
-    const gameRemoveOnReconnect = document.getElementById('gameRemoveOnReconnect');
+    const gameRemoveOnDisconnect = document.getElementById('gameRemoveOnDisconnect');
     const gameRemoveOnServerChange = document.getElementById('gameRemoveOnServerChange');
     
     const sourcePartyToggle = document.getElementById('sourcePartyToggle');
@@ -2502,6 +2991,9 @@
   const chatAddOnMention = document.getElementById('chatAddOnMention');
   const chatStringList = document.getElementById('chatStringList');
   const addChatStringBtn = document.getElementById('addChatString');
+  // Manual source elements
+  const sourceManualToggle = document.getElementById('sourceManualToggle');
+  const manualClearOnGameStart = document.getElementById('manualClearOnGameStart');
 
     if (sourceGameToggle) {
       sourceGameToggle.checked = sourcesSettings.game.enabled;
@@ -2518,6 +3010,13 @@
         saveSourcesSettings();
       });
     }
+    if (gameAddFromWho) {
+      gameAddFromWho.checked = sourcesSettings.game.addFromWho;
+      gameAddFromWho.addEventListener('change', () => {
+        sourcesSettings.game.addFromWho = gameAddFromWho.checked;
+        saveSourcesSettings();
+      });
+    }
 
     if (gameRemoveOnDeath) {
       gameRemoveOnDeath.checked = sourcesSettings.game.removeOnDeath;
@@ -2527,10 +3026,10 @@
       });
     }
 
-    if (gameRemoveOnReconnect) {
-      gameRemoveOnReconnect.checked = sourcesSettings.game.removeOnReconnect;
-      gameRemoveOnReconnect.addEventListener('change', () => {
-        sourcesSettings.game.removeOnReconnect = gameRemoveOnReconnect.checked;
+    if (gameRemoveOnDisconnect) {
+      gameRemoveOnDisconnect.checked = sourcesSettings.game.removeOnReconnect;
+      gameRemoveOnDisconnect.addEventListener('change', () => {
+        sourcesSettings.game.removeOnReconnect = gameRemoveOnDisconnect.checked;
         saveSourcesSettings();
       });
     }
@@ -2575,13 +3074,20 @@
       });
     }
 
-    // Party auto-refresh are premium (disabled for now)
-    // Premium placeholders (disabled)
+    // Party auto-refresh options
     if (partyRefreshServerChange) {
-      partyRefreshServerChange.checked = sourcesSettings.party.autoRefreshServerChange;
+      partyRefreshServerChange.checked = !!sourcesSettings.party.autoRefreshServerChange;
+      partyRefreshServerChange.addEventListener('change', () => {
+        sourcesSettings.party.autoRefreshServerChange = partyRefreshServerChange.checked;
+        saveSourcesSettings();
+      });
     }
     if (partyRefreshGameEnd) {
-      partyRefreshGameEnd.checked = sourcesSettings.party.autoRefreshGameEnd;
+      partyRefreshGameEnd.checked = !!sourcesSettings.party.autoRefreshGameEnd;
+      partyRefreshGameEnd.addEventListener('change', () => {
+        sourcesSettings.party.autoRefreshGameEnd = partyRefreshGameEnd.checked;
+        saveSourcesSettings();
+      });
     }
 
     if (sourcePartyInvitesToggle) {
@@ -2612,6 +3118,54 @@
       chatAddOnMention.checked = sourcesSettings.chat.addOnMention;
       chatAddOnMention.addEventListener('change', () => {
         sourcesSettings.chat.addOnMention = chatAddOnMention.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    // Guild bindings
+    const sourceGuildToggle = document.getElementById('sourceGuildToggle');
+    const guildRemoveOnServerChange = document.getElementById('guildRemoveOnServerChange');
+    const guildOnlineOnly = document.getElementById('guildOnlineOnly');
+
+    if (sourceGuildToggle) {
+      sourceGuildToggle.checked = !!sourcesSettings.guild?.enabled;
+      sourceGuildToggle.addEventListener('change', () => {
+        if (!sourcesSettings.guild) sourcesSettings.guild = {};
+        sourcesSettings.guild.enabled = sourceGuildToggle.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (guildRemoveOnServerChange) {
+      guildRemoveOnServerChange.checked = !!sourcesSettings.guild?.removeOnServerChange;
+      guildRemoveOnServerChange.addEventListener('change', () => {
+        if (!sourcesSettings.guild) sourcesSettings.guild = {};
+        sourcesSettings.guild.removeOnServerChange = guildRemoveOnServerChange.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    if (guildOnlineOnly) {
+      guildOnlineOnly.checked = !!sourcesSettings.guild?.onlineOnly;
+      guildOnlineOnly.addEventListener('change', () => {
+        if (!sourcesSettings.guild) sourcesSettings.guild = {};
+        sourcesSettings.guild.onlineOnly = guildOnlineOnly.checked;
+        saveSourcesSettings();
+      });
+    }
+
+    // Manual bindings
+    if (sourceManualToggle) {
+      sourceManualToggle.checked = !!sourcesSettings.manual.enabled;
+      sourceManualToggle.addEventListener('change', () => {
+        sourcesSettings.manual.enabled = sourceManualToggle.checked;
+        saveSourcesSettings();
+      });
+    }
+    if (manualClearOnGameStart) {
+      manualClearOnGameStart.checked = !!sourcesSettings.manual.clearOnGameStart;
+      manualClearOnGameStart.addEventListener('change', () => {
+        sourcesSettings.manual.clearOnGameStart = manualClearOnGameStart.checked;
         saveSourcesSettings();
       });
     }
@@ -2673,84 +3227,30 @@
     // Initial render for chat strings
     renderChatStrings();
 
-    // Update table rendering to use stat settings
-    function getColorForValue(column, value) {
-      const rules = statSettings.colorRules[column];
-      if (!rules) return '';
-
-      for (const rule of rules) {
-        if (rule.op === '>=' && value >= rule.value) {
-          return `style="color:${rule.color}"`;
-        }
-        if (rule.op === '<' && value < rule.value) {
-          return `style="color:${rule.color}"`;
-        }
-      }
-      return '';
-    }
-
-    // Settings submenu toggle
+    // Settings submenu toggle logic (LEGACY CODE - NO LONGER USED)
+    // This code is for the old collapsible submenu that was removed.
+    // Keeping it to avoid breaking anything, but it should not run.
     const settingsBtn = document.querySelector('.nav-item[data-panel="settings"]');
     const settingsSubmenu = document.querySelector('.settings-submenu');
 
-    // Toggle submenu when settings is clicked
-    settingsBtn?.addEventListener('click', (e) => {
-      // We still stop propagation so the generic listener does not fire twice,
-      // but we explicitly invoke the panel switch here to ensure the Settings panel becomes visible.
-      e.stopPropagation();
-      const expanded = settingsBtn.classList.toggle('expanded');
-      settingsSubmenu.classList.toggle('expanded', expanded);
-      // Activate Settings top-level panel
-      showPanel('settings');
-      // Mark only Basic subsection active initially when expanding
-      document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
-      const basicBtn = document.querySelector('.nav-item.sub-item[data-settings="basic"]');
-      if (basicBtn) basicBtn.classList.add('active');
-      showSettingsSection('basic');
-      localStorage.setItem('activeSettingsSection', 'basic');
-      // Persist expanded state
-      localStorage.setItem('settingsExpanded', expanded);
-    });
+    function openSettingsSubmenu(initialSection) {
+      // Legacy - no longer used
+      return;
+    }
 
-    // Handle settings section clicks
-    document.querySelectorAll('.nav-item.sub-item').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const section = btn.getAttribute('data-settings');
-        // Nur diese Kategorie als aktiv markieren
-        document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        // Show settings panel und Section
-        showPanel('settings');
-        showSettingsSection(section);
-        // Save active section
-        localStorage.setItem('activeSettingsSection', section);
-      });
-    });
+    function closeSettingsSubmenu() {
+      // Legacy - no longer used
+      return;
+    }
 
-    // Show specific settings section
     function showSettingsSection(section) {
-      document.querySelectorAll('.settings-content').forEach(content => {
-        content.classList.toggle('active', 
-          content.getAttribute('data-section') === section);
-      });
+      // Legacy - no longer used
+      return;
     }
 
-    // Restore settings state on load
-    const settingsExpanded = localStorage.getItem('settingsExpanded') === 'true';
-    if (settingsExpanded) {
-      settingsBtn.classList.add('expanded');
-      settingsSubmenu.classList.add('expanded');
-    }
-
-    // Restore active settings section
-    const activeSection = localStorage.getItem('activeSettingsSection') || 'basic';
-    document.querySelectorAll('.nav-item.sub-item').forEach(b => b.classList.remove('active'));
-    const activeBtn = document.querySelector(`.nav-item.sub-item[data-settings="${activeSection}"]`);
-    if (activeBtn) {
-      activeBtn.classList.add('active');
-      showSettingsSection(activeSection);
-    }
+    // Remove legacy settings persistence keys
+    localStorage.removeItem('settingsExpanded');
+    localStorage.removeItem('activeSettingsSection');
   </script>
 </body>
 </html>

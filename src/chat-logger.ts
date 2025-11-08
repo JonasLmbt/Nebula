@@ -317,8 +317,27 @@ export class MinecraftChatLogger extends EventEmitter {
 
     // Game start detection (clear list)
     if (msg.indexOf('The game starts in 1 second!') !== -1 && msg.indexOf(':') === -1) {
-      this.players.clear();
-      this.emit('playersUpdated', Array.from(this.players));
+      // Fire a gameStart event shortly after countdown finishes
+      setTimeout(() => this.emit('gameStart'), 1100);
+      return;
+    }
+
+    // Guild list parsing
+    // Start: "Guild Name: ..."
+    if (msg.indexOf('Guild Name: ') === 0) {
+      this.emit('message', { name: '', text: msg });
+      return;
+    }
+
+    // Guild member lines: " ●  " (online) or " ?  " (offline)
+    if (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1) {
+      this.emit('message', { name: '', text: msg });
+      return;
+    }
+
+    // Guild list end: "Total Members: ..."
+    if (msg.indexOf('Total Members:') === 0) {
+      this.emit('message', { name: '', text: msg });
       return;
     }
 

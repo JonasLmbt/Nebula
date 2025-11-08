@@ -89,6 +89,9 @@ app.whenReady().then(() => {
     chat.on('lobbyJoined', () => {
       if (win) win.webContents.send('chat:lobbyJoined');
     });
+    chat.on('gameStart', () => {
+      if (win) win.webContents.send('chat:gameStart');
+    });
     chat.on('usernameMention', (name: string) => {
       if (win) win.webContents.send('chat:usernameMention', name);
     });
