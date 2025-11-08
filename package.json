@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "dotenv": "^16.6.1",
+    "firebase": "^12.5.0",
     "node-fetch": "^2.6.7",
     "tail": "^2.2.6"
   }

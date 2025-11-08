@@ -3449,6 +3449,167 @@
     // ==========================================
     // Profile & Discord Authentication
     // ==========================================
+
+    // ==========================================
+    // Firebase Cloud Sync
+    // ==========================================
+
+    // Import Firebase (using require for Electron compatibility)
+    let firebase, firestore, initializeApp, getFirestore, doc, setDoc, getDoc, serverTimestamp;
+    
+    try {
+      const firebaseApp = require('firebase/app');
+      const firestoreModule = require('firebase/firestore');
+      
+      initializeApp = firebaseApp.initializeApp;
+      getFirestore = firestoreModule.getFirestore;
+      doc = firestoreModule.doc;
+      setDoc = firestoreModule.setDoc;
+      getDoc = firestoreModule.getDoc;
+      serverTimestamp = firestoreModule.serverTimestamp;
+      
+      // Initialize Firebase with environment variables
+      const firebaseConfig = {
+        apiKey: process.env.FIREBASE_API_KEY,
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.FIREBASE_APP_ID
+      };
+      
+      firebase = initializeApp(firebaseConfig);
+      firestore = getFirestore(firebase);
+      
+      console.log('[Firebase] Initialized successfully');
+    } catch (error) {
+      console.error('[Firebase] Failed to initialize:', error);
+      firestore = null;
+    }
+
+    // Cloud Sync Functions
+    async function uploadUserSettings(userId) {
+      if (!firestore) {
+        throw new Error('Firebase not initialized');
+      }
+      
+      try {
+        // Collect all local settings
+        const settings = {
+          nicks: JSON.parse(localStorage.getItem('nicks') || '[]'),
+          appearanceSettings: JSON.parse(localStorage.getItem('appearanceSettings') || '{}'),
+          shortcuts: JSON.parse(localStorage.getItem('shortcuts') || '[]'),
+          basicSettings: JSON.parse(localStorage.getItem('basicSettings') || '{}'),
+          statSettings: JSON.parse(localStorage.getItem('statSettings') || '{}'),
+          sourcesSettings: JSON.parse(localStorage.getItem('sourcesSettings') || '{}'),
+          nickDisplayMode: localStorage.getItem('nickDisplayMode') || 'nick',
+        };
+        
+        // Upload to Firestore
+        const userDocRef = doc(firestore, 'users', userId);
+        await setDoc(userDocRef, {
+          settings,
+          updatedAt: serverTimestamp(),
+          version: '1.0.0'
+        });
+        
+        // Update local sync timestamp
+        localStorage.setItem('lastSyncTime', Date.now().toString());
+        
+        console.log('[Firebase] Settings uploaded successfully');
+        return { success: true };
+      } catch (error) {
+        console.error('[Firebase] Upload failed:', error);
+        throw error;
+      }
+    }
+
+    async function downloadUserSettings(userId) {
+      if (!firestore) {
+        throw new Error('Firebase not initialized');
+      }
+      
+      try {
+        const userDocRef = doc(firestore, 'users', userId);
+        const docSnap = await getDoc(userDocRef);
+        
+        if (!docSnap.exists()) {
+          console.log('[Firebase] No cloud settings found');
+          return { success: true, data: null };
+        }
+        
+        const data = docSnap.data();
+        const settings = data.settings;
+        
+        // Apply settings to localStorage
+        if (settings.nicks) localStorage.setItem('nicks', JSON.stringify(settings.nicks));
+        if (settings.appearanceSettings) localStorage.setItem('appearanceSettings', JSON.stringify(settings.appearanceSettings));
+        if (settings.shortcuts) localStorage.setItem('shortcuts', JSON.stringify(settings.shortcuts));
+        if (settings.basicSettings) localStorage.setItem('basicSettings', JSON.stringify(settings.basicSettings));
+        if (settings.statSettings) localStorage.setItem('statSettings', JSON.stringify(settings.statSettings));
+        if (settings.sourcesSettings) localStorage.setItem('sourcesSettings', JSON.stringify(settings.sourcesSettings));
+        if (settings.nickDisplayMode) localStorage.setItem('nickDisplayMode', settings.nickDisplayMode);
+        
+        // Update local sync timestamp
+        localStorage.setItem('lastSyncTime', Date.now().toString());
+        
+        console.log('[Firebase] Settings downloaded successfully');
+        return { success: true, data: settings, timestamp: data.updatedAt };
+      } catch (error) {
+        console.error('[Firebase] Download failed:', error);
+        throw error;
+      }
+    }
+
+    async function syncUserSettings(userId, direction = 'auto') {
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
+      
+      try {
+        if (direction === 'upload') {
+          return await uploadUserSettings(userId);
+        } else if (direction === 'download') {
+          const result = await downloadUserSettings(userId);
+          if (result.data) {
+            // Reload page to apply all settings
+            location.reload();
+          }
+          return result;
+        } else {
+          // Auto: Check which is newer
+          const userDocRef = doc(firestore, 'users', userId);
+          const docSnap = await getDoc(userDocRef);
+          
+          const lastLocalSync = parseInt(localStorage.getItem('lastSyncTime') || '0');
+          
+          if (!docSnap.exists()) {
+            // No cloud data, upload local
+            return await uploadUserSettings(userId);
+          }
+          
+          const cloudData = docSnap.data();
+          const cloudTimestamp = cloudData.updatedAt ? cloudData.updatedAt.toMillis() : 0;
+          
+          if (cloudTimestamp > lastLocalSync) {
+            // Cloud is newer, download
+            console.log('[Firebase] Cloud settings are newer, downloading...');
+            const result = await downloadUserSettings(userId);
+            if (result.data) {
+              location.reload();
+            }
+            return result;
+          } else {
+            // Local is newer or equal, upload
+            console.log('[Firebase] Local settings are newer, uploading...');
+            return await uploadUserSettings(userId);
+          }
+        }
+      } catch (error) {
+        console.error('[Firebase] Sync failed:', error);
+        throw error;
+      }
+    }
     
     let userProfile = JSON.parse(localStorage.getItem('userProfile') || 'null');
     let authTokens = JSON.parse(localStorage.getItem('authTokens') || 'null');
@@ -3698,12 +3859,12 @@
       });
     }
 
-    // Sync Now Handler (placeholder for future implementation)
+    // Sync Now Handler (Firebase Cloud Sync)
     const syncNowBtn = document.getElementById('syncNowBtn');
     if (syncNowBtn) {
       syncNowBtn.addEventListener('click', async () => {
-        if (!authTokens) {
-          showNotification('Please login first');
+        if (!userProfile) {
+          showNotification('Please login with Discord first');
           return;
         }
 
@@ -3711,19 +3872,18 @@
           syncNowBtn.disabled = true;
           syncNowBtn.textContent = 'Syncing...';
           
-          // TODO: Implement actual cloud sync with backend API
-          // For now, just simulate sync
-          await new Promise(r => setTimeout(r, 1500));
+          // Sync user settings with Firebase
+          await syncUserSettings(userProfile.id, 'auto');
           
-          localStorage.setItem('lastSyncTime', new Date().toISOString());
+          // Update UI timestamp
           updateProfileUI();
           
-          showNotification('Settings synced successfully! (Backend integration coming soon)');
+          showNotification('Settings synced successfully!');
           syncNowBtn.disabled = false;
           syncNowBtn.textContent = 'Sync Now';
         } catch (err) {
           console.error('Sync error:', err);
-          showNotification('Sync failed: ' + err);
+          showNotification('Sync failed: ' + (err.message || err));
           syncNowBtn.disabled = false;
           syncNowBtn.textContent = 'Sync Now';
         }
@@ -3759,6 +3919,19 @@
     // Initialize profile UI on load
     updateProfileUI();
     checkAndRefreshToken();
+    
+    // Auto-Sync: Check for cloud updates every 5 minutes
+    setInterval(async () => {
+      if (userProfile && firestore) {
+        try {
+          console.log('[Firebase] Auto-sync check...');
+          await syncUserSettings(userProfile.id, 'auto');
+        } catch (error) {
+          console.warn('[Firebase] Auto-sync failed:', error);
+          // Don't show notification for background sync failures
+        }
+      }
+    }, 5 * 60 * 1000); // 5 minutes
   </script>
 </body>
 </html>
