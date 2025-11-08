@@ -579,10 +579,11 @@ electron_1.ipcMain.handle('window:setBounds', (_e, bounds) => {
     }
 });
 // --- Discord OAuth2 Authentication ---
-// Note: For production, set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in .env
+// Note: Set DISCORD_CLIENT_ID in .env (Client Secret optional for desktop apps)
 // Create your Discord app at: https://discord.com/developers/applications
+// Important: Enable "Public Client" toggle in OAuth2 settings for desktop apps!
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || ''; // Optional for public clients
 const DISCORD_REDIRECT_URI = 'http://localhost:3000/auth/discord/callback'; // Your backend callback URL
 // Open Discord OAuth2 URL in browser
 electron_1.ipcMain.handle('auth:discord:login', async () => {
@@ -601,28 +602,33 @@ electron_1.ipcMain.handle('auth:discord:login', async () => {
 });
 // Exchange Discord auth code for tokens (called by renderer after redirect)
 electron_1.ipcMain.handle('auth:discord:exchange', async (_e, code) => {
-    if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
-        return { error: 'Discord credentials not configured in .env' };
+    if (!DISCORD_CLIENT_ID) {
+        return { error: 'Discord Client ID not configured in .env' };
     }
     try {
+        // Build token request body
+        const tokenParams = {
+            client_id: DISCORD_CLIENT_ID,
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: DISCORD_REDIRECT_URI,
+        };
+        // Add client_secret only if provided (required for confidential clients)
+        if (DISCORD_CLIENT_SECRET) {
+            tokenParams.client_secret = DISCORD_CLIENT_SECRET;
+        }
         // Exchange code for access token
         const tokenResponse = await (0, node_fetch_1.default)('https://discord.com/api/oauth2/token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({
-                client_id: DISCORD_CLIENT_ID,
-                client_secret: DISCORD_CLIENT_SECRET,
-                grant_type: 'authorization_code',
-                code,
-                redirect_uri: DISCORD_REDIRECT_URI,
-            }).toString(),
+            body: new URLSearchParams(tokenParams).toString(),
         });
         if (!tokenResponse.ok) {
             const errorText = await tokenResponse.text();
             console.error('Discord token exchange failed:', errorText);
-            return { error: 'Failed to exchange Discord auth code' };
+            return { error: `Failed to exchange Discord auth code: ${errorText}` };
         }
         const tokenData = await tokenResponse.json();
         // Fetch user info
@@ -661,21 +667,25 @@ electron_1.ipcMain.handle('auth:discord:exchange', async (_e, code) => {
 });
 // Refresh Discord access token
 electron_1.ipcMain.handle('auth:discord:refresh', async (_e, refreshToken) => {
-    if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
-        return { error: 'Discord credentials not configured' };
+    if (!DISCORD_CLIENT_ID) {
+        return { error: 'Discord Client ID not configured' };
     }
     try {
+        const refreshParams = {
+            client_id: DISCORD_CLIENT_ID,
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+        };
+        // Add client_secret only if provided
+        if (DISCORD_CLIENT_SECRET) {
+            refreshParams.client_secret = DISCORD_CLIENT_SECRET;
+        }
         const response = await (0, node_fetch_1.default)('https://discord.com/api/oauth2/token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({
-                client_id: DISCORD_CLIENT_ID,
-                client_secret: DISCORD_CLIENT_SECRET,
-                grant_type: 'refresh_token',
-                refresh_token: refreshToken,
-            }).toString(),
+            body: new URLSearchParams(refreshParams).toString(),
         });
         if (!response.ok) {
             return { error: 'Failed to refresh Discord token' };

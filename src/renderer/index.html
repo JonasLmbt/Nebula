@@ -3494,13 +3494,32 @@
           }
 
           // Show waiting message
-          showNotification('Complete the Discord login in your browser. After authorizing, you\'ll need to manually enter the auth code here (temporary solution until backend is set up).');
+          showNotification('Complete the Discord login in your browser. After authorizing, copy the FULL URL from the address bar and paste it here.');
           
-          // For now, show a prompt for manual code entry (temporary until backend callback is ready)
+          // For now, show a prompt for manual URL entry (temporary until backend callback is ready)
           setTimeout(() => {
-            const code = prompt('Paste the authorization code from the redirect URL (after ?code=):');
-            if (code && code.trim()) {
-              handleDiscordCallback(code.trim());
+            const input = prompt('Paste the complete redirect URL from your browser:\n(Starts with http://localhost:3000/...)');
+            if (input && input.trim()) {
+              // Extract code from URL
+              let code = input.trim();
+              
+              // If user pasted full URL, extract code parameter
+              if (code.includes('?code=')) {
+                const urlParams = new URLSearchParams(code.split('?')[1]);
+                code = urlParams.get('code') || code;
+              } else if (code.includes('&code=')) {
+                // Handle if code is not first parameter
+                const urlParams = new URLSearchParams(code.split('?')[1] || code);
+                code = urlParams.get('code') || code;
+              }
+              
+              if (code && code.length > 10) { // Basic validation
+                handleDiscordCallback(code);
+              } else {
+                showNotification('Invalid code or URL. Please try again.');
+                discordLoginBtn.disabled = false;
+                discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
+              }
             } else {
               discordLoginBtn.disabled = false;
               discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
