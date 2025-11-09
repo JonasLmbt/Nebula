@@ -4,7 +4,7 @@ Nebula is a lightweight Bedwars stats overlay for Hypixel that automatically det
 
 ## Features
 
-### 🎮 Automatic Player Detection
+### Automatic Player Detection
 - Monitors Minecraft chat log in real-time
 - Detects players from various sources:
   - `/who` command output
@@ -19,7 +19,7 @@ Nebula is a lightweight Bedwars stats overlay for Hypixel that automatically det
   - LabyMod
   - Feather
 
-### 📊 Smart Stats Loading
+### Smart Stats Loading
 - Efficient Hypixel API usage:
   - 10-minute stat caching
   - Rate limiting (max 3 concurrent requests)
