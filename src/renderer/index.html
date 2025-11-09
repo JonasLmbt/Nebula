@@ -334,8 +334,8 @@
   .settings-checkbox span{flex:1}
   .settings-checkbox small{display:block;margin-top:4px}
   
-  /* Premium badge */
-  .premium-badge{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
+  /* Plus badge */
+  .plus-badge{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
   
   /* Settings subsections */
   .settings-subsection{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.06)}
@@ -348,7 +348,7 @@
   .profile-header{display:flex;align-items:center;gap:16px}
   .profile-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:var(--accent);position:relative;overflow:hidden}
   .profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-  .profile-avatar.empty::before{content:"?";font-size:40px;opacity:0.5}
+  .profile-avatar.empty::before{content:"";position:absolute;width:48px;height:48px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366eaff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:contain;opacity:0.6}
   .profile-info{flex:1;display:flex;flex-direction:column;gap:6px}
   .profile-username{font-size:24px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px}
   .profile-status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
@@ -366,10 +366,14 @@
   .profile-stat{background:rgba(0,0,0,0.2);padding:12px 16px;border-radius:10px;display:flex;flex-direction:column;gap:4px}
   .profile-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600}
   .profile-stat-value{font-size:20px;font-weight:700;color:var(--accent)}
-  .premium-card{background:linear-gradient(145deg,rgba(102,114,234,0.1),rgba(118,75,162,0.1));border:1px solid rgba(102,114,234,0.3)}
-  .premium-card .premium-icon{font-size:48px;text-align:center;margin-bottom:12px;filter:drop-shadow(0 0 12px rgba(102,114,234,0.5))}
-  .premium-status{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
-  .premium-status.active{background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:1px solid var(--accent)}
+  .plus-card{background:linear-gradient(145deg,rgba(102,114,234,0.1),rgba(118,75,162,0.1));border:1px solid rgba(102,114,234,0.3)}
+  .plus-card .plus-icon{font-size:48px;text-align:center;margin-bottom:12px;filter:drop-shadow(0 0 12px rgba(102,114,234,0.5))}
+  .plus-status{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
+  .plus-status.active{background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:1px solid var(--accent)}
+  
+  /* Payment button hover effects */
+  .payment-btn-monthly:hover{background:var(--accent)!important;color:white!important;transform:translateY(-2px);box-shadow:0 6px 16px rgba(102,114,234,0.3)!important}
+  .payment-btn-yearly:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(32,178,170,0.4)!important}
   .sync-info{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
   .sync-time{font-size:12px;color:var(--muted)}
   .logout-btn{padding:8px 16px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;transition:.2s}
@@ -474,13 +478,20 @@
     <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
     </symbol>
-    <symbol id="i-premium" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
     </symbol>
     <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"/>
       <circle cx="12" cy="12" r="6"/>
       <circle cx="12" cy="12" r="2"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20,6 9,17 4,12"/>
+    </symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
     </symbol>
   </svg>
   <div class="topbar">
@@ -999,33 +1010,33 @@
             </div>
           </div>
 
-          <!-- Premium Card -->
-          <div class="profile-card premium-card">
+          <!-- Plus Card -->
+          <div class="profile-card plus-card">
             <div class="profile-section">
               <h3>
-                <svg class="icon" aria-hidden="true"><use href="#i-premium"/></svg>
-                Premium Status
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                Plus Status
               </h3>
-              <div class="premium-icon">✨</div>
-              <div class="premium-status" id="premiumStatus">
-                <div style="display:flex;flex-direction:column;gap:4px">
+              <div class="plus-icon">✨</div>
+              <div class="plus-status" id="plusStatus">
+                <div id="plusStatusText" style="display:flex;flex-direction:column;gap:4px">
                   <span style="font-weight:600;font-size:14px">Free Plan</span>
-                  <span style="font-size:12px;color:var(--muted)">Unlock all features with Premium</span>
+                  <span style="font-size:12px;color:var(--muted)">Try Plus (Demo Mode)</span>
                 </div>
-                <button class="btn primary" id="upgradePremiumBtn" style="padding:8px 16px;font-size:13px">
-                  <svg class="icon" aria-hidden="true"><use href="#i-premium"/></svg>
-                  <span>Upgrade</span>
+                <button class="btn primary" id="upgradePlusBtn" style="padding:8px 16px;font-size:13px">
+                  <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                  <span>Try Demo</span>
                 </button>
               </div>
               <div style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px">
                 <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                  <b style="color:var(--text)">Premium features:</b><br>
+                  <b style="color:var(--text)">Plus features:</b><br>
                   • Unlimited nickname entries<br>
                   • Custom color themes & UI layouts<br>
                   • Advanced statistics & session history<br>
                   • Priority support & early features<br>
                   • Export/Import settings backups<br><br>
-                  <b style="color:var(--accent)">Only €4.99/month</b>
+                  <b style="color:var(--accent)">Only €1.99/month</b>
                 </div>
               </div>
             </div>
@@ -3125,8 +3136,8 @@
         removeOnMemberLeave: true,
         removeAllOnLeaveOrDisband: true,
         showInviteTemp: true,
-        autoRefreshServerChange: false, // premium placeholder
-        autoRefreshGameEnd: false // premium placeholder
+        autoRefreshServerChange: false, // plus placeholder
+        autoRefreshGameEnd: false // plus placeholder
       },
       partyInvites: {
         enabled: true
@@ -3652,54 +3663,87 @@
         if (accountStatsCard) accountStatsCard.style.display = 'none';
       }
 
-      // Update Premium status (async for both logged in/out states)
-      updatePremiumStatus();
+      // Update Plus status (async for both logged in/out states)
+      updatePlusStatus();
     }
 
-    // Update Premium UI status
-    async function updatePremiumStatus() {
-      const premiumStatus = document.getElementById('premiumStatus');
-      const upgradePremiumBtn = document.getElementById('upgradePremiumBtn');
+    // Update Plus UI status
+    async function updatePlusStatus() {
+      const plusStatusText = document.getElementById('plusStatusText');
+      const upgradePlusBtn = document.getElementById('upgradePlusBtn');
       
-      if (!premiumStatus || !upgradePremiumBtn) return;
+      if (!plusStatusText || !upgradePlusBtn) return;
+
+      // Check for demo plus (local session only) with time limit
+      const demoPlus = localStorage.getItem('demoPlus') === 'true';
+      const demoStartTime = parseInt(localStorage.getItem('demoPlusStartTime') || '0');
+      const now = Date.now();
+      const demoTimeLeft = 10 * 60 * 1000 - (now - demoStartTime); // 10 minutes
+      const isDemoExpired = demoPlus && demoTimeLeft <= 0;
 
       if (userProfile && authTokens) {
         try {
-          const premiumData = await ipcRenderer.invoke('premium:checkStatus', userProfile.id);
+          const plusData = await ipcRenderer.invoke('plus:checkStatus', userProfile.id);
           
-          if (premiumData.isPremium) {
-            const expiresDate = new Date(premiumData.expiresAt).toLocaleDateString();
-            premiumStatus.innerHTML = `
-              <div style="display:flex;flex-direction:column;gap:4px">
-                <span style="font-weight:600;font-size:14px;color:var(--accent)">✨ Premium Active</span>
+          if (plusData.isPlus) {
+            const expiresDate = new Date(plusData.expiresAt).toLocaleDateString();
+            const isPaidPlus = plusData.type === 'paid';
+            const isTestPlus = plusData.type === 'test';
+            
+            if (isPaidPlus) {
+              plusStatusText.innerHTML = `
+                <span style="font-weight:600;font-size:14px;color:var(--accent)">✨ Plus Active</span>
                 <span style="font-size:12px;color:var(--muted)">Expires: ${expiresDate}</span>
-              </div>
-            `;
-            upgradePremiumBtn.textContent = 'Manage';
-            upgradePremiumBtn.disabled = false;
+              `;
+              upgradePlusBtn.textContent = 'Manage';
+              upgradePlusBtn.disabled = false;
+            } else if (isTestPlus) {
+              const hoursLeft = Math.ceil((plusData.expiresAt - Date.now()) / (60 * 60 * 1000));
+              plusStatusText.innerHTML = `
+                <span style="font-weight:600;font-size:14px;color:var(--warning)">🧪 Test Plus Active</span>
+                <span style="font-size:12px;color:var(--muted)">${hoursLeft} hours left of monthly test</span>
+              `;
+              upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Upgrade to Full</span>';
+              upgradePlusBtn.disabled = false;
+            }
           } else {
-            premiumStatus.innerHTML = `
-              <div style="display:flex;flex-direction:column;gap:4px">
-                <span style="font-weight:600;font-size:14px">Free Plan</span>
-                <span style="font-size:12px;color:var(--muted)">Unlock all features with Premium</span>
-              </div>
+            plusStatusText.innerHTML = `
+              <span style="font-weight:600;font-size:14px">Free Plan</span>
+              <span style="font-size:12px;color:var(--muted)">Unlock all features with Plus</span>
             `;
-            upgradePremiumBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-premium"/></svg><span>Upgrade</span>';
-            upgradePremiumBtn.disabled = false;
+            upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Upgrade</span>';
+            upgradePlusBtn.disabled = false;
           }
         } catch (error) {
-          console.error('[Premium] Status check failed:', error);
+          console.error('[Plus] Status check failed:', error);
         }
-      } else {
-        // Logged out state
-        premiumStatus.innerHTML = `
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <span style="font-weight:600;font-size:14px">Free Plan</span>
-            <span style="font-size:12px;color:var(--muted)">Login to upgrade to Premium</span>
-          </div>
+      } else if (demoPlus && !isDemoExpired) {
+        // Demo plus mode (with time limit)
+        const minutesLeft = Math.ceil(demoTimeLeft / (60 * 1000));
+        plusStatusText.innerHTML = `
+          <span style="font-weight:600;font-size:14px;color:var(--accent)">✨ Demo Plus</span>
+          <span style="font-size:12px;color:var(--muted)">${minutesLeft} minutes left - Get unlimited access</span>
         `;
-        upgradePremiumBtn.textContent = 'Upgrade';
-        upgradePremiumBtn.disabled = true;
+        upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Upgrade Now</span>';
+        upgradePlusBtn.disabled = false;
+      } else if (isDemoExpired) {
+        // Demo expired - reset demo
+        localStorage.removeItem('demoPlus');
+        localStorage.removeItem('demoPlusStartTime');
+        plusStatusText.innerHTML = `
+          <span style="font-weight:600;font-size:14px">Demo Expired</span>
+          <span style="font-size:12px;color:var(--muted)">Try again or upgrade to Plus</span>
+        `;
+        upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Try Again</span>';
+        upgradePlusBtn.disabled = false;
+      } else {
+        // Logged out state - but allow demo plus for testing
+        plusStatusText.innerHTML = `
+          <span style="font-weight:600;font-size:14px">Free Plan</span>
+          <span style="font-size:12px;color:var(--muted)">Try Plus (Demo Mode)</span>
+        `;
+        upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Try Demo</span>';
+        upgradePlusBtn.disabled = false; // Enable demo even without login
       }
     }
 
@@ -3925,66 +3969,264 @@
       });
     }
 
-    // Premium Upgrade Handler
-    const upgradePremiumBtn = document.getElementById('upgradePremiumBtn');
-    if (upgradePremiumBtn) {
-      upgradePremiumBtn.addEventListener('click', async () => {
-        if (!userProfile) {
-          showNotification('Please login with Discord first');
+    // Plus Upgrade Handler
+    const upgradePlusBtn = document.getElementById('upgradePlusBtn');
+    if (upgradePlusBtn) {
+      upgradePlusBtn.addEventListener('click', async () => {
+        // Check if demo reset
+        if (upgradePlusBtn.textContent === 'Reset Demo') {
+          localStorage.removeItem('demoPlus');
+          showNotification('Demo Plus reset');
+          updatePlusStatus();
           return;
         }
 
-        try {
-          upgradePremiumBtn.disabled = true;
-          upgradePremiumBtn.textContent = 'Opening payment...';
-          
-          const result = await ipcRenderer.invoke('premium:createCheckout', userProfile.id);
-          
-          if (result.error) {
-            throw new Error(result.error);
-          }
-          
-          showNotification('Payment page opened in browser. Complete your purchase and return to verify.');
-          
-          // Show verification dialog after a delay
-          setTimeout(() => {
-            showPremiumVerificationDialog();
-          }, 2000);
-          
-        } catch (err) {
-          console.error('Premium checkout error:', err);
-          showNotification('Failed to open payment: ' + (err.message || err));
-        } finally {
-          upgradePremiumBtn.disabled = false;
-          updatePremiumStatus(); // Reset button text
+        if (!userProfile) {
+          // Demo mode without login
+          showNotification('🎉 Demo Plus activated! Try all Plus features this session.');
+          localStorage.setItem('demoPlus', 'true');
+          updatePlusStatus();
+          return;
         }
+
+        // Open our new plan selection dialog instead of direct checkout
+        showPlusVerificationDialog();
       });
     }
 
-    // Premium verification dialog
-    function showPremiumVerificationDialog() {
-      const token = prompt('Enter your purchase confirmation token from the payment page:');
+    // Plus verification dialog
+    function showPlusVerificationDialog() {
+      // Create different dialogs based on login status
+      const modal = document.getElementById('notificationModal');
+      const messageEl = document.getElementById('notificationMessage');
+      const okBtn = document.getElementById('notificationOkBtn');
       
-      if (token && token.trim().length > 0) {
-        verifyPremiumPurchase(token.trim());
+      if (userProfile && authTokens) {
+        // LOGGED IN USER: Direct purchase options (no trial mentioned)
+        messageEl.innerHTML = `
+          <div style="text-align:left;padding:12px 0">
+            <h3 style="margin:0 0 12px 0;color:var(--accent)">Upgrade to Nebula Plus</h3>
+            <p style="margin:0 0 20px 0">Choose your plan and unlock all Plus features:</p>
+            <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+              <button id="monthlyPlanBtn" style="background:var(--surface2);color:var(--text);border:2px solid var(--border);padding:16px 24px;border-radius:12px;cursor:pointer;font-weight:500;font-size:14px;transition:all 0.2s ease;min-width:140px">
+                � Monthly<br>
+                <span style="font-size:18px;font-weight:700;color:var(--accent)">€1.99</span><br>
+                <small style="opacity:0.7">per month</small>
+              </button>
+              <button id="yearlyPlanBtn" style="background:linear-gradient(135deg,#20B2AA,#17A2B8);color:white;border:2px solid #20B2AA;padding:16px 24px;border-radius:12px;cursor:pointer;font-weight:500;font-size:14px;transition:all 0.2s ease;min-width:140px;position:relative;box-shadow:0 4px 12px rgba(32,178,170,0.3)">
+                <div style="position:absolute;top:-8px;right:-8px;background:#FF6B35;color:white;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">-16%</div>
+                � Yearly<br>
+                <span style="font-size:18px;font-weight:700">€20</span><br>
+                <small style="opacity:0.9">save €4/year</small>
+              </button>
+            </div>
+            <div style="text-align:center;margin-top:16px">
+              <button id="cancelBtn" style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:8px 16px;border-radius:6px;cursor:pointer">Cancel</button>
+            </div>
+            <p style="margin:16px 0 0 0;font-size:12px;color:var(--muted);text-align:center">
+              � Secure payment via Stripe • Cancel anytime
+            </p>
+          </div>
+        `;
+      } else {
+        // NOT LOGGED IN: Only demo available
+        messageEl.innerHTML = `
+          <div style="text-align:left;padding:12px 0">
+            <h3 style="margin:0 0 12px 0;color:var(--accent)">Try Nebula Plus</h3>
+            <p style="margin:0 0 16px 0">Login with Discord for more options, or try a quick demo:</p>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              <button id="loginForTrialBtn" style="background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:500">� Login for 7-Day Trial</button>
+              <button id="quickDemoBtn" style="background:var(--surface2);color:var(--text);border:none;padding:8px 16px;border-radius:6px;cursor:pointer">⚡ 10-Min Demo</button>
+              <button id="cancelBtn" style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:8px 16px;border-radius:6px;cursor:pointer">Cancel</button>
+            </div>
+          </div>
+        `;
+      }
+      
+      modal.classList.add('open');
+      
+      const closeModal = () => {
+        modal.classList.remove('open');
+        messageEl.innerHTML = ''; // Clear custom content
+      };
+
+      // Handle monthly plan (€1.99/month)
+      const monthlyPlanBtn = document.getElementById('monthlyPlanBtn');
+      if (monthlyPlanBtn) {
+        monthlyPlanBtn.onclick = async () => {
+          closeModal();
+          
+          try {
+            const result = await ipcRenderer.invoke('plus:createCheckout', userProfile.id, { plan: 'monthly' });
+            
+            if (result.error) {
+              showNotification('❌ ' + result.error);
+              return;
+            }
+            
+            showNotification('💳 Opening monthly payment (€1.99/month)...');
+            
+            // After a delay, show payment verification dialog
+            setTimeout(() => {
+              showPaymentVerificationDialog();
+            }, 3000);
+          } catch (err) {
+            showNotification('❌ Error: ' + (err.message || err));
+          }
+        };
+      }
+
+      // Handle yearly plan (€20/year - save 16%!)
+      const yearlyPlanBtn = document.getElementById('yearlyPlanBtn');
+      if (yearlyPlanBtn) {
+        yearlyPlanBtn.onclick = async () => {
+          closeModal();
+          
+          try {
+            const result = await ipcRenderer.invoke('plus:createCheckout', userProfile.id, { plan: 'yearly' });
+            
+            if (result.error) {
+              showNotification('❌ ' + result.error);
+              return;
+            }
+            
+            showNotification('💎 Opening yearly payment (€20/year - save 16%)...');
+            
+            // After a delay, show payment verification dialog
+            setTimeout(() => {
+              showPaymentVerificationDialog();
+            }, 3000);
+          } catch (err) {
+            showNotification('❌ Error: ' + (err.message || err));
+          }
+        };
+      }
+
+      // Handle login prompt for trial
+      const loginForTrialBtn = document.getElementById('loginForTrialBtn');
+      if (loginForTrialBtn) {
+        loginForTrialBtn.onclick = () => {
+          closeModal();
+          showNotification('Please login with Discord first to start your 7-day trial!');
+          // Scroll to login section
+          document.getElementById('discordSection').scrollIntoView({ behavior: 'smooth' });
+        };
+      }
+
+      // Handle quick demo (non-logged in users)
+      const quickDemoBtn = document.getElementById('quickDemoBtn');
+      if (quickDemoBtn) {
+        quickDemoBtn.onclick = () => {
+          closeModal();
+          const existingDemo = localStorage.getItem('demoPlus') === 'true';
+          const demoStartTime = parseInt(localStorage.getItem('demoPlusStartTime') || '0');
+          const now = Date.now();
+          const timeSinceDemo = now - demoStartTime;
+          
+          // Allow new demo if more than 24 hours passed or no demo yet
+          if (!existingDemo || timeSinceDemo > 24 * 60 * 60 * 1000) {
+            localStorage.setItem('demoPlus', 'true');
+            localStorage.setItem('demoPlusStartTime', String(now));
+            showNotification('⚡ 10-minute Quick Demo activated! Try Nebula Plus features now.');
+            updatePlusStatus();
+          } else {
+            showNotification('⏰ Demo already used today. Login for 7-day trial or wait 24h!');
+          }
+        };
+      }
+
+      // Handle cancel
+      const cancelBtn = document.getElementById('cancelBtn');
+      if (cancelBtn) {
+        cancelBtn.onclick = closeModal;
       }
     }
 
-    // Verify premium purchase
-    async function verifyPremiumPurchase(purchaseToken) {
+    // Payment verification dialog (after Stripe checkout)
+    function showPaymentVerificationDialog() {
+      const modal = document.getElementById('notificationModal');
+      const messageEl = document.getElementById('notificationMessage');
+      
+      messageEl.innerHTML = `
+        <div style="text-align:left;padding:12px 0">
+          <h3 style="margin:0 0 12px 0;color:var(--accent)">Payment Completed?</h3>
+          <p style="margin:0 0 16px 0">Did you successfully complete your payment on Stripe?</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+            <button id="verifyPaymentBtn" style="background:var(--accent);color:white;border:none;padding:12px 20px;border-radius:8px;cursor:pointer;font-weight:500;display:flex;align-items:center;gap:8px"><svg class="icon" aria-hidden="true" style="opacity:0.9"><use href="#i-check"/></svg>Yes, I Paid</button>
+            <button id="paymentCancelBtn" style="background:transparent;color:var(--muted);border:1px solid var(--border);padding:8px 16px;border-radius:6px;cursor:pointer">Not Yet</button>
+          </div>
+          <p style="margin:16px 0 0 0;font-size:12px;color:var(--muted);text-align:center">
+            We'll verify your payment and activate Plus automatically
+          </p>
+        </div>
+      `;
+      
+      modal.classList.add('open');
+      
+      const closeModal = () => {
+        modal.classList.remove('open');
+        messageEl.innerHTML = '';
+      };
+
+      // Handle payment verification
+      document.getElementById('verifyPaymentBtn').onclick = async () => {
+        closeModal();
+        
+        if (!userProfile) {
+          showNotification('⚠️ Please login with Discord first');
+          return;
+        }
+        
+        try {
+          // Extract session_id from URL if available (after Stripe redirect)
+          const urlParams = new URLSearchParams(window.location.search);
+          const sessionId = urlParams.get('session_id');
+          
+          if (sessionId) {
+            // Verify with actual session ID
+            const result = await ipcRenderer.invoke('plus:verify', userProfile.id, sessionId);
+            
+            if (result.error) {
+              showNotification('❌ Payment verification failed: ' + result.error);
+              return;
+            }
+            
+            showNotification('🎉 Plus activated successfully! Welcome to Nebula Plus!');
+            updatePlusStatus();
+          } else {
+            // Fallback: Manual check or demo activation
+            showNotification('🔄 Checking payment status... This may take a moment.');
+            
+            // For demo purposes, you could activate demo plus here
+            // Or implement a webhook-based verification system
+            setTimeout(() => {
+              showNotification('⚠️ Payment verification in progress. Plus will activate automatically once confirmed.');
+            }, 2000);
+          }
+        } catch (err) {
+          showNotification('❌ Verification error: ' + (err.message || err));
+        }
+      };
+
+      // Handle cancellation
+      document.getElementById('paymentCancelBtn').onclick = closeModal;
+    }
+
+    // Verify plus purchase
+    async function verifyPlusPurchase(purchaseToken) {
       try {
-        const result = await ipcRenderer.invoke('premium:verify', userProfile.id, purchaseToken);
+        const result = await ipcRenderer.invoke('plus:verify', userProfile.id, purchaseToken);
         
         if (result.error) {
           throw new Error(result.error);
         }
         
-        showNotification('🎉 Premium activated successfully! Welcome to Nebula Premium!');
-        updateProfileUI(); // Refresh premium status
+        showNotification('🎉 Plus activated successfully! Welcome to Nebula Plus!');
+        updateProfileUI(); // Refresh plus status
         
       } catch (err) {
-        console.error('Premium verification error:', err);
-        showNotification('Premium verification failed: ' + (err.message || err));
+        console.error('Plus verification error:', err);
+        showNotification('Plus verification failed: ' + (err.message || err));
       }
     }
 

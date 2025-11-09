@@ -844,71 +844,112 @@ electron_1.ipcMain.handle('firebase:download', async (_e, userId) => {
     }
 });
 // ==========================================
-// Premium System
+// Plus System
 // ==========================================
-// Premium subscription check via Firebase
-electron_1.ipcMain.handle('premium:checkStatus', async (_e, userId) => {
+// Plus subscription check via Firebase
+electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
     if (!await initFirebaseMain()) {
-        return { isPremium: false, error: 'Firebase not initialized' };
+        return { isPlus: false, error: 'Firebase not initialized' };
     }
     try {
         const { doc, getDoc } = require('firebase/firestore');
-        const userDocRef = doc(firestore, 'premium', userId);
+        // Check for paid plus first
+        const userDocRef = doc(firestore, 'plus', userId);
         const docSnap = await getDoc(userDocRef);
-        if (!docSnap.exists()) {
-            return { isPremium: false };
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const expiresAt = data.expiresAt ? data.expiresAt.toMillis() : 0;
+            const now = Date.now();
+            if (expiresAt > now) {
+                return {
+                    isPlus: true,
+                    type: 'paid',
+                    expiresAt: expiresAt,
+                    plan: data.plan || 'plus',
+                    status: data.status || 'active'
+                };
+            }
         }
-        const data = docSnap.data();
-        const expiresAt = data.expiresAt ? data.expiresAt.toMillis() : 0;
-        const now = Date.now();
+        // Check for active test day
+        const testDocRef = doc(firestore, 'testDays', userId);
+        const testSnap = await getDoc(testDocRef);
+        if (testSnap.exists()) {
+            const testData = testSnap.data();
+            const testExpiresAt = testData.testExpiresAt;
+            if (testExpiresAt && new Date(testExpiresAt.toDate()) > new Date()) {
+                return {
+                    isPlus: true,
+                    type: 'test',
+                    expiresAt: testExpiresAt.toMillis(),
+                    plan: 'test-plus',
+                    status: 'active-test'
+                };
+            }
+        }
+        return { isPlus: false };
+    }
+    catch (error) {
+        console.error('[Plus] Status check failed:', error);
+        return { isPlus: false, error: String(error) };
+    }
+});
+// Create Stripe checkout session (simplified - Stripe handles trials)
+electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { plan: 'monthly' }) => {
+    try {
+        // Use real Stripe payment links with built-in 7-day trials
+        const checkoutUrl = options.plan === 'yearly'
+            ? 'https://buy.stripe.com/9B65kCfLT3Iv7Gn5JO5wI02' // Yearly: €20/year (save €4)
+            : 'https://buy.stripe.com/9B65kC43b92P4ubc8c5wI01'; // Monthly: €1.99/month
+        console.log('[Plus] Opening Stripe checkout:', checkoutUrl, 'Plan:', options.plan);
+        await electron_1.shell.openExternal(checkoutUrl);
         return {
-            isPremium: expiresAt > now,
-            expiresAt: expiresAt,
-            plan: data.plan || 'premium',
-            status: data.status || 'active'
+            success: true,
+            message: options.plan === 'yearly'
+                ? '� Yearly plan selected! €20/year (save 16%)'
+                : '� Monthly plan selected! €1.99/month'
         };
     }
     catch (error) {
-        console.error('[Premium] Status check failed:', error);
-        return { isPremium: false, error: String(error) };
-    }
-});
-// Create Stripe checkout session (placeholder - needs backend)
-electron_1.ipcMain.handle('premium:createCheckout', async (_e, userId) => {
-    // In production: This would call your backend API to create Stripe session
-    // For now: Open Stripe payment link or redirect to website
-    try {
-        const checkoutUrl = `https://your-backend.com/checkout?user=${userId}`;
-        // For demo: simulate opening checkout
-        console.log('[Premium] Would open checkout URL:', checkoutUrl);
-        // Open payment page in browser
-        await electron_1.shell.openExternal('https://buy.stripe.com/test_your_payment_link'); // Replace with real link
-        return { success: true, message: 'Payment page opened in browser' };
-    }
-    catch (error) {
-        console.error('[Premium] Checkout failed:', error);
+        console.error('[Plus] Checkout failed:', error);
         return { error: String(error) };
     }
 });
-// Verify premium purchase (webhook simulation)
-electron_1.ipcMain.handle('premium:verify', async (_e, userId, purchaseToken) => {
+// Verify plus purchase with real Stripe API
+electron_1.ipcMain.handle('plus:verify', async (_e, userId, sessionId) => {
     if (!await initFirebaseMain()) {
         return { error: 'Firebase not initialized' };
     }
     try {
-        // In production: Verify purchase token with your backend/Stripe
-        // For demo: Accept any non-empty token
-        if (!purchaseToken || purchaseToken.length < 10) {
-            return { error: 'Invalid purchase token. For demo, use: "DEMO_PREMIUM_TOKEN_12345"' };
+        const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+        if (!stripeSecretKey || stripeSecretKey === 'sk_test_your_secret_key_here') {
+            return { error: 'Stripe not configured. Please add your Stripe Secret Key to .env file.' };
+        }
+        // If no sessionId provided, return error
+        if (!sessionId) {
+            return { error: 'No payment session ID provided' };
+        }
+        // Verify session with Stripe API
+        const stripeResponse = await (0, node_fetch_1.default)(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+            headers: {
+                'Authorization': `Bearer ${stripeSecretKey}`
+            }
+        });
+        if (!stripeResponse.ok) {
+            return { error: 'Invalid payment session' };
+        }
+        const session = await stripeResponse.json();
+        // Check if payment was successful
+        if (session.payment_status !== 'paid') {
+            return { error: 'Payment not completed' };
         }
         const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
-        // Add 1 month of premium
+        // Add 1 month of plus
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-        const premiumDocRef = doc(firestore, 'premium', userId);
-        await setDoc(premiumDocRef, {
-            plan: 'premium',
+        const plusDocRef = doc(firestore, 'plus', userId);
+        await setDoc(plusDocRef, {
+            plan: 'plus',
             status: 'active',
-            purchaseToken: purchaseToken,
+            stripeSessionId: sessionId,
             purchasedAt: serverTimestamp(),
             expiresAt: expiresAt,
             features: {
@@ -918,15 +959,129 @@ electron_1.ipcMain.handle('premium:verify', async (_e, userId, purchaseToken) =>
                 prioritySupport: true
             }
         });
-        console.log('[Premium] Activated for user:', userId);
+        console.log('[Plus] Activated for user:', userId);
         return {
             success: true,
             expiresAt: expiresAt.getTime(),
-            message: 'Premium activated successfully!'
+            message: 'Plus activated successfully!'
         };
     }
     catch (error) {
-        console.error('[Premium] Verification failed:', error);
+        console.error('[Plus] Verification failed:', error);
+        return { error: String(error) };
+    }
+});
+// Get monthly test day info
+electron_1.ipcMain.handle('plus:getTestDayInfo', async (_e, userId) => {
+    if (!await initFirebaseMain()) {
+        return { error: 'Firebase not initialized' };
+    }
+    try {
+        const { doc, getDoc } = require('firebase/firestore');
+        const testDocRef = doc(firestore, 'testDays', userId);
+        const docSnap = await getDoc(testDocRef);
+        const now = new Date();
+        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        if (!docSnap.exists()) {
+            return {
+                canUseTestDay: true,
+                currentMonth,
+                message: 'You can use your monthly 24h Plus test!'
+            };
+        }
+        const data = docSnap.data();
+        const lastUsedMonth = data.lastUsedMonth;
+        const isTestActive = data.testExpiresAt && new Date(data.testExpiresAt.toDate()) > now;
+        if (lastUsedMonth === currentMonth && !isTestActive) {
+            return {
+                canUseTestDay: false,
+                currentMonth,
+                message: 'Monthly test day already used. Try again next month!'
+            };
+        }
+        if (isTestActive) {
+            const expiresAt = new Date(data.testExpiresAt.toDate());
+            const hoursLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (60 * 60 * 1000));
+            return {
+                canUseTestDay: false,
+                currentMonth,
+                isActive: true,
+                expiresAt: expiresAt.toISOString(),
+                message: `Test Plus active! ${hoursLeft} hours left.`
+            };
+        }
+        return {
+            canUseTestDay: true,
+            currentMonth,
+            message: 'You can use your monthly 24h Plus test!'
+        };
+    }
+    catch (error) {
+        console.error('[Plus] Test day info failed:', error);
+        return { error: String(error) };
+    }
+});
+// Activate monthly test day
+electron_1.ipcMain.handle('plus:activateTestDay', async (_e, userId) => {
+    if (!await initFirebaseMain()) {
+        return { error: 'Firebase not initialized' };
+    }
+    try {
+        const { doc, getDoc, setDoc, serverTimestamp } = require('firebase/firestore');
+        // Check if test day is available first
+        const testDocRef = doc(firestore, 'testDays', userId);
+        const docSnap = await getDoc(testDocRef);
+        const now = new Date();
+        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        // Check if already used this month
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const lastUsedMonth = data.lastUsedMonth;
+            const isTestActive = data.testExpiresAt && new Date(data.testExpiresAt.toDate()) > now;
+            if (isTestActive) {
+                const expiresAt = new Date(data.testExpiresAt.toDate());
+                const hoursLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (60 * 60 * 1000));
+                return { error: `Test Plus already active! ${hoursLeft} hours left.` };
+            }
+            if (lastUsedMonth === currentMonth) {
+                return { error: 'Monthly test day already used. Try again next month!' };
+            }
+        }
+        // Activate 24h test
+        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+        await setDoc(testDocRef, {
+            lastUsedMonth: currentMonth,
+            testStartedAt: serverTimestamp(),
+            testExpiresAt: expiresAt,
+            updatedAt: serverTimestamp()
+        });
+        console.log('[Plus] 24h test day activated for user:', userId);
+        return {
+            success: true,
+            expiresAt: expiresAt.toISOString(),
+            message: '🎉 24h Plus test activated!'
+        };
+    }
+    catch (error) {
+        console.error('[Plus] Test day activation failed:', error);
+        return { error: String(error) };
+    }
+});
+// Open Stripe Customer Portal for subscription management
+electron_1.ipcMain.handle('premium:manageSubscription', async (_e, userId) => {
+    try {
+        // For now, open Stripe customer portal link
+        // In production: You'd create a customer portal session via API
+        const customerPortalUrl = 'https://billing.stripe.com/p/login/test_your_portal_link';
+        console.log('[Plus] Opening customer portal for user:', userId);
+        await electron_1.shell.openExternal(customerPortalUrl);
+        return {
+            success: true,
+            message: 'Customer portal opened - manage your subscription there'
+        };
+    }
+    catch (error) {
+        console.error('[Plus] Customer portal failed:', error);
         return { error: String(error) };
     }
 });
