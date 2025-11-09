@@ -28,7 +28,7 @@ Nebula is a lightweight Bedwars stats overlay for Hypixel that automatically det
 - Incremental updates (only loads new players)
 - Preserves API key limits
 
-### 🔧 Technical Details
+### Technical Details
 - Electron-based overlay
 - TypeScript for type safety
 - IPC communication between processes
