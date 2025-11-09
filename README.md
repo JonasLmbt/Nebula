@@ -15,38 +15,16 @@ That's it! The app works out of the box without any API keys or configuration.
 
 > **Note**: Some advanced features (Discord integration, cloud sync, Plus subscription) may not be available in all builds. The core stats overlay functionality always works.
 
-## 📋 Features
-
-### Automatic Player Detection
-- Monitors Minecraft chat log in real-time
-- Detects players from various sources:
-  - `/who` command output
-  - Join/leave messages
-  - Party members
-  - Final kills
-- Supports multiple Minecraft clients:
-  - Vanilla
-  - Lunar
-  - Badlion
-  - PvPLounge
-  - LabyMod
-  - Feather
-
-### Smart Stats Loading
-- Efficient API usage with caching
-- Automatic rate limiting
-- Incremental updates (only loads new players)
-- Works even when Hypixel API is under load
-
-### Privacy
-- All data processed locally on your computer
-- No personal information is collected
-- Only reads Minecraft chat for player detection
-- Connects to Mojang and Hypixel APIs for stats only
+---
 
 ## 🔧 For Developers
 
-Want to run your own instance or contribute to development? See below.
+Want to run your own instance or contribute? 
+
+**Quick Links:**
+- [📖 Deployment Guide](./docs/DEPLOYMENT.md) - How to set up for public distribution
+- [🔌 Backend API Spec](./docs/BACKEND_SPEC.md) - Backend service implementation guide
+- [💻 Development Setup](#development-setup) - Get started with development
 
 ### Two Deployment Options
 
@@ -99,10 +77,45 @@ npm run build
 
 See `.env.example` for detailed configuration options. Key points:
 
-- **For public distribution**: Only set `BACKEND_API_URL`
+- **For public distribution**: Only set `BACKEND_API_URL` (recommended - see [Deployment Guide](./docs/DEPLOYMENT.md))
 - **For development**: Set `HYPIXEL_KEY` and optionally Discord/Firebase configs
 - **Never commit** `.env` file (it's in `.gitignore`)
 - **Keep secrets server-side** (Stripe, Firebase Admin, etc.)
+
+For complete deployment instructions, see the [Deployment Guide](./docs/DEPLOYMENT.md).
+
+---
+
+## 📋 Features
+
+### Automatic Player Detection
+- Monitors Minecraft chat log in real-time
+- Detects players from various sources:
+  - `/who` command output
+  - Join/leave messages
+  - Party members
+  - Final kills
+- Supports multiple Minecraft clients:
+  - Vanilla
+  - Lunar
+  - Badlion
+  - PvPLounge
+  - LabyMod
+  - Feather
+
+### Smart Stats Loading
+- Efficient API usage with caching
+- Automatic rate limiting
+- Incremental updates (only loads new players)
+- Works even when Hypixel API is under load
+
+### Privacy
+- All data processed locally on your computer
+- No personal information is collected
+- Only reads Minecraft chat for player detection
+- Connects to Mojang and Hypixel APIs for stats only
+
+---
 
 ## 📦 Building & Distribution
 
@@ -303,15 +316,27 @@ cd Nebula
 # Install dependencies
 npm install
 
-# Copy environment template
-cp .env.example .env
+# Option A: Run without any keys (stats won't load)
+npm run dev
 
-# Add your Hypixel API key (optional, for local development)
-# Edit .env and set HYPIXEL_KEY=your-key-here
+# Option B: Use a backend service
+echo "BACKEND_API_URL=https://your-backend.com" > .env
+npm run dev
 
-# Run in development mode
+# Option C: Use your own API key for development
+echo "HYPIXEL_KEY=your-key-here" > .env
 npm run dev
 ```
+
+**Getting a Hypixel API Key:**
+1. Join `mc.hypixel.net`
+2. Run `/api new` in chat
+3. Copy the key that appears
+4. Add to `.env` file
+
+For more detailed setup instructions, see the [Deployment Guide](./docs/DEPLOYMENT.md).
+
+---
 
 ## 📄 License
 
