@@ -33,6 +33,7 @@ jobs:
           ELECTRON_BUILDER_SKIP_VALIDATE: 'true'
           DEBUG: electron-builder
         run: |
+          npm run build
           npx electron-builder --win --publish never
       - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v2
