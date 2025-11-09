@@ -487,9 +487,9 @@ export class MinecraftChatLogger extends EventEmitter {
       if (cleanLine === '' ||
           /^-{2,}\s+.+\s+-{2,}$/.test(cleanLine) || // -- Wardens -- or --- Wardens ---
           /^Guild Name:/i.test(cleanLine)) {
-        // Wichtig: Summary-Zeilen (Total/Online/Offline Members) NICHT mehr hier schlucken,
-        // damit weiter unten die Finish-Logik greift. Früher hat /Members:\s*\d+$/ sie
-        // abgefangen und dadurch wurde die Liste nie beendet -> Timeout-Race.
+  // Important: Do NOT consume summary lines (Total/Online/Offline Members) here.
+  // We allow the finish logic below to see them; previously a /Members:\s*\d+$/ guard
+  // swallowed them and the list never completed -> timeout race.
         this.emit('message', { name: '', text: msg });
         return;
       }

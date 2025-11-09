@@ -59,35 +59,35 @@ HYPIXEL_KEY=your-key-here
 
 ### Distributables & Updates
 
-Nebula kann als Windows‑Installer gebaut und automatisch aktualisiert werden (electron-builder + electron-updater).
+Nebula can be shipped as a Windows installer and auto‑updated using electron-builder + electron-updater.
 
-1) Lokalen Installer bauen
+1) Build a local installer
 
 ```powershell
 npm run dist
 ```
 
-Die Artefakte liegen in `release/` (NSIS Installer und Portable EXE). Hinweis: Falls der lokale Build auf Windows wegen fehlender Symlink‑Rechte fehlschlägt, nutze den GitHub Actions Build (siehe unten).
+Artifacts are written to `release/` (NSIS installer and portable EXE). Note: If a local build fails on Windows due to symlink permissions, use the GitHub Actions build (see below).
 
 2) Releases via GitHub Actions
 
-- Erstelle ein Git‑Tag im Format `vX.Y.Z` und pushe es:
+- Create a Git tag in the form `vX.Y.Z` and push it:
 
 ```powershell
 git tag v1.0.1
 git push --tags
 ```
 
-- Die Action `.github/workflows/release.yml` baut auf `windows-latest` und lädt die Artefakte (EXE, `latest.yml`, Blockmaps) zum GitHub Release hoch.
+- The workflow `.github/workflows/release.yml` builds on `windows-latest` and uploads artifacts (EXE, `latest.yml`, blockmaps) to a GitHub Release.
 
-3) Auto‑Update für Nutzer
+3) Auto‑update for users
 
-- Die App prüft im gepackten Modus automatisch auf Updates und lädt diese im Hintergrund.
-- Beim nächsten Neustart ist die neue Version aktiv. Optional kann per IPC `update:install` sofort neu gestartet werden.
+- When packaged, the app checks for updates automatically and downloads them in the background.
+- The new version activates on the next restart. Optionally, trigger immediate install via IPC `update:install`.
 
-Voraussetzungen/Technik:
-- `package.json > build.publish` zeigt auf `github` (Repo: `JonasLmbt/Nebula`).
-- Der Auto‑Updater ist nur aktiv, wenn die App gepackt läuft (`app.isPackaged`).
+Notes:
+- `package.json > build.publish` points to `github` (repo: `JonasLmbt/Nebula`).
+- Auto‑updater is only active when the app runs packaged (`app.isPackaged`).
 
 ## Usage
 

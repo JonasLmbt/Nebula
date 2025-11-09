@@ -410,14 +410,14 @@ class HypixelCache {
     const ws = bw.winstreak ?? 0;
     const bblr = (bw.beds_broken_bedwars ?? 0) / Math.max(1, bw.beds_lost_bedwars ?? 1);
 
-    // --- Most Played Mode Heuristik ---------------------------------------
-    // Bestimme den wahrscheinlich meistgespielten Modus anhand (wins + losses)
-    // Präfixe gemäß Hypixel-Konvention:
-    // eight_one_*  -> Solo
-    // eight_two_*  -> Doubles
-    // four_three_* -> 3s
-    // four_four_*  -> 4s
-    // two_four_*   -> 4v4
+  // --- Most Played Mode Heuristic ---------------------------------------
+  // Determine likely most played mode using (wins + losses)
+  // Prefixes per Hypixel naming convention:
+  // eight_one_*  -> Solo
+  // eight_two_*  -> Doubles
+  // four_three_* -> 3s
+  // four_four_*  -> 4s
+  // two_four_*   -> 4v4
     const MODE_PREFIX: Array<{ key: string; label: string }> = [
       { key: 'eight_one', label: 'Solo' },
       { key: 'eight_two', label: 'Doubles' },
@@ -542,22 +542,22 @@ class HypixelCache {
   async getStats(name: string) {
     const normalizedName = name.toLowerCase();
     
-    // 1. Cache prüfen
+  // 1. Check cache first
     const cached = this.cache.get(normalizedName);
     if (cached && Date.now() - cached.timestamp < this.TTL) {
       return cached.data;
     }
 
-    // 2. Queue Management (max. 3 parallele Requests)
+  // 2. Queue management (max. 3 concurrent requests)
     while (this.queue.size >= this.MAX_CONCURRENT) {
       await new Promise(r => setTimeout(r, 100));
     }
     
-    // 3. Request durchführen
+  // 3. Perform request
     try {
       this.queue.add(normalizedName);
 
-      // Kleine Verzögerung zwischen Requests
+  // Small delay between requests to avoid burst hitting the API
       if (this.queue.size > 1) {
         await new Promise(r => setTimeout(r, 150));
       }
@@ -566,14 +566,14 @@ class HypixelCache {
       try {
         uuid = await this.getUUID(name);
       } catch (e) {
-        // Name nicht auf Mojang gefunden -> als Nick behandeln
+  // Name not found on Mojang -> treat as possible nick
         return { name, level: 0, ws: 0, fkdr: 0, wlr: 0, bblr: 0, fk: 0, wins: 0, rankTag: null, rankColor: null, unresolved: true };
       }
   const player = await this.fetchHypixelStats(uuid);
   if (!player) throw new Error('Player not found on Hypixel');
   const guild = await this.fetchGuild(uuid);
   const stats = await this.processBedwarsStats(player, name, guild);
-  // UUID für Renderer / Avatar hinzufügen (Crafatar benötigt nackte UUID ohne Bindestriche)
+  // Add UUID for renderer / avatar (Crafatar requires plain UUID without dashes)
   if (uuid) {
     try { (stats as any).uuid = uuid.replace(/-/g, ''); } catch { /* ignore */ }
   }
@@ -1398,7 +1398,7 @@ class HypixelApiRouter {
         const data = await response.json();
         this.backendDown = false;
         
-        // Backend kann Cache-Timeout überschreiben
+  // Backend can override cache timeout
         if (data.cache_player) {
           this.config.cacheTimeout = data.cache_player;
         }

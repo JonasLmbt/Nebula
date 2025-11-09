@@ -12,7 +12,7 @@
     --panel: rgba(255,255,255,0.06);
     --text: #e9e9f1;
     --muted: #9aa0aa;
-    --accent: #66eaff; /* aktualisiert gemäß neuem Style-Snippet */
+  --accent: #66eaff; /* updated according to latest style snippet */
     --accent-soft: rgba(102,234,255,0.25);
     --good: #43d17f;
     --warn: #e0c14d;
@@ -43,7 +43,7 @@
     -webkit-app-region:drag;
   }
   .brand{display:flex;align-items:center}
-  .brand img{height:32px;opacity:.95;display:block} /* reduziert für präzisere Topbar-Abstände */
+  .brand img{height:32px;opacity:.95;display:block} /* reduced for precise topbar spacing */
   .spacer{flex:1}
   .icon-btn,.search{ -webkit-app-region:no-drag }
   .icon-btn{
@@ -1831,8 +1831,8 @@
       if (sessionUuid) {
         sessionAvatar.src = `https://crafatar.com/avatars/${sessionUuid}?size=48&default=MHF_Steve&overlay`;
       } else {
-        // Username-Fallback: zuerst Mojang UUID asynchron laden
-        sessionAvatar.src = `https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?size=48&default=MHF_Steve&overlay`; // Steve als Platzhalter
+  // Username fallback: load Mojang UUID asynchronously; until then use Steve placeholder skin
+  sessionAvatar.src = `https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?size=48&default=MHF_Steve&overlay`; // Steve placeholder
       }
       updateSessionTime();
     }
@@ -3649,7 +3649,7 @@
       console.log('[DEBUG] renderStatLayoutPalette - Filtered stats (no level/name):', stats.length, stats);
       console.log('[DEBUG] renderStatLayoutPalette - Currently used in layout:', Array.from(used));
       
-  // In den Einstellungen bitte ausgeschriebene Namen anzeigen
+  // In settings palette show human-readable names
   palette.innerHTML = stats.map(k => {
         const def = STATS[k];
         const isUsed = used.has(k);
@@ -3696,7 +3696,7 @@
       const layout = statSettings.layout;
       slotsEl.innerHTML = layout.map((stat, i) => {
         if (!stat) return `<div class="slot" data-slot="${i}" data-empty="1">Empty</div>`;
-  // In den Einstellungen die ausgeschriebenen Namen nutzen
+  // In settings slots show explicit names
   const label = STATS[stat]?.name || stat;
   return `<div class="slot filled" data-slot="${i}" data-stat="${stat}" draggable="true">${label}<button class="slot-remove" title="Remove">×</button></div>`;
       }).join('');
