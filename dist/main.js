@@ -43,7 +43,7 @@ const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const crypto = __importStar(require("crypto"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
-require("dotenv/config");
+const dotenv = __importStar(require("dotenv"));
 const events_1 = __importDefault(require("events"));
 const tail_1 = require("tail");
 // Diagnostic: log version and environment early (helps packaged startup investigation)
@@ -84,7 +84,77 @@ try {
 catch (e) {
     console.warn('[Nebula:init] failed to read package.json for diagnostics', e);
 }
-// (incoming) no extra environment loader in compiled output
+// Load environment configuration for both dev and packaged builds.
+// We look for .env in several plausible locations and merge without overriding existing vars.
+// Additionally, we try a JSON config (nebula.config.json) to allow easy editing after install.
+(function loadEnvironment() {
+    const loadedFrom = [];
+    const tryEnv = (p) => {
+        try {
+            if (fs.existsSync(p)) {
+                dotenv.config({ path: p, override: false });
+                loadedFrom.push(p);
+            }
+        }
+        catch { }
+    };
+    const tryJson = (p) => {
+        try {
+            if (fs.existsSync(p)) {
+                const raw = fs.readFileSync(p, 'utf8');
+                const cfg = JSON.parse(raw);
+                for (const [k, v] of Object.entries(cfg || {})) {
+                    if (process.env[k] == null || process.env[k] === '') {
+                        if (typeof v === 'string')
+                            process.env[k] = v;
+                    }
+                }
+                loadedFrom.push(p);
+            }
+        }
+        catch { }
+    };
+    // Candidate paths (order: cwd → exe dir → resources → userData → project root fallback)
+    try {
+        tryEnv(path.join(process.cwd(), '.env'));
+    }
+    catch { }
+    try {
+        const exeDir = path.dirname(electron_1.app.getPath('exe'));
+        tryEnv(path.join(exeDir, '.env'));
+        tryJson(path.join(exeDir, 'nebula.config.json'));
+    }
+    catch { }
+    try {
+        // When packaged, resourcesPath points to app.asar.unpacked or resources folder
+        // (asar disabled in current config, but keep for completeness)
+        tryEnv(path.join(process.resourcesPath || '', '.env'));
+        tryJson(path.join(process.resourcesPath || '', 'nebula.config.json'));
+    }
+    catch { }
+    try {
+        const ud = electron_1.app.getPath('userData');
+        tryEnv(path.join(ud, '.env'));
+        tryJson(path.join(ud, 'nebula.config.json'));
+    }
+    catch { }
+    try {
+        // Project root when running un-packaged via ts-node or dist/main.js
+        tryEnv(path.join(__dirname, '..', '.env'));
+    }
+    catch { }
+    if (loadedFrom.length) {
+        try {
+            const logDir = electron_1.app.getPath('userData');
+            fs.appendFileSync(path.join(logDir, 'startup.log'), `[${new Date().toISOString()}] env-loaded ${JSON.stringify(loadedFrom)}\n`);
+        }
+        catch { }
+        console.log('[Nebula:env] Loaded from:', loadedFrom.join(' | '));
+    }
+    else {
+        console.log('[Nebula:env] No external env/config files found; relying on process.env only');
+    }
+})();
 // Lazy-load chat logger with a robust path resolution for packaged builds
 // Some packagers keep main.js inside dist/, others flatten it to the app root. We probe
 // several candidates and only require a file that actually exists, to avoid crashes.
@@ -1207,11 +1277,11 @@ function generatePKCE() {
 // Open Discord OAuth2 URL in browser
 electron_1.ipcMain.handle('auth:discord:login', async () => {
     if (!DISCORD_CLIENT_ID) {
-    return {
-        error: 'Discord login is not available in this build.',
-        hint: 'This feature requires Discord OAuth configuration. Contact the developer for a version with Discord integration.',
-        featureDisabled: true
-    };
+        return {
+            error: 'Discord login is not available in this build.',
+            hint: 'This feature requires Discord OAuth configuration. Contact the developer for a version with Discord integration.',
+            featureDisabled: true
+        };
     }
     // Generate PKCE parameters for this auth session
     const { code_verifier, code_challenge } = generatePKCE();
@@ -1226,6 +1296,10 @@ electron_1.ipcMain.handle('auth:discord:login', async () => {
         console.error('Failed to open Discord auth URL:', err);
         return { error: 'Failed to open browser for Discord login.' };
     }
+});
+// Simple capability probe for the renderer to decide whether to show the login affordance
+electron_1.ipcMain.handle('auth:discord:available', async () => {
+    return { available: !!DISCORD_CLIENT_ID };
 });
 // Exchange Discord auth code for tokens (called by renderer after redirect)
 electron_1.ipcMain.handle('auth:discord:exchange', async (_e, code) => {
@@ -2043,7 +2117,8 @@ class HypixelApiRouter {
 // Initialize enhanced API Router
 const apiRouter = new HypixelApiRouter({
     userApiKey: process.env.HYPIXEL_KEY || '',
-    useFallbackKey: true,
+    // If a backend is configured, do NOT fall back to a client-side key.
+    useFallbackKey: !process.env.BACKEND_API_URL,
     cacheTimeout: 5 * 60 * 1000
 });
 // const apiRouter = new HypixelApiRouter({

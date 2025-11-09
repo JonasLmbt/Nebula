@@ -1085,6 +1085,11 @@ ipcMain.handle('auth:discord:login', async () => {
   }
 });
 
+// Simple capability probe for the renderer to decide whether to show the login affordance
+ipcMain.handle('auth:discord:available', async () => {
+  return { available: !!DISCORD_CLIENT_ID };
+});
+
 // Exchange Discord auth code for tokens (called by renderer after redirect)
 ipcMain.handle('auth:discord:exchange', async (_e, code: string) => {
   if (!DISCORD_CLIENT_ID) {
@@ -2045,7 +2050,8 @@ class HypixelApiRouter {
 // Initialize enhanced API Router
 const apiRouter = new HypixelApiRouter({
   userApiKey: process.env.HYPIXEL_KEY || '',
-  useFallbackKey: true,
+  // If a backend is configured, do NOT fall back to a client-side key.
+  useFallbackKey: !process.env.BACKEND_API_URL,
   cacheTimeout: 5 * 60 * 1000
 });
 // const apiRouter = new HypixelApiRouter({

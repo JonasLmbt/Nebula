@@ -1656,6 +1656,22 @@
       if (rawResult && !rawResult.error && (rawResult.name || normalized.name)) {
         startStats = normalized; // store normalized for diff calculations
         sessionUuid = normalized.uuid || rawResult.uuid || null;
+        // Fallback: if backend/local stats didn't include a UUID, fetch from Mojang
+        if (!sessionUuid) {
+          try {
+            const fetched = await fetchMojangUuid(sessionUsername);
+            if (fetched) {
+              sessionUuid = fetched.replace(/-/g,'');
+              console.log('[Session] Fetched Mojang UUID fallback:', sessionUuid);
+            } else {
+              console.warn('[Session] No UUID found for', sessionUsername);
+            }
+          } catch (e) {
+            console.warn('[Session] Mojang UUID fallback failed:', e);
+          }
+        }
+        // Update avatar + header immediately
+        updateSessionDisplay();
         if (usernameInput) {
           usernameInput.value = basicSettings.username || '';
           const editBtn = document.getElementById('usernameEditBtn');
@@ -1813,6 +1829,22 @@
       
       if (rawCurrent && !rawCurrent.error) {
         generateSessionHTML(startStats, currentNormalized);
+        // Refresh UUID if backend now supplies it
+        if (!sessionUuid && (currentNormalized.uuid || rawCurrent.uuid)) {
+          sessionUuid = (currentNormalized.uuid || rawCurrent.uuid || '').replace(/-/g,'');
+          console.log('[Session] Acquired UUID during update:', sessionUuid);
+        }
+        // If still missing, attempt one-time Mojang fetch
+        if (!sessionUuid) {
+          try {
+            const fetched = await fetchMojangUuid(sessionUsername);
+            if (fetched) {
+              sessionUuid = fetched.replace(/-/g,'');
+              console.log('[Session] Fetched Mojang UUID (update fallback):', sessionUuid);
+            }
+          } catch {}
+        }
+        updateSessionDisplay();
       } else {
         console.error('Session update error:', rawCurrent?.error);
       }
@@ -1828,6 +1860,18 @@
     
     if (sessionUsername) {
       sessionIgn.textContent = sessionUsername;
+      // Network-resilient avatar loading: try Crafatar by UUID, then fall back to Minotar by name
+      if (sessionAvatar && !sessionAvatar._fallbackBound) {
+        try {
+          sessionAvatar.addEventListener('error', () => {
+            if (sessionUsername) {
+              sessionAvatar.src = `https://minotar.net/helm/${encodeURIComponent(sessionUsername)}/48.png`;
+            }
+          }, { once: true });
+          // mark bound
+          sessionAvatar._fallbackBound = true;
+        } catch {}
+      }
       if (sessionUuid) {
         sessionAvatar.src = `https://crafatar.com/avatars/${sessionUuid}?size=48&default=MHF_Steve&overlay`;
       } else {
@@ -5099,6 +5143,26 @@
 
     // Discord Login Handler
     const discordLoginBtn = document.getElementById('discordLoginBtn');
+
+    // At startup, check if Discord login is available in this build; if not, disable/hide the button
+    (async function initDiscordAvailability(){
+      try {
+        const res = await ipcRenderer.invoke('auth:discord:available');
+        if (!res?.available && discordLoginBtn) {
+          // Hide login affordance for end users; avoid modal prompts
+          discordLoginBtn.disabled = true;
+          discordLoginBtn.style.opacity = '0.5';
+          discordLoginBtn.style.cursor = 'not-allowed';
+          discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login unavailable</span>';
+          const status = document.getElementById('profileStatus');
+          if (status) {
+            status.classList.add('offline');
+            status.innerHTML = '<span class="status-dot"></span><span>Local account only</span>';
+          }
+        }
+      } catch {}
+    })();
+
     if (discordLoginBtn) {
       discordLoginBtn.addEventListener('click', async () => {
         try {
@@ -5108,6 +5172,13 @@
           const result = await ipcRenderer.invoke('auth:discord:login');
           
           if (result.error) {
+            // If feature is disabled in this build, quietly keep the button disabled to avoid repeated prompts
+            if (result.featureDisabled) {
+              discordLoginBtn.disabled = true;
+              discordLoginBtn.style.opacity = '0.5';
+              discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login unavailable</span>';
+              return;
+            }
             showNotification(result.error);
             discordLoginBtn.disabled = false;
             discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
