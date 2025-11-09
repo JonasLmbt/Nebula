@@ -11,37 +11,43 @@ import 'dotenv/config';
 // several candidates and only require a file that actually exists, to avoid crashes.
 type ChatLoggerCtor = new () => any;
 function loadChatLogger(): ChatLoggerCtor {
+  const appPath = (() => { try { return app.getAppPath(); } catch { return __dirname; } })();
   const candidates = [
-    // 1) Typical dev/tsc or packaged with preserved structure
+    path.join(__dirname, 'chat-logger.js'),
     path.join(__dirname, 'chat-logger'),
-    // 2) If main.js was flattened to app root and helpers remained in dist/
+    path.join(__dirname, 'dist', 'chat-logger.js'),
     path.join(__dirname, 'dist', 'chat-logger'),
-    // 3) Defensive: resolve relative to compiled output’s parent (…/app.asar or …/dist)
-    path.join(__dirname, '..', 'dist', 'chat-logger'),
+    path.join(appPath, 'dist', 'chat-logger.js'),
+    path.join(appPath, 'dist', 'chat-logger'),
+    path.join(appPath, 'chat-logger.js'),
+    path.join(appPath, 'chat-logger'),
   ];
-
-  for (const base of candidates) {
+  const tried: Record<string, string> = {};
+  for (const file of candidates) {
     try {
-      // Check with and without explicit .js to handle asar virtual paths
-      const withJs = base.endsWith('.js') ? base : `${base}.js`;
-      if (fs.existsSync(withJs) || fs.existsSync(base)) {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        return require(base).MinecraftChatLogger as ChatLoggerCtor;
+      const exists = fs.existsSync(file);
+      tried[file] = exists ? 'exists' : 'missing';
+      if (!exists) continue;
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require(file);
+      if (mod && mod.MinecraftChatLogger) {
+        console.log('[ChatLogger] Loaded from', file);
+        return mod.MinecraftChatLogger as ChatLoggerCtor;
       }
-    } catch {/* try next */}
+    } catch (err) {
+      tried[file] = 'error:' + String(err);
+    }
   }
-  // Final attempt (may provide a clearer error message in some environments)
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('./chat-logger').MinecraftChatLogger as ChatLoggerCtor;
-  } catch (err) {
-    console.error('[Init] Failed to resolve chat-logger module', {
-      __dirname,
-      candidates,
-      err: String(err),
-    });
-    throw err;
+  console.error('[ChatLogger] All candidate resolutions failed', { __dirname, appPath, tried });
+  // Provide a stub so the app still launches instead of crashing the main process.
+  const events = require('events');
+  class StubChatLogger extends events.EventEmitter {
+    username = '';
+    autoDetect() { return undefined; }
+    switchLogPath(_p: string) {/* noop */}
+    setClient(_c: string) {/* noop */}
   }
+  return StubChatLogger;
 }
 
 let nicksWin: BrowserWindow | null = null;
