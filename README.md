@@ -130,6 +130,16 @@ Default paths checked (in order of recency):
 - 10-minute cache for player stats
 - Automatic UUID caching
 
+### Plus / Subscription Verification
+Nebula Plus (optionale Premium-Features) wird sicher über ein Backend verifiziert:
+- Die App öffnet Stripe Payment Links im Browser (kein Secret im Client).
+- Nach erfolgreicher Zahlung sendet der Client nur die `session_id` an dein Backend (`BACKEND_API_URL`).
+- Das Backend prüft mit dem Stripe Secret und aktualisiert den Plus-Status (Firestore/Admin).
+- Antwortformat erwartet: `{ success, expiresAt, message }`.
+
+Wichtig: Stripe Secrets gehören ausschließlich auf den Server und werden nicht in der Desktop-`.env` hinterlegt.
+Setze im Client lediglich `BACKEND_API_URL=https://your-backend.example.com` in `.env`.
+
 ## License
 
 This project is licensed under the MIT License – see the `LICENSE` file for details.

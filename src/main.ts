@@ -6,7 +6,27 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import 'dotenv/config';
-import { MinecraftChatLogger } from './chat-logger';
+// Lazy-load chat logger with a robust path resolution for packaged builds
+// In some packager setups, main.js may be flattened to app root while helpers remain under dist/.
+// We resolve both possibilities at runtime to avoid "Cannot find module './chat-logger'" in production.
+type ChatLoggerCtor = new () => any;
+function loadChatLogger(): ChatLoggerCtor {
+  try {
+    // Most common (dev/tsc): dist/main.js sits next to dist/chat-logger.js
+    // or packaged keeping relative structure
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('./chat-logger').MinecraftChatLogger as ChatLoggerCtor;
+  } catch (e1) {
+    try {
+      // Some packagers flatten main.js to app root but leave helpers in dist/
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return require(path.join(__dirname, 'dist', 'chat-logger')).MinecraftChatLogger as ChatLoggerCtor;
+    } catch (e2) {
+      console.error('[Init] Failed to resolve chat-logger module', { __dirname, e1: String(e1), e2: String(e2) });
+      throw e2;
+    }
+  }
+}
 
 let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
@@ -103,7 +123,8 @@ app.whenReady().then(() => {
 
   // Start chat logger to detect local Minecraft chat and forward player lists to renderer
   try {
-  let chat = new MinecraftChatLogger();
+    const ChatLogger = loadChatLogger();
+    let chat = new ChatLogger();
     chat.on('playersUpdated', (players: string[]) => {
       if (win) win.webContents.send('chat:players', players);
     });
@@ -146,7 +167,7 @@ app.whenReady().then(() => {
     chat.on('logPathChanged', (payload: { path: string; client?: string }) => {
       if (win) win.webContents.send('chat:logPathChanged', payload);
     });
-    chat.on('error', (err) => console.error('ChatLogger error:', err));
+  chat.on('error', (err: unknown) => console.error('ChatLogger error:', err));
 
     // Allow renderer to update username
     ipcMain.on('set:username', (_e, username: string) => {
@@ -1126,72 +1147,63 @@ ipcMain.handle('plus:createCheckout', async (_e, userId: string, options: { plan
   }
 });
 
-// Verify plus purchase with real Stripe API
+// Verify plus purchase via backend (secure: Stripe secret stays server-side)
+// Backend endpoint should: validate Stripe session, update Firestore, return { success, expiresAt, message }.
 ipcMain.handle('plus:verify', async (_e, userId: string, sessionId?: string) => {
-  if (!await initFirebaseMain()) {
-    return { error: 'Firebase not initialized' };
+  // Basic parameter checks
+  if (!sessionId) {
+    return { error: 'No payment session ID provided' };
   }
-  
+  if (!userId) {
+    return { error: 'Missing userId' };
+  }
+
+  const backendUrl = process.env.BACKEND_API_URL;
+  if (!backendUrl) {
+    return { error: 'Backend not configured (BACKEND_API_URL missing)' };
+  }
+
+  // Compose request – prefer POST for sensitive IDs
+  const verifyEndpoint = backendUrl.replace(/\/$/, '') + '/api/plus/verify';
+  let response: any;
   try {
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    
-    if (!stripeSecretKey || stripeSecretKey === 'sk_test_your_secret_key_here') {
-      return { error: 'Stripe not configured. Please add your Stripe Secret Key to .env file.' };
-    }
-
-    // If no sessionId provided, return error
-    if (!sessionId) {
-      return { error: 'No payment session ID provided' };
-    }
-
-    // Verify session with Stripe API
-    const stripeResponse = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
-      headers: {
-        'Authorization': `Bearer ${stripeSecretKey}`
-      }
+    response = await fetch(verifyEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ userId, sessionId })
     });
-
-    if (!stripeResponse.ok) {
-      return { error: 'Invalid payment session' };
-    }
-
-    const session = await stripeResponse.json();
-    
-    // Check if payment was successful
-    if (session.payment_status !== 'paid') {
-      return { error: 'Payment not completed' };
-    }
-
-    const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
-    
-    // Add 1 month of plus
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-    
-    const plusDocRef = doc(firestore, 'plus', userId);
-    await setDoc(plusDocRef, {
-      plan: 'plus',
-      status: 'active',
-      stripeSessionId: sessionId,
-      purchasedAt: serverTimestamp(),
-      expiresAt: expiresAt,
-      features: {
-        unlimitedNicks: true,
-        customThemes: true,
-        advancedStats: true,
-        prioritySupport: true
-      }
-    });
-    
-    console.log('[Plus] Activated for user:', userId);
-    return { 
-      success: true, 
-      expiresAt: expiresAt.getTime(),
-      message: 'Plus activated successfully!' 
-    };
-  } catch (error) {
-    console.error('[Plus] Verification failed:', error);
-    return { error: String(error) };
+  } catch (networkErr) {
+    console.error('[Plus] Backend verify network error:', networkErr);
+    return { error: 'Network error contacting backend' };
   }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    console.error('[Plus] Backend verify failed status:', response.status, text);
+    return { error: 'Backend verification failed' };
+  }
+
+  let data: any;
+  try {
+    data = await response.json();
+  } catch (parseErr) {
+    console.error('[Plus] Backend JSON parse error:', parseErr);
+    return { error: 'Invalid backend response' };
+  }
+
+  if (data.error) {
+    return { error: data.error };
+  }
+  if (!data.success) {
+    return { error: 'Verification unsuccessful' };
+  }
+
+  // Expect expiresAt (ms) from server
+  return {
+    success: true,
+    expiresAt: data.expiresAt || null,
+    message: data.message || 'Plus activated successfully!'
+  };
 });
 
 // Get monthly test day info
