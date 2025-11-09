@@ -16,6 +16,11 @@ try {
   const chatLoggerPath = path.join(__dirname, 'chat-logger.js');
   const chatLoggerExists = fs.existsSync(chatLoggerPath);
   console.log('[Nebula:init]', { version, __dirname, chatLoggerExists });
+  // also mirror to a log file for users without console
+  try {
+    const logDir = app.getPath('userData');
+    fs.appendFileSync(path.join(logDir, 'startup.log'), `[${new Date().toISOString()}] init ${JSON.stringify({version, __dirname, chatLoggerExists})}\n`);
+  } catch {}
   // If some stale code still attempts to require('./chat-logger'), guarantee a stub file exists
   if (!chatLoggerExists) {
     try {
@@ -402,6 +407,17 @@ async function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   initAutoUpdate();
+
+  // capture uncaught errors to file as well
+  try {
+    process.on('uncaughtException', (err) => {
+      try {
+        const logDir = app.getPath('userData');
+        fs.appendFileSync(path.join(logDir, 'startup.log'), `[${new Date().toISOString()}] uncaught ${String(err)}\n`);
+      } catch {}
+      console.error('Uncaught error in main process:', err);
+    });
+  } catch {}
 
   // Start chat logger to detect local Minecraft chat and forward player lists to renderer
   try {
