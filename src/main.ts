@@ -982,20 +982,24 @@ class HypixelCache {
   }
 }
 
-// Zentraler Cache-Manager
+// Zentraler Cache-Manager (only initialized if HYPIXEL_KEY is available)
 const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
 
 // --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
 ipcMain.handle('bedwars:stats', async (_e, name: string) => {
-  // Try enhanced API system first
+  // Try enhanced API system first (backend or user key)
   try {
     return await apiRouter.getStats(name);
   } catch (error) {
     console.log('[API] Enhanced system failed, using original:', error);
     
-    // Fallback to original system
+    // Fallback to original system if user has provided a key
     if (!process.env.HYPIXEL_KEY) {
-      return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
+      return { 
+        error: 'No API key configured. The app needs either a backend service or a local Hypixel API key to function.',
+        hint: 'For advanced users: Add HYPIXEL_KEY to .env file. Get your key with /api new on Hypixel.',
+        missingConfig: true
+      };
     }
     return hypixel.getStats(name);
   }
@@ -1057,8 +1061,11 @@ function generatePKCE() {
 // Open Discord OAuth2 URL in browser
 ipcMain.handle('auth:discord:login', async () => {
   if (!DISCORD_CLIENT_ID) {
-    const hint = 'Add DISCORD_CLIENT_ID to %APPDATA%/Nebula/.env or nebula.config.json (user data), or place a .env next to the executable. Restart the app afterwards.';
-    return { error: `Discord Client ID not configured. ${hint}` };
+    return {
+      error: 'Discord login is not available in this build.',
+      hint: 'This feature requires Discord OAuth configuration. Contact the developer for a version with Discord integration.',
+      featureDisabled: true
+    };
   }
 
   // Generate PKCE parameters for this auth session
@@ -1253,6 +1260,20 @@ ipcMain.handle('auth:discord:refresh', async (_e, refreshToken: string) => {
 
 // Get Firebase configuration for renderer process
 ipcMain.handle('firebase:getConfig', async () => {
+  // Return config only if Firebase is configured
+  const hasFirebase = !!(
+    process.env.FIREBASE_API_KEY && 
+    process.env.FIREBASE_PROJECT_ID
+  );
+  
+  if (!hasFirebase) {
+    return {
+      error: 'Firebase is not configured in this build',
+      hint: 'Cloud sync features are disabled. Settings will be saved locally only.',
+      featureDisabled: true
+    };
+  }
+  
   return {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -1269,6 +1290,17 @@ let firestore: any = null;
 
 async function initFirebaseMain() {
   if (firebaseApp) return true; // Already initialized
+  
+  // Check if Firebase is configured
+  const hasFirebase = !!(
+    process.env.FIREBASE_API_KEY && 
+    process.env.FIREBASE_PROJECT_ID
+  );
+  
+  if (!hasFirebase) {
+    console.log('[Firebase Main] Not configured - cloud features disabled');
+    return false;
+  }
   
   try {
     const { initializeApp } = require('firebase/app');
@@ -1302,7 +1334,11 @@ async function initFirebaseMain() {
 // Firebase Cloud Sync Handlers
 ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
   if (!await initFirebaseMain()) {
-    return { error: 'Firebase not initialized' };
+    return { 
+      error: 'Cloud sync is not available in this build',
+      hint: 'Settings will be saved locally only. Cloud sync requires Firebase configuration.',
+      featureDisabled: true
+    };
   }
   
   try {
@@ -1325,7 +1361,11 @@ ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
 
 ipcMain.handle('firebase:download', async (_e, userId: string) => {
   if (!await initFirebaseMain()) {
-    return { error: 'Firebase not initialized' };
+    return { 
+      error: 'Cloud sync is not available in this build',
+      hint: 'Using local settings only. Cloud sync requires Firebase configuration.',
+      featureDisabled: true
+    };
   }
   
   try {
@@ -1367,7 +1407,7 @@ ipcMain.handle('metrics:get', async (_e, userId?: string) => {
   };
 
   if (!userId || !await initFirebaseMain()) {
-    return { success: true, data: localMetrics, source: 'local' };
+    return { success: true, data: localMetrics, source: 'local', cloudDisabled: !userId };
   }
 
   try {
@@ -1398,7 +1438,11 @@ ipcMain.handle('metrics:get', async (_e, userId?: string) => {
 // Update account metrics in cloud
 ipcMain.handle('metrics:update', async (_e, userId: string, metrics: any) => {
   if (!userId || !await initFirebaseMain()) {
-    return { error: 'Firebase not available or no user ID' };
+    return { 
+      error: 'Cloud metrics not available',
+      hint: 'Metrics will be tracked locally only.',
+      featureDisabled: true
+    };
   }
 
   try {
@@ -1435,7 +1479,12 @@ ipcMain.handle('metrics:getUserId', async () => {
 // Plus subscription check via Firebase
 ipcMain.handle('plus:checkStatus', async (_e, userId: string) => {
   if (!await initFirebaseMain()) {
-    return { isPlus: false, error: 'Firebase not initialized' };
+    return { 
+      isPlus: false, 
+      error: 'Plus features not available',
+      hint: 'This build does not include Plus subscription features.',
+      featureDisabled: true
+    };
   }
   
   try {
@@ -1796,10 +1845,131 @@ class HypixelApiRouter {
     return false;
   }
 
-  // Use the existing HypixelCache system for now
+  // Main stats fetching method with 3-tier fallback
   async getStats(name: string): Promise<any> {
-    // For now, delegate to the original system
-    return hypixel.getStats(name);
+    const normalizedName = name.toLowerCase();
+    
+    // 1. Check cache first
+    const cached = this.cache.get(normalizedName);
+    if (cached && Date.now() - cached.timestamp < this.config.cacheTimeout) {
+      console.log(`[API] Cache hit for ${name}`);
+      return cached.data;
+    }
+    
+    // 2. Try backend first if available
+    if (this.config.backendUrl && !this.backendDown) {
+      try {
+        const backendResult = await this.fetchFromBackend(name);
+        if (backendResult && !backendResult.error) {
+          // Cache successful backend result
+          this.cache.set(normalizedName, {
+            data: backendResult,
+            timestamp: Date.now()
+          });
+          console.log(`[API] Backend success for ${name}`);
+          return backendResult;
+        }
+      } catch (error) {
+        console.log(`[API] Backend failed for ${name}, trying fallback:`, error);
+        this.backendDown = true;
+        // Continue to next tier
+      }
+    }
+    
+    // 3. Try user's API key if available and fallback is enabled
+    if (this.config.userApiKey && this.config.useFallbackKey && this.userKeyValid) {
+      try {
+        const result = await hypixel.getStats(name);
+        if (result && !result.error) {
+          // Cache successful result
+          this.cache.set(normalizedName, {
+            data: result,
+            timestamp: Date.now()
+          });
+          console.log(`[API] User key success for ${name}`);
+          return result;
+        }
+        if (result && result.error) {
+          // Check if it's a key validity error
+          if (result.error.includes('403') || result.error.includes('Invalid')) {
+            this.userKeyValid = false;
+          }
+        }
+      } catch (error) {
+        console.log(`[API] User key failed for ${name}:`, error);
+        // Continue to error
+      }
+    }
+    
+    // 4. All methods failed
+    return {
+      error: 'Unable to fetch player stats. All API sources are unavailable.',
+      details: {
+        backendAvailable: !this.backendDown,
+        userKeyAvailable: !!this.config.userApiKey,
+        userKeyValid: this.userKeyValid
+      },
+      hint: this.config.userApiKey 
+        ? 'Your API key may be invalid or rate limited. Try again later.'
+        : 'No API key configured. Add HYPIXEL_KEY to .env for offline mode.',
+      missingConfig: !this.config.backendUrl && !this.config.userApiKey
+    };
+  }
+  
+  private async fetchFromBackend(name: string): Promise<any> {
+    if (!this.config.backendUrl) throw new Error('No backend URL configured');
+    
+    // Rate limiting for backend requests
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastBackendRequest;
+    if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+      await new Promise(r => setTimeout(r, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+    }
+    this.lastBackendRequest = Date.now();
+    
+    // Queue management
+    while (this.queue.size >= this.MAX_CONCURRENT) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    
+    try {
+      this.queue.add(name);
+      
+      const response = await fetch(`${this.config.backendUrl}/api/player/${encodeURIComponent(name)}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10000),
+        headers: { 
+          'User-Agent': 'Nebula-Overlay/1.0',
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 429) {
+          this.backendThrottled = true;
+          throw new Error('Backend rate limit reached');
+        }
+        if (response.status === 503) {
+          throw new Error('Backend service unavailable');
+        }
+        throw new Error(`Backend returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Backend should return stats in the same format as our local processing
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Reset throttle status on success
+      this.backendThrottled = false;
+      
+      return data;
+      
+    } finally {
+      this.queue.delete(name);
+    }
   }
 
   // Public methods for status and configuration

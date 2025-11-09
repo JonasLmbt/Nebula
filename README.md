@@ -2,7 +2,91 @@
 
 Nebula is a lightweight Bedwars stats overlay for Hypixel that automatically detects players from your game chat.
 
-## Features
+## 🚀 For End Users
+
+**Just download and run!** No configuration needed.
+
+1. Download the latest release from [GitHub Releases](https://github.com/JonasLmbt/Nebula/releases)
+2. Install and run the application
+3. Join a Bedwars lobby on Hypixel
+4. Player stats will automatically appear in the overlay
+
+That's it! The app works out of the box without any API keys or configuration.
+
+> **Note**: Some advanced features (Discord integration, cloud sync, Plus subscription) may not be available in all builds. The core stats overlay functionality always works.
+
+---
+
+## 🔧 For Developers
+
+Want to run your own instance or contribute? 
+
+**Quick Links:**
+- [📖 Deployment Guide](./docs/DEPLOYMENT.md) - How to set up for public distribution
+- [🔌 Backend API Spec](./docs/BACKEND_SPEC.md) - Backend service implementation guide
+- [💻 Development Setup](#development-setup) - Get started with development
+
+### Two Deployment Options
+
+#### Option A: Backend Service (Recommended for Distribution)
+
+Best for: Sharing the app with others without requiring them to have API keys.
+
+1. Set up a backend service that handles API calls
+2. Configure only `BACKEND_API_URL` in `.env`
+3. Users can run the app without any configuration
+
+Your backend should implement:
+- `GET /ping` - Health check
+- `GET /api/player/:name` - Get player stats
+- `POST /api/plus/verify` - Verify Stripe payments (optional)
+
+#### Option B: Developer Mode (API Keys)
+
+Best for: Local development and testing.
+
+1. Get your own API keys:
+   - Hypixel: Run `/api new` on Hypixel server
+   - Discord: Create app at [Discord Developer Portal](https://discord.com/developers/applications)
+   - Firebase: Create project at [Firebase Console](https://console.firebase.google.com/)
+
+2. Copy `.env.example` to `.env` and configure your keys
+
+3. Run the app in development mode
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
+
+```bash
+# Quick iteration (main process only)
+npm run dev
+
+# Full build & run
+npm run start
+
+# Build only
+npm run build
+```
+
+### Environment Configuration
+
+See `.env.example` for detailed configuration options. Key points:
+
+- **For public distribution**: Only set `BACKEND_API_URL` (recommended - see [Deployment Guide](./docs/DEPLOYMENT.md))
+- **For development**: Set `HYPIXEL_KEY` and optionally Discord/Firebase configs
+- **Never commit** `.env` file (it's in `.gitignore`)
+- **Keep secrets server-side** (Stripe, Firebase Admin, etc.)
+
+For complete deployment instructions, see the [Deployment Guide](./docs/DEPLOYMENT.md).
+
+---
+
+## 📋 Features
 
 ### Automatic Player Detection
 - Monitors Minecraft chat log in real-time
@@ -20,101 +104,155 @@ Nebula is a lightweight Bedwars stats overlay for Hypixel that automatically det
   - Feather
 
 ### Smart Stats Loading
-- Efficient Hypixel API usage:
-  - 10-minute stat caching
-  - Rate limiting (max 3 concurrent requests)
-  - Automatic queue management
-  - UUID caching
+- Efficient API usage with caching
+- Automatic rate limiting
 - Incremental updates (only loads new players)
-- Preserves API key limits
+- Works even when Hypixel API is under load
 
-### Technical Details
-- Electron-based overlay
-- TypeScript for type safety
-- IPC communication between processes
-- File monitoring via `tail`
+### Privacy
+- All data processed locally on your computer
+- No personal information is collected
+- Only reads Minecraft chat for player detection
+- Connects to Mojang and Hypixel APIs for stats only
 
-## Setup
+---
 
-### Installation
-1. Install dependencies:
+## 📦 Building & Distribution
+
+### Local Build
+
+Build a distributable for testing:
+
 ```bash
-npm install
-```
-
-2. Create environment file:
-```bash
-cp .env.example .env
-```
-
-3. Add your Hypixel API key to `.env`:
-```env
-HYPIXEL_KEY=your-key-here
-```
-
-### Development
-- Full build & run: `npm run start`
-- Quick iteration (main process): `npm run dev`
-- Build only: `npm run build`
-
-### Distributables & Updates
-
-Nebula can be shipped as a Windows installer and auto‑updated using electron-builder + electron-updater.
-
-1) Build a local installer
-
-```powershell
 npm run dist
 ```
 
-Artifacts are written to `release/` (NSIS installer and portable EXE). Note: If a local build fails on Windows due to symlink permissions, use the GitHub Actions build (see below).
+Artifacts are created in `release/` directory (NSIS installer and portable EXE).
 
-2) Releases via GitHub Actions
+> **Note**: If building fails on Windows due to symlink permissions, use GitHub Actions instead (see below).
 
-- Create a Git tag in the form `vX.Y.Z` and push it:
+### Automated Releases (GitHub Actions)
 
-```powershell
+Create and push a version tag to automatically build and release:
+
+```bash
 git tag v1.0.1
 git push --tags
 ```
 
-- The workflow `.github/workflows/release.yml` builds on `windows-latest` and uploads artifacts (EXE, `latest.yml`, blockmaps) to a GitHub Release.
+The workflow `.github/workflows/release.yml` will:
+- Build on Windows
+- Create a GitHub Release
+- Upload installer and auto-update files
 
-3) Auto‑update for users
+### Auto-Updates
 
-- When packaged, the app checks for updates automatically and downloads them in the background.
-- The new version activates on the next restart. Optionally, trigger immediate install via IPC `update:install`.
+When running a packaged build:
+- App automatically checks for updates on startup
+- Downloads updates in background
+- Prompts user to install on next restart
+- Can trigger immediate install via IPC `update:install`
 
-Notes:
-- `package.json > build.publish` points to `github` (repo: `JonasLmbt/Nebula`).
-- Auto‑updater is only active when the app runs packaged (`app.isPackaged`).
+> **Note**: Auto-updater only works in packaged builds (`app.isPackaged`).
 
-## Usage
+## 🔐 Security & Privacy
 
-1. Start the overlay
-2. Join a Bedwars lobby
-3. Player stats will automatically appear when:
+### For End Users
+- No API keys needed
+- All processing happens on your computer  
+- Only reads Minecraft chat logs (no personal messages)
+- Connects to public APIs (Mojang, Hypixel) for player stats
+
+### For Developers
+
+**Important Security Rules:**
+
+1. **Never commit secrets** to the repository:
+   - `.env` is in `.gitignore` - keep it that way
+   - Don't hardcode API keys in source code
+
+2. **Keep backend secrets server-side only:**
+   - Stripe API keys (Secret Key, Webhook Secret)
+   - Firebase Admin SDK credentials
+   - Any other sensitive credentials
+
+3. **What's safe in the client:**
+   - Firebase web config (API key, project ID) - protected by Firestore rules
+   - Discord Client ID - public identifier
+   - Backend API URL - public endpoint
+
+4. **For public distribution:**
+   - Use a backend service to proxy API calls
+   - Don't include any API keys in the distributed build
+   - Set `BACKEND_API_URL` to point to your secure backend
+
+## 🛠️ API Integration
+
+### Backend API Specification
+
+If you're setting up a backend service, implement these endpoints:
+
+```
+GET  /ping
+Response: { success: true, cache_player: 300000 }
+
+GET  /api/player/:name
+Response: {
+  name: string,
+  level: number,
+  fkdr: number,
+  wlr: number,
+  // ... other stats
+}
+
+POST /api/plus/verify
+Body: { userId: string, sessionId: string }
+Response: { success: true, expiresAt: number, message: string }
+```
+
+### Local Development Without Backend
+
+1. Get a Hypixel API key: `/api new` on Hypixel server
+2. Add to `.env`: `HYPIXEL_KEY=your-key-here`
+3. Optional: Configure Discord/Firebase for additional features
+
+The app will automatically use local API keys when no backend is configured.
+
+## 📝 Usage
+
+### For End Users
+
+1. Download and install the app
+2. Start the overlay
+3. Join a Bedwars lobby on Hypixel
+4. Player stats will automatically appear when:
    - Players are detected in chat
    - `/who` command is used
    - Party members join/leave
    - Final kills occur
 
-## Privacy Notice
+### For Developers
 
-Nebula reads your Minecraft chat log file to detect players. It only processes:
-- Chat messages marked with `[CHAT]`
-- Player names and game events
-- No personal messages or other chat content
+When running from source:
+```bash
+npm run dev    # Quick development mode
+npm run start  # Full build and run
+```
 
-The app connects to:
-- Mojang API (UUID lookups)
-- Hypixel API (player stats)
+## 🔍 Technical Details
 
-All data is processed locally and cached temporarily (10 minutes).
+### Minecraft Client Support
 
-## Technical Notes
+Automatically detects and monitors log files from:
+- Vanilla Minecraft
+- Lunar Client
+- Badlion Client  
+- PvPLounge
+- LabyMod
+- Feather Client
 
 ### Log File Locations
+
 Default paths checked (in order of recency):
 ```
 %APPDATA%/.minecraft/logs/latest.log
@@ -124,22 +262,82 @@ Default paths checked (in order of recency):
 %APPDATA%/.minecraft/logs/fml-client-latest.log
 ```
 
-### Rate Limiting
-- Max 3 concurrent Hypixel API requests
+### Performance & Rate Limiting
+
+- Max 3 concurrent API requests
 - 150ms delay between requests
-- 10-minute cache for player stats
+- 5-minute cache for player stats
 - Automatic UUID caching
+- Smart queue management
 
-### Plus / Subscription Verification
-Nebula Plus (optionale Premium-Features) wird sicher über ein Backend verifiziert:
-- Die App öffnet Stripe Payment Links im Browser (kein Secret im Client).
-- Nach erfolgreicher Zahlung sendet der Client nur die `session_id` an dein Backend (`BACKEND_API_URL`).
-- Das Backend prüft mit dem Stripe Secret und aktualisiert den Plus-Status (Firestore/Admin).
-- Antwortformat erwartet: `{ success, expiresAt, message }`.
+### Architecture
 
-Wichtig: Stripe Secrets gehören ausschließlich auf den Server und werden nicht in der Desktop-`.env` hinterlegt.
-Setze im Client lediglich `BACKEND_API_URL=https://your-backend.example.com` in `.env`.
+- **Frontend**: Electron + HTML/CSS/TypeScript
+- **Chat Parser**: Real-time log file monitoring with `tail`
+- **API Router**: 3-tier fallback system (Backend → User Key → Error)
+- **State Management**: IPC communication between main and renderer processes
 
-## License
+## 💎 Premium Features
+
+### Nebula Plus
+
+Optional premium features are managed securely through a backend service:
+
+- **Payment**: Stripe checkout (no secrets in client)
+- **Verification**: Backend validates purchases using Stripe webhooks
+- **Status Check**: Client queries backend for subscription status
+- **Security**: All sensitive operations handled server-side
+
+**For developers implementing Plus:**
+1. Set up Stripe account and webhook endpoint
+2. Configure `BACKEND_API_URL` in `.env`
+3. Implement `/api/plus/verify` endpoint on backend
+4. Backend stores subscription status in Firebase/database
+
+**Important**: Stripe secrets (API keys, webhook secrets) must **never** be in the client app. They belong exclusively on the backend server.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/JonasLmbt/Nebula.git
+cd Nebula
+
+# Install dependencies
+npm install
+
+# Option A: Run without any keys (stats won't load)
+npm run dev
+
+# Option B: Use a backend service
+echo "BACKEND_API_URL=https://your-backend.com" > .env
+npm run dev
+
+# Option C: Use your own API key for development
+echo "HYPIXEL_KEY=your-key-here" > .env
+npm run dev
+```
+
+**Getting a Hypixel API Key:**
+1. Join `mc.hypixel.net`
+2. Run `/api new` in chat
+3. Copy the key that appears
+4. Add to `.env` file
+
+For more detailed setup instructions, see the [Deployment Guide](./docs/DEPLOYMENT.md).
+
+---
+
+## 📄 License
 
 This project is licensed under the MIT License – see the `LICENSE` file for details.
