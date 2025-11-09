@@ -13,8 +13,28 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const pkg = require('../package.json');
   const version = pkg?.version;
-  const chatLoggerExists = fs.existsSync(path.join(__dirname, 'chat-logger.js'));
+  const chatLoggerPath = path.join(__dirname, 'chat-logger.js');
+  const chatLoggerExists = fs.existsSync(chatLoggerPath);
   console.log('[Nebula:init]', { version, __dirname, chatLoggerExists });
+  // If some stale code still attempts to require('./chat-logger'), guarantee a stub file exists
+  if (!chatLoggerExists) {
+    try {
+      const stub = [
+        "const { EventEmitter } = require('events');",
+        "class MinecraftChatLogger extends EventEmitter {",
+        "  constructor(){ super(); this.username=''; }",
+        "  autoDetect(){ return undefined; }",
+        "  switchLogPath(_p){}",
+        "  setClient(_c){}",
+        "}",
+        "module.exports = { MinecraftChatLogger };\n",
+      ].join('\n');
+      fs.writeFileSync(chatLoggerPath, stub, 'utf8');
+      console.log('[Nebula:init] Wrote chat-logger stub at runtime');
+    } catch (e) {
+      console.warn('[Nebula:init] Failed to write chat-logger stub', e);
+    }
+  }
 } catch (e) {
   console.warn('[Nebula:init] failed to read package.json for diagnostics', e);
 }
