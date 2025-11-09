@@ -37,6 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
+// Auto-Update (only active when packaged)
+const electron_updater_1 = require("electron-updater");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const crypto = __importStar(require("crypto"));
@@ -45,6 +47,45 @@ require("dotenv/config");
 const chat_logger_1 = require("./chat-logger");
 let nicksWin = null;
 let win = null;
+function initAutoUpdate() {
+    // Skip in dev/unpackaged mode
+    if (!electron_1.app.isPackaged) {
+        return;
+    }
+    try {
+        electron_updater_1.autoUpdater.logger = console;
+        electron_updater_1.autoUpdater.autoDownload = true;
+        electron_updater_1.autoUpdater.on('checking-for-update', () => {
+            if (win)
+                win.webContents.send('update:status', 'checking');
+        });
+        electron_updater_1.autoUpdater.on('update-available', (info) => {
+            if (win)
+                win.webContents.send('update:available', info);
+        });
+        electron_updater_1.autoUpdater.on('update-not-available', (info) => {
+            if (win)
+                win.webContents.send('update:none', info);
+        });
+        electron_updater_1.autoUpdater.on('error', (err) => {
+            if (win)
+                win.webContents.send('update:error', err ? (err.message || String(err)) : 'unknown');
+        });
+        electron_updater_1.autoUpdater.on('download-progress', (prog) => {
+            if (win)
+                win.webContents.send('update:progress', prog);
+        });
+        electron_updater_1.autoUpdater.on('update-downloaded', (info) => {
+            if (win)
+                win.webContents.send('update:ready', info);
+        });
+        // Initial check
+        electron_updater_1.autoUpdater.checkForUpdates().catch(e => console.warn('AutoUpdate check failed:', e));
+    }
+    catch (e) {
+        console.warn('AutoUpdate init failed:', e);
+    }
+}
 async function createWindow() {
     electron_1.app.setName('Nebula');
     // On Windows, set an explicit AppUserModelID for proper taskbar grouping/notifications
@@ -56,8 +97,8 @@ async function createWindow() {
     // Try to resolve an application icon (preferring .ico on Windows, then .png, then .svg)
     const resolveAsset = (file) => path.resolve(__dirname, '..', 'assets', file);
     const iconCandidates = process.platform === 'win32'
-        ? ['nebula-logo.ico', 'nebula-logo.png', 'nebula-logo.svg']
-        : ['nebula-logo.png', 'nebula-logo.svg', 'nebula-logo.ico'];
+        ? ['nebula-logo.ico', 'nebula-logo.png', 'nebula-lettering.svg']
+        : ['nebula-logo.png', 'nebula-lettering.svg', 'nebula-logo.ico'];
     let iconPath;
     for (const f of iconCandidates) {
         const p = resolveAsset(f);
@@ -97,6 +138,7 @@ async function createWindow() {
 }
 electron_1.app.whenReady().then(() => {
     createWindow();
+    initAutoUpdate();
     // Start chat logger to detect local Minecraft chat and forward player lists to renderer
     try {
         let chat = new chat_logger_1.MinecraftChatLogger();
@@ -111,6 +153,10 @@ electron_1.app.whenReady().then(() => {
         chat.on('partyInvite', (inviter) => {
             if (win)
                 win.webContents.send('chat:partyInvite', inviter);
+        });
+        chat.on('partyInviteExpired', (player) => {
+            if (win)
+                win.webContents.send('chat:partyInviteExpired', player);
         });
         chat.on('partyCleared', () => {
             if (win)
@@ -135,6 +181,14 @@ electron_1.app.whenReady().then(() => {
         chat.on('gameStart', () => {
             if (win)
                 win.webContents.send('chat:gameStart');
+        });
+        chat.on('guildMembersUpdated', (players) => {
+            if (win)
+                win.webContents.send('chat:guildMembers', players);
+        });
+        chat.on('guildMemberLeft', (name) => {
+            if (win)
+                win.webContents.send('chat:guildMemberLeft', name);
         });
         chat.on('usernameMention', (name) => {
             if (win)
@@ -181,6 +235,21 @@ electron_1.app.whenReady().then(() => {
             catch {
                 return undefined;
             }
+        });
+        // Allow renderer to trigger install
+        electron_1.ipcMain.on('update:install', () => {
+            try {
+                electron_updater_1.autoUpdater.quitAndInstall();
+            }
+            catch (e) {
+                console.warn('Failed to quitAndInstall:', e);
+            }
+        });
+        electron_1.ipcMain.on('update:check', () => {
+            try {
+                electron_updater_1.autoUpdater.checkForUpdates().catch(e => console.warn('Manual update check failed:', e));
+            }
+            catch { }
         });
     }
     catch (e) {
@@ -392,6 +461,35 @@ class HypixelCache {
         const losses = bw.losses_bedwars ?? 0;
         const ws = bw.winstreak ?? 0;
         const bblr = (bw.beds_broken_bedwars ?? 0) / Math.max(1, bw.beds_lost_bedwars ?? 1);
+        // --- Most Played Mode Heuristik ---------------------------------------
+        // Bestimme den wahrscheinlich meistgespielten Modus anhand (wins + losses)
+        // Präfixe gemäß Hypixel-Konvention:
+        // eight_one_*  -> Solo
+        // eight_two_*  -> Doubles
+        // four_three_* -> 3s
+        // four_four_*  -> 4s
+        // two_four_*   -> 4v4
+        const MODE_PREFIX = [
+            { key: 'eight_one', label: 'Solo' },
+            { key: 'eight_two', label: 'Doubles' },
+            { key: 'four_three', label: '3s' },
+            { key: 'four_four', label: '4s' },
+            { key: 'two_four', label: '4v4' },
+        ];
+        let mostPlayed = null;
+        let mostGames = -1;
+        try {
+            for (const m of MODE_PREFIX) {
+                const w = bw[`${m.key}_wins_bedwars`] ?? 0;
+                const l = bw[`${m.key}_losses_bedwars`] ?? 0;
+                const games = (Number(w) || 0) + (Number(l) || 0);
+                if (games > mostGames) {
+                    mostGames = games;
+                    mostPlayed = games > 0 ? m.label : null;
+                }
+            }
+        }
+        catch { /* ignore mode calc errors */ }
         // Determine rank/prefix and a display color
         const getRankInfo = (p) => {
             // Precedence (Hypixel specifics): custom prefix > special rank field (rank) > monthlyPackageRank (SUPERSTAR) > newPackageRank > packageRank
@@ -468,6 +566,7 @@ class HypixelCache {
             bedsLost: bw.beds_lost_bedwars ?? 0,
             kills: bw.kills_bedwars ?? 0,
             deaths: bw.deaths_bedwars ?? 0,
+            mode: mostPlayed, // Neuer "Most Played Mode" (heuristisch wins+losses)
             // Derived efficiencies
             winsPerLevel: +(wins / Math.max(1, stars)).toFixed(2),
             fkPerLevel: +(fk / Math.max(1, stars)).toFixed(2),
@@ -520,6 +619,13 @@ class HypixelCache {
                 throw new Error('Player not found on Hypixel');
             const guild = await this.fetchGuild(uuid);
             const stats = await this.processBedwarsStats(player, name, guild);
+            // UUID für Renderer / Avatar hinzufügen (Crafatar benötigt nackte UUID ohne Bindestriche)
+            if (uuid) {
+                try {
+                    stats.uuid = uuid.replace(/-/g, '');
+                }
+                catch { /* ignore */ }
+            }
             // Cache successful request
             this.cache.set(normalizedName, {
                 data: stats,
@@ -542,12 +648,20 @@ class HypixelCache {
 }
 // Zentraler Cache-Manager
 const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
-// --- IPC: Bedwars Stats Fetch (jetzt mit Cache)
+// --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
 electron_1.ipcMain.handle('bedwars:stats', async (_e, name) => {
-    if (!process.env.HYPIXEL_KEY) {
-        return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
+    // Try enhanced API system first
+    try {
+        return await apiRouter.getStats(name);
     }
-    return hypixel.getStats(name);
+    catch (error) {
+        console.log('[API] Enhanced system failed, using original:', error);
+        // Fallback to original system
+        if (!process.env.HYPIXEL_KEY) {
+            return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
+        }
+        return hypixel.getStats(name);
+    }
 });
 // --- IPC: Always-on-top toggle from renderer appearance settings
 electron_1.ipcMain.handle('window:setAlwaysOnTop', (_e, flag) => {
@@ -844,6 +958,70 @@ electron_1.ipcMain.handle('firebase:download', async (_e, userId) => {
     }
 });
 // ==========================================
+// Account Metrics System
+// ==========================================
+// Get account metrics (cloud + local merge)
+electron_1.ipcMain.handle('metrics:get', async (_e, userId) => {
+    const localMetrics = {
+        memberSince: Date.now(), // fallback
+        playersTracked: 0,
+        sessionsCount: 0,
+        totalLookups: 0
+    };
+    if (!userId || !await initFirebaseMain()) {
+        return { success: true, data: localMetrics, source: 'local' };
+    }
+    try {
+        const { doc, getDoc } = require('firebase/firestore');
+        const metricsDocRef = doc(firestore, 'metrics', userId);
+        const docSnap = await getDoc(metricsDocRef);
+        if (!docSnap.exists()) {
+            return { success: true, data: localMetrics, source: 'local' };
+        }
+        const cloudData = docSnap.data();
+        const mergedData = {
+            memberSince: cloudData.memberSince || localMetrics.memberSince,
+            playersTracked: Math.max(cloudData.playersTracked || 0, localMetrics.playersTracked),
+            sessionsCount: Math.max(cloudData.sessionsCount || 0, localMetrics.sessionsCount),
+            totalLookups: Math.max(cloudData.totalLookups || 0, localMetrics.totalLookups)
+        };
+        return { success: true, data: mergedData, source: 'cloud', timestamp: cloudData.updatedAt?.toMillis() || 0 };
+    }
+    catch (error) {
+        console.error('[Metrics] Get failed:', error);
+        return { success: true, data: localMetrics, source: 'local', error: String(error) };
+    }
+});
+// Update account metrics in cloud
+electron_1.ipcMain.handle('metrics:update', async (_e, userId, metrics) => {
+    if (!userId || !await initFirebaseMain()) {
+        return { error: 'Firebase not available or no user ID' };
+    }
+    try {
+        const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
+        const metricsDocRef = doc(firestore, 'metrics', userId);
+        await setDoc(metricsDocRef, {
+            memberSince: metrics.memberSince,
+            playersTracked: metrics.playersTracked,
+            sessionsCount: metrics.sessionsCount,
+            totalLookups: metrics.totalLookups,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log('[Metrics] Updated in cloud for user:', userId);
+        return { success: true };
+    }
+    catch (error) {
+        console.error('[Metrics] Update failed:', error);
+        return { error: String(error) };
+    }
+});
+// Get current Discord user ID (for metrics)
+electron_1.ipcMain.handle('metrics:getUserId', async () => {
+    // We don't store user state globally, return null for now
+    // The renderer will manage user ID via Discord login flow
+    return null;
+});
+// ==========================================
 // Plus System
 // ==========================================
 // Plus subscription check via Firebase
@@ -898,14 +1076,14 @@ electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { 
     try {
         // Use real Stripe payment links with built-in 7-day trials
         const checkoutUrl = options.plan === 'yearly'
-            ? 'https://buy.stripe.com/9B65kCfLT3Iv7Gn5JO5wI02' // Yearly: €20/year (save €4)
+            ? 'https://buy.stripe.com/9B65kCfLT3Iv7Gn5JO5wI02' // Yearly: €19.99/year (save €4)
             : 'https://buy.stripe.com/9B65kC43b92P4ubc8c5wI01'; // Monthly: €1.99/month
         console.log('[Plus] Opening Stripe checkout:', checkoutUrl, 'Plan:', options.plan);
         await electron_1.shell.openExternal(checkoutUrl);
         return {
             success: true,
             message: options.plan === 'yearly'
-                ? '� Yearly plan selected! €20/year (save 16%)'
+                ? '� Yearly plan selected! €19.99/year (save 16%)'
                 : '� Monthly plan selected! €1.99/month'
         };
     }
@@ -1082,6 +1260,188 @@ electron_1.ipcMain.handle('premium:manageSubscription', async (_e, userId) => {
     }
     catch (error) {
         console.error('[Plus] Customer portal failed:', error);
+        return { error: String(error) };
+    }
+});
+class HypixelApiRouter {
+    constructor(config) {
+        this.cache = new Map();
+        this.uuidCache = new Map();
+        this.queue = new Set();
+        // Status tracking
+        this.backendDown = false;
+        this.backendThrottled = false;
+        this.userKeyValid = true;
+        this.hypixelApiDown = false;
+        // Rate limiting
+        this.lastBackendRequest = 0;
+        this.lastHypixelRequest = 0;
+        this.MIN_REQUEST_INTERVAL = 150; // 150ms between requests
+        this.MAX_CONCURRENT = 3;
+        this.config = {
+            backendUrl: process.env.BACKEND_API_URL,
+            userApiKey: process.env.HYPIXEL_KEY || '',
+            useFallbackKey: true,
+            cacheTimeout: 5 * 60 * 1000, // 5 minutes
+        };
+        // Merge with provided config
+        Object.assign(this.config, config);
+        this.validateConfig();
+        if (this.config.backendUrl) {
+            this.pingBackend(); // Initial backend health check
+        }
+    }
+    validateConfig() {
+        if (!this.config.backendUrl && !this.config.userApiKey) {
+            console.warn('[API] No backend URL or user API key configured - stats will be unavailable');
+        }
+    }
+    async pingBackend() {
+        if (!this.config.backendUrl)
+            return false;
+        try {
+            const response = await (0, node_fetch_1.default)(`${this.config.backendUrl}/ping`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000),
+                headers: { 'User-Agent': 'Nebula-Overlay/1.0' }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.backendDown = false;
+                // Backend kann Cache-Timeout überschreiben
+                if (data.cache_player) {
+                    this.config.cacheTimeout = data.cache_player;
+                }
+                console.log('[API] Backend connection successful');
+                return true;
+            }
+            if (response.status === 403) {
+                console.log('[API] Backend access denied - using developer mode');
+                this.backendDown = true;
+                return false;
+            }
+        }
+        catch (error) {
+            this.backendDown = true;
+            console.log('[API] Backend unavailable, using fallback:', error);
+        }
+        return false;
+    }
+    // Use the existing HypixelCache system for now
+    async getStats(name) {
+        // For now, delegate to the original system
+        return hypixel.getStats(name);
+    }
+    // Public methods for status and configuration
+    getStatus() {
+        return {
+            backendAvailable: !this.backendDown,
+            backendThrottled: this.backendThrottled,
+            userKeyValid: this.userKeyValid,
+            hypixelApiDown: this.hypixelApiDown,
+            cacheSize: this.cache.size,
+            uuidCacheSize: this.uuidCache.size,
+            config: {
+                hasBackend: !!this.config.backendUrl,
+                hasUserKey: !!this.config.userApiKey,
+                useFallback: this.config.useFallbackKey
+            }
+        };
+    }
+    updateConfig(newConfig) {
+        this.config = { ...this.config, ...newConfig };
+        if (newConfig.backendUrl || newConfig.userApiKey) {
+            this.validateConfig();
+            if (this.config.backendUrl) {
+                this.pingBackend();
+            }
+        }
+    }
+    clearCache() {
+        this.cache.clear();
+        this.uuidCache.clear();
+        // Also clear original cache
+        hypixel.clearCache();
+    }
+    async verifyUserApiKey(apiKey) {
+        if (!apiKey)
+            return { valid: false, error: 'No API key provided' };
+        try {
+            const response = await (0, node_fetch_1.default)('https://api.hypixel.net/punishmentStats', {
+                headers: { 'API-Key': apiKey },
+                signal: AbortSignal.timeout(5000)
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const isValid = data.success === true;
+                this.userKeyValid = isValid;
+                return { valid: isValid, error: isValid ? undefined : 'API returned invalid response' };
+            }
+            else if (response.status === 403) {
+                this.userKeyValid = false;
+                return { valid: false, error: 'Invalid API key (403 Forbidden)' };
+            }
+            else if (response.status === 429) {
+                this.userKeyValid = false;
+                return { valid: false, error: 'Rate limited (too many requests)' };
+            }
+            else {
+                this.userKeyValid = false;
+                return { valid: false, error: `HTTP ${response.status}: ${response.statusText}` };
+            }
+        }
+        catch (error) {
+            this.userKeyValid = false;
+            if (error.name === 'TimeoutError') {
+                return { valid: false, error: 'Request timed out (check your internet connection)' };
+            }
+            else if (error.message?.includes('fetch')) {
+                return { valid: false, error: 'Network error (check your internet connection)' };
+            }
+            return { valid: false, error: error.message || 'Unknown error occurred' };
+        }
+    }
+}
+// Initialize enhanced API Router
+const apiRouter = new HypixelApiRouter({
+    userApiKey: process.env.HYPIXEL_KEY || '',
+    useFallbackKey: true,
+    cacheTimeout: 5 * 60 * 1000
+});
+// const apiRouter = new HypixelApiRouter({
+//   userApiKey: process.env.HYPIXEL_KEY || '',
+//   useFallbackKey: true,
+//   cacheTimeout: 5 * 60 * 1000
+// });
+// --- IPC: Enhanced API Management ---
+electron_1.ipcMain.handle('api:getStatus', async () => {
+    return apiRouter.getStatus();
+});
+electron_1.ipcMain.handle('api:setUserKey', async (_e, apiKey) => {
+    const result = await apiRouter.verifyUserApiKey(apiKey);
+    if (result.valid) {
+        apiRouter.updateConfig({ userApiKey: apiKey });
+        return { success: true };
+    }
+    return { success: false, error: result.error || 'Invalid API key' };
+});
+electron_1.ipcMain.handle('api:clearCache', async () => {
+    apiRouter.clearCache();
+    return { success: true };
+});
+electron_1.ipcMain.handle('api:toggleFallback', async (_e, enabled) => {
+    apiRouter.updateConfig({ useFallbackKey: enabled });
+    return { success: true, enabled };
+});
+// --- IPC: External URL opener
+electron_1.ipcMain.handle('external:open', async (_e, url) => {
+    try {
+        const { shell } = await Promise.resolve().then(() => __importStar(require('electron')));
+        await shell.openExternal(url);
+        return { success: true };
+    }
+    catch (error) {
+        console.error('[External] Failed to open URL:', error);
         return { error: String(error) };
     }
 });

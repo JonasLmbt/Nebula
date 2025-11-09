@@ -57,10 +57,16 @@ export class MinecraftChatLogger extends EventEmitter {
   private clientPaths: Record<string,string> = buildClientPaths();
   public players = new Set<string>();
   public partyMembers = new Set<string>();
+  public guildMembers = new Set<string>();
+  public guildSource = new Set<string>(); // Track which players came from guild
   public inLobby = false;
+  public inGuildList = false;
+  private guildListTimeout?: NodeJS.Timeout; // Timeout to end guild parsing
   public username?: string;
   public chosenClient?: string; // explicit chosen client key
   public detectedClient?: string; // latest modified client key
+  // Track if we're waiting for continuation lines of an incoming party invite
+  private awaitingInviteContinuation: boolean = false;
 
   constructor(opts?: { client?: string; manualPath?: string; username?: string }) {
     super();
@@ -135,13 +141,56 @@ export class MinecraftChatLogger extends EventEmitter {
     return s.replace(/(§|�)[0-9a-fk-or]/gi, '').trim();
   }
 
+  // Finish guild list parsing and emit events
+  private finishGuildList(): void {
+    this.inGuildList = false;
+    
+    // Clear timeout
+    if (this.guildListTimeout) {
+      clearTimeout(this.guildListTimeout);
+      this.guildListTimeout = undefined;
+    }
+    
+    // Emit the guild members as a separate event
+    if (this.guildMembers.size > 0) {
+      // Emit guild-specific update
+      this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+      
+      // Also update main players list
+      this.players.clear();
+      this.guildSource.clear();
+      this.guildMembers.forEach(member => {
+        this.players.add(member);
+        this.guildSource.add(member);
+      });
+      this.emit('playersUpdated', Array.from(this.players));
+    }
+  }
+
   private handleLine(line: string) {
     const chatIndex = line.indexOf('[CHAT]');
-    if (chatIndex === -1) return;
+    // If line lacks [CHAT], we still might want to capture continuation of multi-line party invites
+    if (chatIndex === -1) {
+      if (this.awaitingInviteContinuation) {
+        const trimmed = this.stripColorCodes(line.trim());
+        if (trimmed) {
+          if (/^You have 60 seconds to accept\.?/i.test(trimmed) || /Click here to join!?/i.test(trimmed)) {
+            console.log('[DBG:PARTY_INVITE_IN_CONTINUATION]', trimmed);
+            // Stop waiting after capturing continuation
+            this.awaitingInviteContinuation = false;
+          }
+        }
+      }
+      return;
+    }
 
     const raw = line.substring(chatIndex + 6).trim();
     const msg = this.stripColorCodes(raw);
     if (!msg) return;
+
+    try {
+      console.log('[DBG:CLEAN]', msg);
+    } catch {}
 
     // Clean rank tags from names like [VIP] Player -> Player
     const cleanName = (name: string) => {
@@ -168,7 +217,19 @@ export class MinecraftChatLogger extends EventEmitter {
 
     // /who output: ONLINE: player1, player2, player3
     if (msg.indexOf('ONLINE:') !== -1 && msg.indexOf(',') !== -1) {
-      if (this.inLobby) this.players.clear();
+      // Don't clear players in lobby if they came from guild
+      if (this.inLobby) {
+        // Only clear non-guild players
+        const toRemove: string[] = [];
+        this.players.forEach(player => {
+          if (!this.guildSource.has(player)) {
+            toRemove.push(player);
+          }
+        });
+        toRemove.forEach(player => this.players.delete(player));
+      } else {
+        this.players.clear();
+      }
       this.inLobby = false;
 
       const who = msg.substring(8)
@@ -176,8 +237,8 @@ export class MinecraftChatLogger extends EventEmitter {
         .map(s => cleanName(s))
         .filter((s): s is string => !!s);
 
-  this.players.clear();
-  who.forEach(p => { if (p) this.players.add(p); });
+      // Add /who players (but preserve guild members)
+      who.forEach(p => { if (p) this.players.add(p); });
       this.emit('playersUpdated', Array.from(this.players));
       return;
     }
@@ -221,22 +282,82 @@ export class MinecraftChatLogger extends EventEmitter {
       return;
     }
 
-    // Party invite: "[RANK] Name has invited you to join their party!" (robust regex)
-    if (msg.includes('has invited you to join their party!') && msg.indexOf(':') === -1) {
-      const inviteMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has invited you to join their party!$/);
+    // Party invite (incoming): Beispiel:
+    // [MVP+] Zorbas05 has invited you to join their party!You have 60 seconds to accept. Click here to join!
+    if (msg.indexOf('has invited you to join their party!') !== -1 && msg.indexOf(':') === -1) {
+      console.log('[DBG:PARTY_INVITE_IN_RAW_MATCH_CANDIDATE]', msg);
+      const inviteMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has invited you to join their party!/);
       if (inviteMatch) {
         const inviter = cleanName(inviteMatch[1]);
-        if (inviter) this.emit('partyInvite', inviter);
+        console.log('[DBG:PARTY_INVITE_IN_MATCH]', inviteMatch, 'inviter=', inviter);
+        if (inviter) {
+          this.emit('partyInvite', inviter);
+          // Expect multi-line continuation lines following (without [CHAT])
+          this.awaitingInviteContinuation = true;
+        }
         return;
+      } else {
+        console.log('[DBG:PARTY_INVITE_IN_NO_REGEX_MATCH]');
       }
-      // Fallback: try cutting before "has invited"
+      // Fallback: vor "has invited" abschneiden
       const cutIdx = msg.indexOf('has invited');
       if (cutIdx > 0) {
         const inviterRaw = msg.substring(0, cutIdx).trim();
         const inviter = cleanName(inviterRaw.includes(']') ? inviterRaw.substring(inviterRaw.lastIndexOf(']') + 1).trim() : inviterRaw);
-        if (inviter) this.emit('partyInvite', inviter);
+        console.log('[DBG:PARTY_INVITE_IN_FALLBACK]', inviterRaw, '=>', inviter);
+        if (inviter) {
+          this.emit('partyInvite', inviter);
+        }
+        return;
+      } else {
+        console.log('[DBG:PARTY_INVITE_IN_FALLBACK_NOT_APPLIED]');
+      }
+    }
+
+    // Party invite (outgoing): Beispiel:
+    // [VIP] wisdomVII invited [MVP+] Zorbas05 to the party! They have 60 seconds to accept.
+    if (msg.indexOf(' invited ') !== -1 && msg.indexOf(' to the party!') !== -1 && msg.indexOf(':') === -1) {
+      console.log('[DBG:PARTY_INVITE_OUT_RAW_MATCH_CANDIDATE]', msg);
+      const outgoingMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) invited (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) to the party!/);
+      if (outgoingMatch) {
+        const inviter = cleanName(outgoingMatch[1]);
+        const invitee = cleanName(outgoingMatch[2]);
+        console.log('[DBG:PARTY_INVITE_OUT_MATCH]', outgoingMatch, 'inviter=', inviter, 'invitee=', invitee, 'selfUsername=', this.username);
+        if (this.username && inviter && inviter.toLowerCase() === this.username.toLowerCase()) {
+          this.emit('partyInvite', invitee);
+        } else {
+          console.log('[DBG:PARTY_INVITE_OUT_IGNORED_NOT_SELF]');
+        }
+        return;
+      } else {
+        console.log('[DBG:PARTY_INVITE_OUT_NO_REGEX_MATCH]');
+      }
+    }
+
+    // Party invite expiration: Beispiel:
+    // The party invite from [MVP+] Zorbas05 has expired.
+    // The party invite to [MVP+] Zorbas05 has expired.
+    if (msg.indexOf('party invite') !== -1 && msg.indexOf('has expired') !== -1 && msg.indexOf(':') === -1) {
+      console.log('[DBG:PARTY_INVITE_EXPIRE_RAW_MATCH_CANDIDATE]', msg);
+      const fromMatch = msg.match(/^The party invite from (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has expired/);
+      if (fromMatch) {
+        const expiredPlayer = cleanName(fromMatch[1]);
+        console.log('[DBG:PARTY_INVITE_EXPIRE_FROM_MATCH]', fromMatch, 'expiredPlayer=', expiredPlayer);
+        if (expiredPlayer) {
+          this.emit('partyInviteExpired', expiredPlayer);
+        }
         return;
       }
+      const toMatch = msg.match(/^The party invite to (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has expired/);
+      if (toMatch) {
+        const expiredPlayer = cleanName(toMatch[1]);
+        console.log('[DBG:PARTY_INVITE_EXPIRE_TO_MATCH]', toMatch, 'expiredPlayer=', expiredPlayer);
+        if (expiredPlayer) {
+          this.emit('partyInviteExpired', expiredPlayer);
+        }
+        return;
+      }
+      console.log('[DBG:PARTY_INVITE_EXPIRE_NO_REGEX_MATCH]');
     }
 
     // Self join: "You have joined [RANK] LeaderName's party!"
@@ -295,14 +416,24 @@ export class MinecraftChatLogger extends EventEmitter {
       return;
     }
 
-    // "You left the party" -> clear entire party
-    if (msg.indexOf('You left the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
+    // Party disbanded detection
+    if (msg.includes('disbanded') && msg.indexOf(':') === -1) {
+      // "The party was disbanded because all invites expired and the party was empty."
+      // "[VIP] wisdomVII has disbanded the party!"
+      console.log('Party was disbanded:', msg);
       this.partyMembers.clear();
       this.emit('partyCleared');
       return;
     }
 
-    if (msg.indexOf('left the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
+    // "You left the party" -> clear entire party
+    if (msg.indexOf('You left the party') !== -1 && msg.indexOf(':') === -1) {
+      this.partyMembers.clear();
+      this.emit('partyCleared');
+      return;
+    }
+
+    if (msg.indexOf('left the party') !== -1 && msg.indexOf(':') === -1) {
       let pleft = msg.split(' ')[0];
       if (pleft.indexOf('[') !== -1) pleft = msg.split(' ')[1];
       const leftPlayer = cleanName(pleft || '');
@@ -323,26 +454,154 @@ export class MinecraftChatLogger extends EventEmitter {
     }
 
     // Guild list parsing
-    // Start: "Guild Name: ..."
-    if (msg.indexOf('Guild Name: ') === 0) {
+  // Start: "Guild Name: ..." or category headers like "-- Guards --" / "--- Guards ---"
+  if (msg.indexOf('Guild Name: ') === 0 || msg.trim().match(/^-{2,}\s+\w+\s+-{2,}$/)) {
+      if (!this.inGuildList) {
+        console.log('Starting guild list parsing with trigger:', msg.trim());
+        this.inGuildList = true;
+        this.guildMembers.clear();
+        
+        // Clear any existing timeout
+        if (this.guildListTimeout) {
+          clearTimeout(this.guildListTimeout);
+        }
+        
+        // Set a timeout to automatically end guild parsing after 15 seconds
+        this.guildListTimeout = setTimeout(() => {
+          if (this.inGuildList) {
+            console.log('Guild list parsing timeout - ending guild list with', this.guildMembers.size, 'members');
+            this.finishGuildList();
+          }
+        }, 15000);
+      }
+      
       this.emit('message', { name: '', text: msg });
       return;
     }
 
-    // Guild member lines: " ●  " (online) or " ?  " (offline)
-    if (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1) {
-      this.emit('message', { name: '', text: msg });
-      return;
+    // Unified guild member parsing (handles both /guild list and /guild online formats)
+    if (this.inGuildList) {
+      const cleanLine = msg.trim();
+
+      // Skip category headers / separators / summary lines
+      if (cleanLine === '' ||
+          /^-{2,}\s+.+\s+-{2,}$/.test(cleanLine) || // -- Wardens -- or --- Wardens ---
+          /^Guild Name:/i.test(cleanLine)) {
+        // Wichtig: Summary-Zeilen (Total/Online/Offline Members) NICHT mehr hier schlucken,
+        // damit weiter unten die Finish-Logik greift. Früher hat /Members:\s*\d+$/ sie
+        // abgefangen und dadurch wurde die Liste nie beendet -> Timeout-Race.
+        this.emit('message', { name: '', text: msg });
+        return;
+      }
+
+      // Summary lines: end of guild list => finish
+      if (/^Total Members:/i.test(cleanLine) || /^Online Members:/i.test(cleanLine) || /^Offline Members:/i.test(cleanLine)) {
+        console.log('Guild summary line encountered (finish list):', cleanLine);
+        this.emit('message', { name: '', text: msg });
+        this.finishGuildList();
+        return;
+      }
+
+      // Status icons lines (● or ?) treated similarly; we'll strip them during name extraction
+      const working = cleanLine.replace(/[●]/g, '').trim();
+
+      // Try to extract multiple ranked players from one line
+      const multiMatches = Array.from(working.matchAll(/\[[^\]]+\]\s+([A-Za-z0-9_]{3,16})\s*\?*/g));
+      if (multiMatches.length > 0) {
+        console.log('Guild multi-member line:', cleanLine, 'matches:', multiMatches.map(m => m[1]));
+        multiMatches.forEach(m => {
+          const nm = m[1];
+          if (nm) {
+            this.guildMembers.add(nm);
+            console.log('Added guild member:', nm, '| Total:', this.guildMembers.size);
+          }
+        });
+        // Emit incremental update for faster UI
+        this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+        this.emit('message', { name: '', text: msg });
+        return;
+      }
+
+      // Single ranked player line e.g. "[VIP] TwitterSpace ?" or "[MVP+] hitlast67 ?"
+      const singleRank = working.match(/^\[[^\]]+\]\s+([A-Za-z0-9_]{3,16})\s*\?*$/);
+      if (singleRank) {
+        const nm = singleRank[1];
+        console.log('Guild single ranked member line:', cleanLine, 'name:', nm);
+        this.guildMembers.add(nm);
+        console.log('Added guild member:', nm, '| Total:', this.guildMembers.size);
+        // Emit incremental update for faster UI
+        this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+        this.emit('message', { name: '', text: msg });
+        return;
+      }
+
+      // Plain username line (fallback) e.g. "wisdomVII" or "everlive" (strip trailing '?')
+      const plainMatch = working.match(/^([A-Za-z0-9_]{3,16})\s*\?*$/);
+      if (plainMatch) {
+        const nm = plainMatch[1];
+        console.log('Guild plain member line:', cleanLine, 'name:', nm);
+        this.guildMembers.add(nm);
+        console.log('Added guild member:', nm, '| Total:', this.guildMembers.size);
+        // Emit incremental update for faster UI
+        this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+        this.emit('message', { name: '', text: msg });
+        return;
+      }
+
+      // Non-member content inside guild list (e.g. MOTD lines) -> just pass through
+      if (this.inGuildList) {
+        console.log('Ignoring non-member guild line:', cleanLine);
+        this.emit('message', { name: '', text: msg });
+        return;
+      }
     }
 
-    // Guild list end: "Total Members: ..."
-    if (msg.indexOf('Total Members:') === 0) {
+    // Guild live leave/join notifications
+    // Example: "Guild > awemoon left." or "Guild > Name joined."
+    if (msg.indexOf('Guild > ') === 0 && msg.indexOf(':') === -1) {
+      const clean = msg.substring('Guild > '.length).trim();
+      // Left
+      let m = clean.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) left\.$/);
+      if (m) {
+        const nm = m[1];
+        console.log('Guild member left detected:', nm);
+        // Update internal set if present
+        if (this.guildMembers.has(nm)) this.guildMembers.delete(nm);
+        // Emit specific event and incremental members update
+        this.emit('guildMemberLeft', nm);
+        this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+        return;
+      }
+      // Joined (optional future use)
+      m = clean.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) joined\.$/);
+      if (m) {
+        const nm = m[1];
+        console.log('Guild member joined detected:', nm);
+        // Don't auto-add here to avoid noise unless desired; keep as message only
+        // this.guildMembers.add(nm);
+        // this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+        return;
+      }
+    }
+
+    // Guild list end: "Total Members:", "Online Members:", "Offline Members:"
+    if (msg.indexOf('Total Members:') === 0 || 
+        msg.indexOf('Online Members:') === 0 || 
+        msg.indexOf('Offline Members:') === 0) {
+      console.log('Guild list end detected:', msg.trim(), 'Found', this.guildMembers.size, 'members');
+      this.finishGuildList();
       this.emit('message', { name: '', text: msg });
       return;
     }
 
     // General chat message: "[RANK] Name: message" or "Name: message"
     if (msg.includes(':')) {
+      // If we're still parsing guild list and get a chat message, end the guild list
+      if (this.inGuildList) {
+        console.log('Chat message detected while in guild list - ending guild list parsing');
+        this.finishGuildList();
+      }
+      
       const idx = msg.indexOf(':');
       const prefix = msg.substring(0, idx).trim();
       const text = msg.substring(idx + 1).trim();

@@ -109,6 +109,11 @@
   .menu.open{display:block}
   .menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:8px 10px;border-radius:6px;cursor:pointer}
   .menu button:hover{background:var(--row-hover)}
+  /* Pinned row styling */
+  tr.pinned { background: rgba(255,255,255,0.08); }
+  tr.pinned:hover { background: rgba(255,255,255,0.10); }
+  .pin-indicator { margin-left:4px; color: var(--accent); filter: drop-shadow(0 0 2px rgba(102,234,255,0.4)); }
+  thead th.sorted { color: var(--accent); }
 
   /* Resize grips */
   .grip{position:fixed;z-index:1000;-webkit-app-region:no-drag}
@@ -173,7 +178,10 @@
 
   .nick-indicator{display:inline-flex;align-items:center;margin-left:6px;opacity:.7;cursor:help}
   .party-indicator{display:inline-flex;align-items:center;margin-left:4px;opacity:.8;cursor:help;color:var(--accent)}
+  .self-indicator{display:inline-flex;align-items:center;margin-left:4px;opacity:1;cursor:help}
   .nick-indicator .icon{width:16px;height:16px}
+  .party-indicator .icon{width:16px;height:16px}
+  .self-indicator .icon{width:16px;height:16px}
 
   /* Forms */
   .add-nick-form{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px}
@@ -208,6 +216,7 @@
   .layout-palette{display:flex;flex-wrap:wrap;gap:8px}
   .stat-pill{padding:6px 10px;background:rgba(255,255,255,0.07);border-radius:24px;font-size:12px;font-weight:500;cursor:grab;user-select:none;display:flex;align-items:center;gap:6px;position:relative}
   .stat-pill[data-used="1"]{opacity:.35;filter:grayscale(60%);cursor:not-allowed}
+  .stat-pill.disabled{opacity:.35;filter:grayscale(80%);cursor:not-allowed}
   .layout-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
   .slot{background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.14);border-radius:10px;min-height:46px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);position:relative;padding:4px;transition:.15s}
   .slot.filled{border-style:solid;color:var(--text);font-weight:500}
@@ -379,6 +388,26 @@
   .logout-btn{padding:8px 16px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;transition:.2s}
   .logout-btn:hover{background:rgba(224,90,90,0.15);color:#ff6b6b;border-color:#ff6b6b}
 
+  /* Session Panel Styles */
+  .session-container{display:flex;flex-direction:column;height:100%}
+  .session-header{margin-bottom:16px}
+  .session-player{display:flex;align-items:center;margin-top:12px}
+  .session-content{flex:1;overflow-y:auto}
+  #sessionStatsContainer{min-height:200px}
+  .session-stat-row{margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .session-stat-label{font-weight:600;color:var(--text)}
+  .session-stat-value{font-family:monospace;font-size:13px}
+  .session-stat-start{color:var(--muted)}
+  .session-stat-arrow{color:var(--accent);margin:0 6px}
+  .session-stat-current{color:var(--text)}
+  .session-stat-diff{font-weight:600;margin-left:6px}
+  .session-stat-diff.positive{color:#22c55e}
+  .session-stat-diff.negative{color:#ef4444}
+  .session-stat-diff.neutral{color:var(--muted)}
+  .session-category{margin-top:20px;margin-bottom:12px}
+  .session-category:first-child{margin-top:0}
+  .session-category-title{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+
   /* --- Client Selection Redesign --- */
   #clientSelectGrid{--btn-h:34px}
   .client-btn{
@@ -423,7 +452,7 @@
     <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
 
     <!-- Sidebar -->
-    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <symbol id="i-overlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>
     </symbol>
     <symbol id="i-nicks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -486,12 +515,53 @@
       <circle cx="12" cy="12" r="6"/>
       <circle cx="12" cy="12" r="2"/>
     </symbol>
+    <!-- Self/Own user indicator -->
+    <symbol id="i-self" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M4 20c1.8-3.2 4.7-5 8-5s6.2 1.8 8 5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="6" r="3" fill="currentColor"/>
+    </symbol>
     <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="20,6 9,17 4,12"/>
+    </symbol>
+    <!-- Step icons for Discord login guide -->
+    <symbol id="i-step-1" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
+      <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">1</text>
+    </symbol>
+    <symbol id="i-step-2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
+      <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">2</text>
+    </symbol>
+    <symbol id="i-step-3" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
+      <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">3</text>
     </symbol>
     <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
       <circle cx="12" cy="7" r="4"/>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="7" cy="7" r="3"/>
+      <path d="m21 12-4.4-4.4a1.5 1.5 0 0 0-2.12 0L9.5 12.5a1.5 1.5 0 0 0 0 2.12L14 19l7-7z"/>
+      <path d="M16 8 2 22"/>
+      <path d="m8 16 6-6"/>
+    </symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="m9 12 2 2 4-4"/>
+    </symbol>
+    <symbol id="i-session" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 1v6"/>
+      <path d="M12 17v6"/>
+      <path d="m4.2 4.2 4.2 4.2"/>
+      <path d="m15.6 15.6 4.2 4.2"/>
+      <path d="M1 12h6"/>
+      <path d="M17 12h6"/>
+      <path d="m4.2 19.8 4.2-4.2"/>
+      <path d="m15.6 8.4 4.2-4.2"/>
+    </symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 3l5 5-5 5-4-4-6 6-2-2 6-6-4-4 5-5z"/>
     </symbol>
   </svg>
   <div class="topbar">
@@ -500,7 +570,7 @@
         <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
       </svg>
     </button>
-  <div class="brand"><img src="../../assets/nebula-logo.svg" alt="Nebula"></div>
+  <div class="brand"><img src="../../assets/nebula-lettering.svg" alt="Nebula"></div>
     <div class="spacer"></div>
 
     <!-- Refresh -->
@@ -537,9 +607,14 @@
   <aside id="sidebar" class="sidebar" aria-hidden="true">
     <div class="sidebar-inner">
       <nav class="nav">
-        <button class="nav-item active" data-panel="home">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg></span>
+        <button class="nav-item active" data-panel="overlay">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg></span>
           <span class="nav-label">Overlay</span>
+        </button>
+
+        <button class="nav-item" data-panel="session">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-session"/></svg></span>
+          <span class="nav-label">Session</span>
         </button>
 
         <button class="nav-item" data-panel="nicks">
@@ -547,15 +622,12 @@
           <span class="nav-label">Nicks</span>
         </button>
 
-  <!-- Direct settings entries (no submenu) -->
+  <!-- Direct settings entries -->
+        <div class="nav-sep"></div>
         <button class="nav-item" data-panel="columns">
           <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
           <span class="nav-label">Columns</span>
         </button>
-
-  <!-- Removed separator between Nicks and Columns per request -->
-
-        <div class="nav-sep"></div>
         <button class="nav-item" data-panel="sources">
           <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
           <span class="nav-label">Sources</span>
@@ -582,8 +654,8 @@
   </aside>
 
   <div class="content">
-    <!-- Home Panel -->
-    <div class="panel" id="panel-home">
+    <!-- Overlay Panel -->
+    <div class="panel" id="panel-overlay">
       <div class="table-wrap">
         <table id="table">
           <colgroup>
@@ -606,6 +678,42 @@
           </thead>
           <tbody id="rows"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Session Panel -->
+    <div class="panel" id="panel-session">
+      <div class="session-container">
+        <div class="session-header">
+          <div class="session-info">
+            <h2 style="margin:0 0 8px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+              <span class="settings-icon">
+                <svg class="icon" aria-hidden="true"><use href="#i-session"/></svg>
+              </span>
+              <span id="sessionTitle">Session Stats</span>
+            </h2>
+            <div class="session-player">
+              <img id="sessionAvatar" src="https://crafatar.com/avatars/MHF_Steve?size=48&default=MHF_Steve&overlay" 
+                   style="width:48px;height:48px;border-radius:8px;margin-right:12px;" alt="Player Avatar">
+              <div>
+                <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
+                <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="session-content">
+          <div id="sessionStatsContainer" style="background:var(--panel);border-radius:12px;padding:20px;margin-top:16px;">
+            <div id="sessionStats" style="font-size:14px;line-height:1.6;">
+              <div style="text-align:center;color:var(--muted);padding:40px 20px;">
+                <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
+                <div style="font-size:16px;margin-bottom:8px;">No Session Active</div>
+                <div style="font-size:13px;">Enter your Minecraft IGN in Profile settings and start playing to track session stats!</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -651,7 +759,7 @@
         </div>
       </div>
       <!-- Add Nick Form -->
-      <div class="add-nick-form" id="addNickForm" style="display: none;">
+      <div class="add-nick-form" id="addNickForm" style="display:none;margin:20px 0 16px;">
         <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">Add new nick</h3>
         <div class="form-row">
           <label class="form-label">
@@ -669,10 +777,10 @@
       </div>
 
       <!-- Nicks List -->
-      <div class="nicks-list" id="nicksList">
+      <div class="nicks-list" id="nicksList" style="margin:12px 0 12px;">
         <!-- Nicks werden hier per JS eingefügt -->
       </div>
-      <button class="add-btn" id="addNickBtn" title="Add nick">+</button>
+      <button class="add-btn" id="addNickBtn" title="Add nick" style="margin-top:4px;">+</button>
     </div>
 
   <!-- Client & Account Panel (was part of Basic Settings) -->
@@ -680,7 +788,7 @@
         <div class="settings-section">
           <h2>
             <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
-            Client & Minecraft Account
+            Client & API Management
           </h2>
 
           <div class="settings-subsection">
@@ -715,17 +823,60 @@
               <div id="clientStatus" class="ok">No client selected yet.</div>
             </div>
           </div>
-          <!-- Username subsection with divider like in Sources -->
+          <!-- API Management subsection -->
           <div class="settings-subsection">
             <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
-              <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
-              Minecraft Ingame Name (IGN)
+              <svg class="icon" aria-hidden="true"><use href="#i-cloud"/></svg>
+              Hypixel API Management
             </h3>
-            <div class="settings-row" style="margin-top:4px;">
-              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="width: 100%; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
-                <small style="color:var(--muted);font-size:11px;">Used for chat mentions and automatic adding to the list.</small>
+            
+            <!-- API Status -->
+            <div class="settings-row" style="margin-bottom:12px;">
+              <span class="settings-icon" style="width:24px;text-align:center;"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg></span>
+              <div style="flex: 1;">
+                <div id="apiStatus" style="font-size:13px;color:var(--muted);">
+                  <div id="backendStatus">Checking backend...</div>
+                  <div id="userKeyStatus">No user key configured</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- User API Key Input -->
+            <div class="settings-row" style="margin-bottom:8px;">
+              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg></span>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input id="apiKeyInput" type="password" placeholder="Your Hypixel API Key (optional)" class="settings-input" style="flex:1; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
+                  <button id="pasteApiKeyBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:60px;">Paste</button>
+                  <button id="testApiKeyBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:60px;">Test</button>
+                </div>
+                <small style="color:var(--muted);font-size:11px;">
+                  Get your API key at <a href="#" id="hypixelApiLink" style="color:var(--accent);">hypixel.net</a> • Only needed if backend is unavailable
+                </small>
+              </div>
+            </div>
+
+            <!-- Fallback Setting -->
+            <div class="settings-row" style="margin-bottom:12px;">
+              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
+              <div style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; flex-direction: column;">
+                  <span>Use API Key Fallback</span>
+                  <small style="color:var(--muted);font-size:11px;">Fall back to your API key when backend is unavailable</small>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="fallbackKeyToggle" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- API Actions -->
+            <div class="settings-row" style="gap:8px;">
+              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span>
+              <div style="display:flex;gap:8px;flex:1;">
+                <button id="clearCacheBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;flex:1;">Clear Cache</button>
+                <button id="refreshApiStatusBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;flex:1;">Refresh Status</button>
               </div>
             </div>
           </div>
@@ -799,6 +950,10 @@
               <label class="settings-checkbox">
                 <input type="checkbox" id="partyShowInviteTemp" checked />
                 <span>Show invited player (temp)</span>
+              </label>
+              <label class="settings-checkbox">
+                <input type="checkbox" id="sourcePartyInvitesToggle" checked />
+                <span>Enable party invites display</span>
               </label>
               <label class="settings-checkbox">
                 <input type="checkbox" id="partyRefreshServerChange" />
@@ -883,7 +1038,7 @@
                   <input type="checkbox" id="guildOnlineOnly" checked />
                   <span>Show only online guild members</span>
                 </label>
-                <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Guild members are added when you use /g list. Use this to quickly check guildmates' stats.</small>
+                <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Guild members are added when you use /guild list. Use this to quickly check guildmates' stats.</small>
               </div>
             </div>
           </div>
@@ -1010,6 +1165,27 @@
             </div>
           </div>
 
+          <!-- Minecraft IGN Card -->
+          <div class="profile-card">
+            <div class="profile-section">
+              <h3 style="margin: 0 0 12px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+                <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
+                Minecraft Ingame Name (IGN)
+              </h3>
+              <div class="settings-row" style="margin: 0;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display:flex;gap:8px;align-items:center;width:100%">
+                    <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;" disabled />
+                    <button id="usernameEditBtn" type="button" style="padding:11px 18px;border:0;border-radius:8px;background:var(--accent);color:#0b1e24;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                      Change
+                    </button>
+                  </div>
+                  <small style="color:var(--muted);font-size:12px;line-height:1.4;">Used for chat mentions and automatic adding to the list. Changes sync with your Discord account when logged in.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Plus Card -->
           <div class="profile-card plus-card">
             <div class="profile-section">
@@ -1074,9 +1250,18 @@
               <div style="padding:16px;background:rgba(0,0,0,0.3);border-radius:10px;margin-top:12px">
                 <div style="font-size:14px;line-height:1.8;margin-bottom:16px">
                   <b style="color:var(--accent)">Steps:</b><br>
-                  1️⃣ Authorize Nebula in the browser tab that opened<br>
-                  2️⃣ After authorizing, copy the <b>complete URL</b> from the address bar<br>
-                  3️⃣ Paste it in the field below and click "Login"
+                  <div style="display:flex;align-items:center;margin-bottom:8px">
+                    <svg class="icon" style="width:20px;height:20px;margin-right:8px" aria-hidden="true"><use href="#i-step-1"/></svg>
+                    <span>Authorize Nebula in the browser tab that opened</span>
+                  </div>
+                  <div style="display:flex;align-items:center;margin-bottom:8px">
+                    <svg class="icon" style="width:20px;height:20px;margin-right:8px" aria-hidden="true"><use href="#i-step-2"/></svg>
+                    <span>After authorizing, copy the <b>complete URL</b> from the address bar</span>
+                  </div>
+                  <div style="display:flex;align-items:center">
+                    <svg class="icon" style="width:20px;height:20px;margin-right:8px" aria-hidden="true"><use href="#i-step-3"/></svg>
+                    <span>Paste it in the field below and click "Login"</span>
+                  </div>
                 </div>
                 <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
                   The URL should start with: <code style="background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;font-size:11px">http://localhost:3000/auth/discord/callback?code=...</code>
@@ -1170,14 +1355,65 @@
   <script>
     console.log('NEBULA LOADED - Version:', new Date().toISOString());
     
-    const { ipcRenderer } = require("electron");
+  const { ipcRenderer } = require("electron");
+  // Expose ipcRenderer globally for existing code paths that use window.ipcRenderer
+  try { window.ipcRenderer = ipcRenderer; } catch (_) { /* noop */ }
     const rows = document.getElementById("rows");
     const input = document.getElementById("playerInput");
     let queue = [];
 
+    // Session tracking variables
+    let startStats = null;        // Stats when session started
+    let startTime = new Date();   // Session start time
+    let sessionUsername = null;   // Current session username
+    let sessionUpdateInterval = null; // Interval for updating session
+    let sessionUuid = null;       // UUID für Avatar
+
+    // Account Metrics Tracking
+    let accountMetrics = JSON.parse(localStorage.getItem('accountMetrics') || JSON.stringify({
+      memberSince: Date.now(),
+      players: [],  // stored as array, converted to Set in memory
+      sessionsCount: 0,
+      totalLookups: 0
+    }));
+    
+    // Convert stored array to Set for players
+    accountMetrics.players = new Set(accountMetrics.players || []);
+
+    function saveAccountMetrics() {
+      const toStore = {
+        ...accountMetrics,
+        players: Array.from(accountMetrics.players) // Set -> Array for JSON
+      };
+      localStorage.setItem('accountMetrics', JSON.stringify(toStore));
+      console.log('[Metrics] Local data saved:', toStore);
+    }
+
+    function trackStatsLookup(playerName) {
+      if (!playerName) return;
+      
+      const normalizedName = playerName.toLowerCase().trim();
+      const wasNew = !accountMetrics.players.has(normalizedName);
+      
+      accountMetrics.players.add(normalizedName);
+      accountMetrics.totalLookups++;
+      
+      saveAccountMetrics();
+      
+      if (wasNew) {
+        console.log('[Metrics] New player tracked:', playerName, '- Total:', accountMetrics.players.size);
+      }
+    }
+
+    function trackSessionStart() {
+      accountMetrics.sessionsCount++;
+      saveAccountMetrics();
+      console.log('[Metrics] Session started - Total:', accountMetrics.sessionsCount);
+    }
+
     // Auto-resize overlay logic (defined early so it can be called anywhere)
   const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
-    const MIN_HEIGHT = 220; // minimum window height
+    const MIN_HEIGHT = 120; // minimum window height for empty overlay
     const DEFAULT_HEIGHT = 560; // default full height
     let resizeTimeout = null;
 
@@ -1185,7 +1421,7 @@
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         const activePanel = document.querySelector('.panel.active');
-        const panelHome = document.getElementById('panel-home');
+        const panelOverlay = document.getElementById('panel-overlay');
         const sidebar = document.getElementById('sidebar');
 
         // Get appearance settings safely
@@ -1193,7 +1429,7 @@
 
         // Only auto-resize if:
         // 1. Feature is enabled
-        // 2. Home panel is active
+        // 2. Overlay panel is active
         // 3. Sidebar is closed
         const allowAuto = appearanceSettings.autoResize !== false; // default true
         if (sidebar?.classList.contains('open')) {
@@ -1201,7 +1437,7 @@
             ipcRenderer.invoke('window:setBounds', { height: DEFAULT_HEIGHT });
             return;
         }
-        if (!allowAuto || !activePanel || activePanel !== panelHome) {
+        if (!allowAuto || !activePanel || activePanel !== panelOverlay) {
           const table = document.getElementById('table');
           const rc = table?.querySelectorAll('tbody tr').length || 0;
           if (rc === 0) ipcRenderer.invoke('window:setBounds', { height: MIN_HEIGHT });
@@ -1245,7 +1481,11 @@
   // Total needed height: topbar + content top padding + table-wrap top padding + header + rows + padding
   const extra = 12; // small extra slack below table
   const neededHeight = topbarHeight + contentPadTop + wrapPadTop + theadHeight + (rowCount * rowHeight) + padding + extra;
-  const finalHeight = Math.min(neededHeight, DEFAULT_HEIGHT);
+  
+  // Set a reasonable maximum based on screen height (80% of screen height or at least 800px)
+  const screenHeight = window.screen.availHeight;
+  const maxHeight = Math.max(800, Math.floor(screenHeight * 0.8));
+  const finalHeight = Math.min(neededHeight, maxHeight);
 
         ipcRenderer.invoke('window:setBounds', { height: finalHeight });
 
@@ -1265,8 +1505,10 @@
 
   const displayedPlayers = new Set();
   const nickedPlayers = new Set(); // tracks players originally added via nick
-  // playerSources: map normalized name -> set of sources ('username'|'manual'|'party'|'who'|'chat')
+  // playerSources: map normalized name -> set of sources ('username'|'manual'|'party'|'who'|'chat'|'invite'|'guild')
   const playerSources = new Map();
+  // Track invite timeouts: map normalized name -> timeout ID
+  const inviteTimeouts = new Map();
   // Cache for all loaded player objects (keyed by normalized name)
   let playerCache = {};
   // Tracks whether a registered nick is CURRENTLY active (i.e. we saw the nick-form in /who or chat)
@@ -1275,9 +1517,15 @@
   console.log('displayedPlayers initialized:', displayedPlayers);
   const originalNicks = {}; // realName(lower) -> originally eingegebener Nick
   let nickDisplayMode = localStorage.getItem('nickDisplayMode') || 'nick';
+  // Pinned players cannot be removed by any automatic source removal
+  let pinnedPlayers = new Set(JSON.parse(localStorage.getItem('pinnedPlayers') || '[]').map(s => String(s).toLowerCase()));
+  function savePinned() { localStorage.setItem('pinnedPlayers', JSON.stringify(Array.from(pinnedPlayers))); }
   // Track whether we are in the pre-game lobby phase (after "Sending you to..." and before game start)
   let preGameLobby = false;
+  // Track whether we are currently in an active game (after gameStart until next server change / lobby join)
+  let gameInProgress = false;
   let guildListMode = false; // Tracks if we're currently parsing guild list output
+  let guildBatchAccepted = false; // Only add members if guild was enabled when the list started
 
   // Nick management (moved earlier to ensure availability before initial renders)
   let nicks = JSON.parse(localStorage.getItem('nicks') || '[]');
@@ -1292,11 +1540,461 @@
   }
   function isNick(name) { return nicks.some(n => n.nick.toLowerCase() === String(name).toLowerCase()); }
 
+  // Session Stats Functions
+  function normalizeBedwarsStats(player) {
+    if (!player || typeof player !== 'object') return {
+      name: '', level: 0, ws: 0,
+      fk: 0, fd: 0, fkdr: 0,
+      wins: 0, losses: 0, wlr: 0,
+      bb: 0, bl: 0, bblr: 0,
+      uuid: null
+    };
+
+    // Level / Stars
+    const level = (typeof player.level === 'number')
+      ? player.level
+      : (player.stats?.Bedwars?.Experience != null
+          ? getBedWarsLevel(Number(player.stats.Bedwars.Experience))
+          : 0);
+
+    // Raw values with multiple fallbacks
+    const fk = Number(
+      player.fk ??
+      player.finalKills ??
+      player.stats?.Bedwars?.final_kills_bedwars ?? 0
+    );
+    const fd = Number(
+      player.fd ??
+      player.finalDeaths ??
+      player.stats?.Bedwars?.final_deaths_bedwars ?? 0
+    );
+    const wins = Number(
+      player.wins ??
+      player.stats?.Bedwars?.wins_bedwars ?? 0
+    );
+    const losses = Number(
+      player.losses ??
+      player.stats?.Bedwars?.losses_bedwars ?? 0
+    );
+    const bb = Number(
+      player.bb ??
+      player.bedsBroken ??
+      player.stats?.Bedwars?.beds_broken_bedwars ?? 0
+    );
+    const bl = Number(
+      player.bl ??
+      player.bedsLost ??
+      player.stats?.Bedwars?.beds_lost_bedwars ?? 0
+    );
+    const ws = Number(
+      player.ws ??
+      player.winstreak ??
+      player.stats?.Bedwars?.winstreak ?? 0
+    );
+
+    // Derived ratios (avoid division by zero)
+    const fkdr = fd > 0 ? fk / fd : fk > 0 ? fk : 0;
+    const wlr = losses > 0 ? wins / losses : wins > 0 ? wins : 0;
+    const bblr = bl > 0 ? bb / bl : bb > 0 ? bb : 0;
+
+    const uuid = (player.uuid || player.id || null);
+    return { name: player.name || player.username || player.displayName || '', level, ws, fk, fd, fkdr, wins, losses, wlr, bb, bl, bblr, uuid };
+  }
+
+  async function fetchMojangUuid(name) {
+    if (!name) return null;
+    try {
+      const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data && data.id) ? data.id : null; // already ohne Bindestriche
+    } catch { return null; }
+  }
+
+  async function startSession(username) {
+    if (!username || username.trim() === '') {
+      console.log('Cannot start session: no username provided');
+      return;
+    }
+    
+    // Wait for IPC to be available
+    if (!window.ipcRenderer) {
+      console.log('IPC not ready yet, waiting...');
+      setTimeout(() => startSession(username), 500);
+      return;
+    }
+    
+    console.log('Starting session for:', username);
+    sessionUsername = username;
+    startTime = new Date();
+    
+    // Show loading state
+    const sessionStats = document.getElementById('sessionStats');
+    if (sessionStats) {
+      sessionStats.innerHTML = `
+        <div style="text-align:center;color:var(--muted);padding:40px 20px;">
+          <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;animation:spin 2s linear infinite;"><use href="#i-session"/></svg>
+          <div style="font-size:16px;margin-bottom:8px;color:var(--text);">Loading Session Stats</div>
+          <div style="font-size:13px;">Fetching current stats for ${username}...</div>
+        </div>
+        <style>
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+      `;
+    }
+    
+    try {
+      // First check API status
+      const apiStatus = await window.ipcRenderer.invoke('api:getStatus');
+      console.log('API Status:', apiStatus);
+      
+  const rawResult = await window.ipcRenderer.invoke('bedwars:stats', username);
+      console.log('Session API raw result:', rawResult);
+      const normalized = normalizeBedwarsStats(rawResult);
+      console.log('Session API normalized result:', normalized);
+      
+      if (rawResult && !rawResult.error && (rawResult.name || normalized.name)) {
+        startStats = normalized; // store normalized for diff calculations
+        sessionUuid = normalized.uuid || rawResult.uuid || null;
+        if (usernameInput) {
+          usernameInput.value = basicSettings.username || '';
+          const editBtn = document.getElementById('usernameEditBtn');
+          let editing = false;
+          const applyUsername = () => {
+            const prev = (basicSettings.username || '').trim();
+            const next = (usernameInput.value || '').trim();
+            if (prev && prev !== next) {
+              removePlayerSource(prev, 'username');
+            }
+            basicSettings.username = next;
+            localStorage.setItem('username', next);
+            updateSidebarUsername();
+            try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
+            if (next && next !== sessionUsername) {
+              startSession(next);
+            }
+          };
+
+          // Initial state: not editing
+          usernameInput.disabled = true;
+          if (editBtn) {
+            editBtn.addEventListener('click', () => {
+              editing = !editing;
+              if (editing) {
+                // Enter edit mode
+                usernameInput.disabled = false;
+                usernameInput.focus();
+                usernameInput.select();
+                editBtn.textContent = 'Save';
+              } else {
+                // Save
+                usernameInput.disabled = true;
+                editBtn.textContent = 'Change';
+                applyUsername();
+              }
+            });
+          }
+
+          // Enter key saves, Escape cancels
+          usernameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              if (editing) {
+                editing = false;
+                usernameInput.disabled = true;
+                if (editBtn) editBtn.textContent = 'Change';
+                applyUsername();
+              }
+            } else if (e.key === 'Escape') {
+              if (editing) {
+                editing = false;
+                usernameInput.value = basicSettings.username || '';
+                usernameInput.disabled = true;
+                if (editBtn) editBtn.textContent = 'Change';
+              }
+            }
+          });
+
+          // Start session on app load if username exists (delayed)
+          const savedUsername = basicSettings.username || '';
+          if (savedUsername) {
+            console.log('Found saved username on app load:', savedUsername);
+            localStorage.setItem('username', savedUsername);
+            setTimeout(() => {
+              if (!sessionUsername) {
+                console.log('Starting session on app load for:', savedUsername);
+                startSession(savedUsername);
+              }
+            }, 400);
+          }
+        }
+        // Create detailed error message with API status
+        let detailedError = `
+          <div style="text-align:center;color:#ef4444;padding:40px 20px;">
+            <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
+            <div style="font-size:16px;margin-bottom:8px;">Session Start Failed</div>
+            <div style="font-size:13px;line-height:1.5;margin-bottom:12px;">
+              ${errorMsg}
+            </div>
+        `;
+        
+        // Add API status information if available
+        if (apiStatus) {
+          detailedError += `
+            <div style="font-size:11px;color:var(--muted);text-align:left;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin:16px 0;">
+              <strong>API Status:</strong><br>
+              Backend: ${apiStatus.backendAvailable ? '🟢 Available' : '🔴 Down'}<br>
+              User Key: ${apiStatus.config.hasUserKey ? '🟢 Set' : '🔴 Not Set'}<br>
+              Enhanced System: ${apiStatus.config.useEnhanced ? 'Enabled' : 'Disabled'}
+            </div>
+          `;
+        }
+        
+        detailedError += `
+            <div style="font-size:13px;line-height:1.5;">
+              <strong>What Session Stats Do:</strong><br>
+              • Track your progress since app start<br>
+              • Show stat changes (wins, kills, etc.)<br>
+              • Update automatically while playing
+            </div>
+          </div>
+        `;
+        
+        // Show specific error message
+        if (sessionStats) {
+          sessionStats.innerHTML = detailedError;
+        }
+      }
+    } catch (error) {
+  console.error('Failed to start session (exception):', error);
+      
+      // Show network error with API diagnostics
+      if (sessionStats) {
+        sessionStats.innerHTML = `
+          <div style="text-align:center;color:#ef4444;padding:40px 20px;">
+            <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
+            <div style="font-size:16px;margin-bottom:8px;">Connection Error</div>
+            <div style="font-size:13px;line-height:1.5;margin-bottom:12px;">
+              Could not connect to Hypixel API.
+            </div>
+            <div style="font-size:11px;color:var(--muted);text-align:left;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin:16px 0;">
+              <strong>Error Details:</strong><br>
+              ${error.message || error}<br><br>
+              <strong>Current API Setup:</strong><br>
+              Enhanced API System: Active<br>
+              .env HYPIXEL_KEY: ${process?.env?.HYPIXEL_KEY ? 'Set' : 'Missing'}<br>
+              User API Key: Check Client Settings
+            </div>
+            <div style="font-size:13px;line-height:1.5;">
+              You can configure API keys in <strong>Client Settings</strong>.<br>
+              Try using your own API key if the backend is down.
+            </div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  async function updateSession() {
+    if (!startStats || !sessionUsername) return;
+    
+    // Wait for IPC to be available
+    if (!window.ipcRenderer) {
+      console.log('IPC not ready for session update, skipping...');
+      return;
+    }
+    
+    console.log('Updating session for:', sessionUsername);
+    
+    try {
+      const rawCurrent = await window.ipcRenderer.invoke('bedwars:stats', sessionUsername);
+      console.log('Session update raw result:', rawCurrent);
+      const currentNormalized = normalizeBedwarsStats(rawCurrent);
+      console.log('Session update normalized:', currentNormalized);
+      
+      if (rawCurrent && !rawCurrent.error) {
+        generateSessionHTML(startStats, currentNormalized);
+      } else {
+        console.error('Session update error:', rawCurrent?.error);
+      }
+    } catch (error) {
+      console.error('Failed to update session:', error);
+    }
+  }
+
+  function updateSessionDisplay() {
+    const sessionIgn = document.getElementById('sessionIgn');
+    const sessionTime = document.getElementById('sessionTime');
+    const sessionAvatar = document.getElementById('sessionAvatar');
+    
+    if (sessionUsername) {
+      sessionIgn.textContent = sessionUsername;
+      if (sessionUuid) {
+        sessionAvatar.src = `https://crafatar.com/avatars/${sessionUuid}?size=48&default=MHF_Steve&overlay`;
+      } else {
+        // Username-Fallback: zuerst Mojang UUID asynchron laden
+        sessionAvatar.src = `https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?size=48&default=MHF_Steve&overlay`; // Steve als Platzhalter
+      }
+      updateSessionTime();
+    }
+  }
+
+  function updateSessionTime() {
+    const sessionTime = document.getElementById('sessionTime');
+    if (!sessionTime || !startTime) return;
+    
+    const secsElapsed = Math.floor((new Date() - startTime) / 1000);
+    const minsElapsed = Math.floor(secsElapsed / 60);
+    const hoursElapsed = Math.floor(minsElapsed / 60);
+    
+    let timeText = 'Session: ';
+    if (hoursElapsed > 0) {
+      timeText += `${hoursElapsed}h ${minsElapsed % 60}m`;
+    } else {
+      timeText += `${minsElapsed}m`;
+    }
+    
+    sessionTime.textContent = timeText;
+  }
+
+  function sessionStatHTML(startVal, currentVal, isNegativeStat = false) {
+    if (startVal === undefined || currentVal === undefined) {
+      return '<span style="color: #ef4444;">?</span>';
+    }
+    
+    const diff = currentVal - startVal;
+    const diffDisplay = Math.abs(diff) < 0.001 ? diff.toFixed(3) : diff.toLocaleString();
+    
+    let diffClass = 'neutral';
+    if (diff > 0) {
+      diffClass = isNegativeStat ? 'negative' : 'positive';
+    } else if (diff < 0) {
+      diffClass = isNegativeStat ? 'positive' : 'negative';
+    }
+    
+    return `
+      <div class="session-stat-value">
+        <span class="session-stat-start">${startVal.toLocaleString()}</span>
+        <span class="session-stat-arrow">→</span>
+        <span class="session-stat-current">${currentVal.toLocaleString()}</span>
+        <span class="session-stat-diff ${diffClass}">[${diff > 0 ? '+' : ''}${diffDisplay}]</span>
+      </div>
+    `;
+  }
+
+  function generateSessionHTML(startPlayer, currentPlayer) {
+    const sessionStats = document.getElementById('sessionStats');
+    const sessionTitle = document.getElementById('sessionTitle');
+    
+    sessionTitle.textContent = 'Bedwars Session Stats';
+    
+    console.log('Generating session HTML:', { startPlayer, currentPlayer });
+    
+    let html = '';
+    
+    // Helper function to safely get stat value
+    function getStat(player, statName) {
+      if (!player) return 0;
+      if (typeof player[statName] === 'number') return player[statName];
+      return 0;
+    }
+    
+    // Level/Stars - Use the same logic as main table
+    const startLevel = startPlayer?.level ?? (startPlayer?.stats?.Bedwars?.Experience != null ? getBedWarsLevel(Number(startPlayer.stats.Bedwars.Experience)) : 0);
+    const currentLevel = currentPlayer?.level ?? (currentPlayer?.stats?.Bedwars?.Experience != null ? getBedWarsLevel(Number(currentPlayer.stats.Bedwars.Experience)) : 0);
+    
+    html += `
+      <div class="session-category">
+        <div class="session-category-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg>
+          General
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Stars</span>
+          ${sessionStatHTML(startLevel, currentLevel)}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Win Streak</span>
+          ${sessionStatHTML(getStat(startPlayer, 'ws'), getStat(currentPlayer, 'ws'))}
+        </div>
+      </div>
+    `;
+    
+    // Combat Stats
+    html += `
+      <div class="session-category">
+        <div class="session-category-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
+          Combat
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Final Kills</span>
+          ${sessionStatHTML(getStat(startPlayer, 'fk'), getStat(currentPlayer, 'fk'))}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Final Deaths</span>
+          ${sessionStatHTML(getStat(startPlayer, 'fd'), getStat(currentPlayer, 'fd'), true)}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">FKDR</span>
+          ${sessionStatHTML(getStat(startPlayer, 'fkdr'), getStat(currentPlayer, 'fkdr'))}
+        </div>
+      </div>
+    `;
+    
+    // Game Stats  
+    html += `
+      <div class="session-category">
+        <div class="session-category-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+          Games
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Wins</span>
+          ${sessionStatHTML(getStat(startPlayer, 'wins'), getStat(currentPlayer, 'wins'))}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Losses</span>
+          ${sessionStatHTML(getStat(startPlayer, 'losses'), getStat(currentPlayer, 'losses'), true)}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">WLR</span>
+          ${sessionStatHTML(getStat(startPlayer, 'wlr'), getStat(currentPlayer, 'wlr'))}
+        </div>
+      </div>
+    `;
+    
+    // Bed Stats
+    html += `
+      <div class="session-category">
+        <div class="session-category-title">
+          <svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg>
+          Beds
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Beds Broken</span>
+          ${sessionStatHTML(getStat(startPlayer, 'bb'), getStat(currentPlayer, 'bb'))}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">Beds Lost</span>
+          ${sessionStatHTML(getStat(startPlayer, 'bl'), getStat(currentPlayer, 'bl'), true)}
+        </div>
+        <div class="session-stat-row">
+          <span class="session-stat-label">BBLR</span>
+          ${sessionStatHTML(getStat(startPlayer, 'bblr'), getStat(currentPlayer, 'bblr'))}
+        </div>
+      </div>
+    `;
+    
+    sessionStats.innerHTML = html;
+    updateSessionTime();
+  }
+
   // Column definitions (labeling + optional derived calculators)
   const STATS = {
     // Core
     level: { name: 'Level', short: 'Lvl', type: 'number' }, // No colorRules - uses prestige coloring
     ws: { name: 'Win Streak', short: 'WS', type: 'number', colorRules: true },
+    mode: { name: 'Most Played Mode', short: 'Mode', type: 'text' },
     fkdr: { name: 'Final K/D Ratio', short: 'FKDR', type: 'number', colorRules: true },
     wlr: { name: 'Win/Loss Ratio', short: 'WLR', type: 'number', colorRules: true },
     bblr: { name: 'Bed Break/Loss Ratio', short: 'BBLR', type: 'number', colorRules: true },
@@ -1321,17 +2019,23 @@
       return lvl > 0 ? fk / lvl : 0;
     }},
     bedwarsScore: { name: 'Bedwars Score', short: 'Score', type: 'number', colorRules: true, calc: (p) => {
-      // Lightweight heuristic score
-      const ws = Number(p?.ws ?? 0);
+      // Konsistente Formel mit Backend (multiplikativ): fkdr * wlr * (level / 100)
+      // Fallback: wenn level fehlt -> aus Experience berechnen
+      let level = Number(p?.level ?? 0);
+      if ((!level || !Number.isFinite(level)) && p?.experience != null) {
+        try { level = Math.floor(getBedWarsLevel(Number(p.experience))); } catch {}
+      }
       const fkdr = Number(p?.fkdr ?? 0);
       const wlr = Number(p?.wlr ?? 0);
-      return Math.round((fkdr * 100) + (wlr * 50) + ws);
+      if (!Number.isFinite(fkdr) || !Number.isFinite(wlr) || !Number.isFinite(level)) return 0;
+      const score = fkdr * wlr * (level / 100);
+      return Number.isFinite(score) ? +score.toFixed(2) : 0;
     }},
 
     // Monthly (if provided by backend)
-    mfkdr: { name: 'Monthly Final K/D Ratio', short: 'Monthly FKDR', type: 'number', colorRules: true },
-    mwlr: { name: 'Monthly Win/Loss Ratio', short: 'Monthly WLR', type: 'number', colorRules: true },
-    mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'Monthly BBLR', type: 'number', colorRules: true },
+  mfkdr: { name: 'Monthly Final K/D Ratio', short: 'Monthly FKDR', type: 'number', colorRules: true, disabled: true },
+  mwlr: { name: 'Monthly Win/Loss Ratio', short: 'Monthly WLR', type: 'number', colorRules: true, disabled: true },
+  mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'Monthly BBLR', type: 'number', colorRules: true, disabled: true },
 
     // Meta
     guildName: { name: 'Guild Name', short: 'Guild', type: 'text' },
@@ -1339,8 +2043,15 @@
   };
 
   // Sorting state
-  let sortKey = null; // 'level' | 'ws' | 'fkdr' | 'wlr' | 'bblr' | 'fk' | 'wins'
+  let sortKey = null; // keys from STATS, e.g. 'level' | 'ws' | 'fkdr' | 'wlr' | 'bblr' | 'fk' | 'wins' | 'bedwarsScore' | ...
   let sortDir = 'asc'; // 'asc' | 'desc'
+  // Restore persisted sort if exists
+  try {
+    const sk = localStorage.getItem('sortKey');
+    const sd = localStorage.getItem('sortDir');
+    if (sk) sortKey = (sk === 'score' ? 'bedwarsScore' : sk);
+    if (sd === 'asc' || sd === 'desc') sortDir = sd;
+  } catch {}
 
   function getNumeric(value) {
     const n = Number(value);
@@ -1389,7 +2100,11 @@
       case 'deaths': return getNumeric(player?.deaths ?? 0);
       case 'winsPerLevel': return getNumeric(STATS.winsPerLevel.calc(player));
       case 'fkPerLevel': return getNumeric(STATS.fkPerLevel.calc(player));
-      case 'bedwarsScore': return getNumeric(STATS.bedwarsScore.calc(player));
+  case 'score': // legacy alias
+  case 'bedwarsScore': {
+        const v = (player && typeof player.bedwarsScore === 'number') ? player.bedwarsScore : STATS.bedwarsScore.calc(player);
+        return getNumeric(v);
+      }
       case 'mfkdr': return getNumeric(player?.mfkdr ?? NaN);
       case 'mwlr': return getNumeric(player?.mwlr ?? NaN);
       case 'mbblr': return getNumeric(player?.mbblr ?? NaN);
@@ -1441,16 +2156,20 @@
           return `<span class="player-name" style="color:#AAAAAA">${esc(displayName)}</span>`;
         })()}
         ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
-        ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
+  ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
+  ${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Gepinnt"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
+        ${sessionUsername && String(player.name).trim().toLowerCase() === String(sessionUsername).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
       </td>`,
       dynamicCells
     ].join('');
+    const pinned = pinnedPlayers.has(key);
     rows.insertAdjacentHTML("beforeend", `
-      <tr data-name="${escAttr(player.name)}">
+      <tr data-name="${escAttr(player.name)}" ${pinned ? 'class="pinned"' : ''}>
         ${orderedCells}
         <td class="actions">
           <button class="icon-btn row-menu-btn">⋮</button>
           <div class="menu">
+            <button class="pin-btn">${pinned ? 'Unpin' : 'Pin'}</button>
             <button class="remove-btn">Remove</button>
           </div>
         </td>
@@ -1598,6 +2317,9 @@
 
   console.log('Received stats for', realName, ':', res);
 
+  // Track successful stats lookup for metrics
+  trackStatsLookup(res.name || realName);
+
   const normName = String(res.name || realName).toLowerCase();
   displayedPlayers.add(normName);
   playerCache[normName] = res;
@@ -1612,8 +2334,20 @@
 
     // Remove a player row and all state completely
     function removePlayer(name) {
-      const row = rows.querySelector(`tr[data-name="${escAttr(name)}"]`);
       const key = String(getRealName(name) || name).trim().toLowerCase();
+      
+      // NEVER remove the session username (own user)
+      if (sessionUsername && key === String(sessionUsername).trim().toLowerCase()) {
+        console.log('Preventing removal of session username:', name);
+        return;
+      }
+      // Prevent removal if pinned
+      if (pinnedPlayers.has(key)) {
+        console.log('Preventing removal of pinned player:', name);
+        return;
+      }
+      
+      const row = rows.querySelector(`tr[data-name="${escAttr(name)}"]`);
       if (row) row.remove();
       displayedPlayers.delete(key);
       playerSources.delete(key);
@@ -1630,7 +2364,8 @@
       if (source === 'chat' && !sourcesSettings?.chat?.enabled) return;
       if (source === 'party' && !sourcesSettings?.party?.enabled) return;
       if (source === 'who' && !sourcesSettings?.game?.addFromWho) return;
-      if (source === 'guild' && !sourcesSettings?.guild?.enabled) return;
+  if (source === 'guild' && (!sourcesSettings?.guild?.enabled)) return;
+      if (source === 'invite' && (!sourcesSettings?.party?.enabled || !sourcesSettings?.party?.showInviteTemp || !sourcesSettings?.partyInvites?.enabled)) return;
       
       const key = String(getRealName(name) || name).toLowerCase();
       const set = playerSources.get(key) || new Set();
@@ -1640,6 +2375,18 @@
 
     function removePlayerSource(name, source) {
       const key = String(getRealName(name) || name).toLowerCase();
+      
+      // NEVER remove sources for session username (own user)
+      if (sessionUsername && key === String(sessionUsername).trim().toLowerCase()) {
+        console.log('Preventing source removal for session username:', name, 'source:', source);
+        return;
+      }
+      // Do not alter sources for pinned players (they are immutable except manual unpin)
+      if (pinnedPlayers.has(key)) {
+        console.log('Preventing source removal for pinned player:', name, 'source:', source);
+        return;
+      }
+      
       const set = playerSources.get(key);
       if (!set) return;
       set.delete(source);
@@ -1651,9 +2398,49 @@
       }
     }
 
+    // Manage invite timeouts
+    function addInviteTimeout(name) {
+      const key = String(getRealName(name) || name).toLowerCase();
+      
+      // Clear any existing timeout
+      if (inviteTimeouts.has(key)) {
+        clearTimeout(inviteTimeouts.get(key));
+      }
+      
+      // Set 60 second timeout to remove invite source
+      const timeoutId = setTimeout(() => {
+        console.log('Invite timeout expired for:', name);
+        removePlayerSource(name, 'invite');
+        inviteTimeouts.delete(key);
+        renderTable();
+        updateOverlaySize();
+      }, 60000); // 60 seconds
+      
+      inviteTimeouts.set(key, timeoutId);
+      console.log('Set invite timeout for:', name, 'expires in 60s');
+    }
+
+    function clearInviteTimeout(name) {
+      const key = String(getRealName(name) || name).toLowerCase();
+      if (inviteTimeouts.has(key)) {
+        clearTimeout(inviteTimeouts.get(key));
+        inviteTimeouts.delete(key);
+      }
+    }
+
     function clearAllButUsername() {
       // Remove all non-username-backed players; keep username-only
+      const selfKey = sessionUsername ? String(sessionUsername).trim().toLowerCase() : null;
       for (const [key, set] of Array.from(playerSources.entries())) {
+        // Always preserve the session user even if it (temporarily) lacks an explicit 'username' source
+        if (selfKey && key === selfKey) {
+          playerSources.set(key, new Set(['username']));
+          continue;
+        }
+        // Preserve pinned players entirely
+        if (pinnedPlayers.has(key)) {
+          continue;
+        }
         if (set.has('username')) {
           // Keep only username source
           playerSources.set(key, new Set(['username']));
@@ -1664,8 +2451,8 @@
         if (tr) tr.remove();
         displayedPlayers.delete(key);
         playerSources.delete(key);
-  nickedPlayers.delete(key);
-    delete originalNicks[key];
+	  nickedPlayers.delete(key);
+        delete originalNicks[key];
       }
       // Clean any stray rows
       rows.querySelectorAll('tr[data-name]').forEach(tr => {
@@ -1710,10 +2497,26 @@
   const incomingSet = new Set(newPlayers.map(p => String(p).trim().toLowerCase()));
         for (const [key, sources] of Array.from(playerSources.entries())) {
           if (sources.has('who') && !incomingSet.has(key)) {
+            // Don't remove the session username - keep it in the overlay
+            if (sessionUsername && key === String(sessionUsername).trim().toLowerCase()) {
+              // Keep session username but remove the 'who' source
+              sources.delete('who');
+              playerSources.set(key, sources);
+              continue;
+            }
+            // Skip removal if pinned
+            if (pinnedPlayers.has(key)) {
+              continue;
+            }
+            
             // Remove only the 'who' source; other sources may still keep the player
             sources.delete('who');
             if (sources.size === 0) {
-              removePlayer(key);
+              if (!pinnedPlayers.has(key)) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources);
+              }
             } else {
               playerSources.set(key, sources);
             }
@@ -1753,6 +2556,45 @@
       }
     });
 
+    // Guild members handling (source: guild)
+    ipcRenderer.on('chat:guildMembers', (_e, guildMembers) => {
+      try {
+        if (!Array.isArray(guildMembers)) return;
+        if (!sourcesSettings?.guild?.enabled) return; // feature disabled -> ignore this batch entirely
+        if (!guildBatchAccepted) return; // only apply if guild was enabled when the list started
+        console.log('Guild settings check:', sourcesSettings?.guild?.enabled, 'Adding', guildMembers.length, 'guild members');
+        
+        // Add all guild members with 'guild' source
+        guildMembers.forEach(member => {
+          if (!member || typeof member !== 'string') return;
+          addPlayer(member, 'guild');
+        });
+        
+        renderTable();
+        updateOverlaySize();
+      } catch (err) {
+        console.error('Error handling chat:guildMembers', err);
+      }
+    });
+
+    // Guild member left: remove guild source if onlineOnly is enabled
+    ipcRenderer.on('chat:guildMemberLeft', (_e, name) => {
+      try {
+        if (!name || typeof name !== 'string') return;
+        if (!sourcesSettings?.guild?.enabled) return;
+        // Only enforce removal when onlineOnly is active AND we're in pre-game lobby or in-game.
+        // In normal lobbies, keep showing guild members even if a live "Guild > name left." arrives.
+        if (sourcesSettings?.guild?.onlineOnly && (preGameLobby || gameInProgress)) {
+          console.log('Guild member left (onlineOnly active):', name);
+          removePlayerSource(name, 'guild');
+          renderTable();
+          updateOverlaySize();
+        }
+      } catch (err) {
+        console.error('Error handling chat:guildMemberLeft', err);
+      }
+    });
+
     // Party members handling (source: party)
     ipcRenderer.on('chat:party', (_e, members) => {
       try {
@@ -1762,6 +2604,10 @@
         members.forEach(member => {
           if (!member || typeof member !== 'string') return;
           addPlayer(member, 'party');
+          // Clear invite timeout since they're now in party
+          clearInviteTimeout(member);
+          // Remove any lingering 'invite' source so player is fully promoted to party
+          removePlayerSource(member, 'invite');
         });
         // Remove party source for players no longer in party
         if (sourcesSettings?.party?.removeOnMemberLeave) {
@@ -1769,7 +2615,11 @@
             if (sources.has('party') && !incoming.has(key)) {
               sources.delete('party');
               if (sources.size === 0) {
-                removePlayer(key);
+                if (!pinnedPlayers.has(key)) {
+                  removePlayer(key);
+                } else {
+                  playerSources.set(key, sources);
+                }
               } else {
                 playerSources.set(key, sources);
               }
@@ -1787,11 +2637,31 @@
     ipcRenderer.on('chat:partyInvite', (_e, inviter) => {
       try {
         if (!inviter || typeof inviter !== 'string') return;
-        if (sourcesSettings?.party?.showInviteTemp) {
-          addPlayer(inviter, 'invite');
-        }
+        if (!sourcesSettings?.party?.enabled || !sourcesSettings?.party?.showInviteTemp || !sourcesSettings?.partyInvites?.enabled) return;
+        
+        console.log('Party invite received from:', inviter);
+        addPlayer(inviter, 'invite');
+        addInviteTimeout(inviter);
+        renderTable();
+        updateOverlaySize();
       } catch (err) {
         console.error('Error handling chat:partyInvite', err);
+      }
+    });
+
+    // Party invite expired - remove invite source immediately
+    ipcRenderer.on('chat:partyInviteExpired', (_e, player) => {
+      try {
+        if (!player || typeof player !== 'string') return;
+        console.log('Party invite expired for:', player);
+        
+        // Clear timeout and remove invite source
+        clearInviteTimeout(player);
+        removePlayerSource(player, 'invite');
+        renderTable();
+        updateOverlaySize();
+      } catch (err) {
+        console.error('Error handling chat:partyInviteExpired', err);
       }
     });
 
@@ -1803,7 +2673,11 @@
             if (sources.has('party')) {
               sources.delete('party');
               if (sources.size === 0) {
-                removePlayer(key);
+                if (!pinnedPlayers.has(key)) {
+                  removePlayer(key);
+                } else {
+                  playerSources.set(key, sources);
+                }
               } else {
                 playerSources.set(key, sources);
               }
@@ -1819,7 +2693,12 @@
 
     function esc(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
     function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
-    function fmt(n) { return (n == null || isNaN(n)) ? "—" : n; }
+    function fmt(n) {
+      if (n == null) return "—";
+      if (typeof n === 'string') return n || "—";
+      if (typeof n === 'number') return isNaN(n) ? "—" : n;
+      return String(n);
+    }
     
     // Nick management (definition moved earlier)
 
@@ -1918,12 +2797,13 @@
         // Detect guild list start: "Guild Name: ..."
         if (msg.indexOf('Guild Name: ') === 0) {
           guildListMode = true;
-          console.log('[Guild] Guild list mode activated');
+          guildBatchAccepted = !!sourcesSettings?.guild?.enabled; // snapshot enabled state
+          console.log('[Guild] Guild list mode activated (accepted=', guildBatchAccepted, ')');
           return;
         }
 
         // Parse guild member lines (online: " ●  ", offline: " ?  ")
-        if (guildListMode && (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1)) {
+  if (guildListMode && guildBatchAccepted && (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1)) {
           const isOnline = msg.indexOf(' ●  ') !== -1;
           
           // Skip offline members if onlineOnly is enabled
@@ -1956,6 +2836,7 @@
         // Detect guild list end: "Total Members: ..."
         if (guildListMode && msg.indexOf('Total Members:') === 0) {
           guildListMode = false;
+          guildBatchAccepted = false;
           console.log('[Guild] Guild list mode deactivated');
           return;
         }
@@ -1995,8 +2876,9 @@
     // Server change → remove who/chat/username/guild sources if enabled
     ipcRenderer.on('chat:serverChange', () => {
       try {
-        // Enter pre-game lobby phase on server change
+        // Enter pre-game lobby phase on server change; game not yet started
         preGameLobby = true;
+        gameInProgress = false;
         if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange && !sourcesSettings?.guild?.removeOnServerChange) return;
         const allKeys = Array.from(playerSources.keys());
         allKeys.forEach(key => {
@@ -2023,7 +2905,11 @@
           }
           if (changed) {
             if (sources.size === 0) {
-              removePlayer(key);
+              if (!pinnedPlayers.has(key)) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources); // keep empty set for pinned
+              }
             } else {
               playerSources.set(key, sources);
             }
@@ -2041,6 +2927,7 @@
       try {
         // Leaving game back to lobby: disable pre-game chat auto-add
         preGameLobby = false;
+        gameInProgress = false;
         if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange) return;
         const allKeys = Array.from(playerSources.keys());
         allKeys.forEach(key => {
@@ -2063,7 +2950,11 @@
           }
           if (changed) {
             if (sources.size === 0) {
-              removePlayer(key);
+              if (!pinnedPlayers.has(key)) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources);
+              }
             } else {
               playerSources.set(key, sources);
             }
@@ -2076,22 +2967,43 @@
       }
     });
 
-    // Game start → optionally clear manually added players
+    // Game start → optionally clear manually added players and guild members
     ipcRenderer.on('chat:gameStart', () => {
       try {
         // Game started: disable pre-game chat auto-add
         preGameLobby = false;
-        if (!sourcesSettings?.manual?.clearOnGameStart) return;
+        gameInProgress = true;
+        
+        // Clear manually added players if setting is enabled
+        if (sourcesSettings?.manual?.clearOnGameStart) {
+          for (const [key, sources] of Array.from(playerSources.entries())) {
+            if (sources.has('manual')) {
+              sources.delete('manual');
+              if (sources.size === 0) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources);
+              }
+            }
+          }
+        }
+        
+        // Always clear guild members when game starts (they should not persist in actual games)
         for (const [key, sources] of Array.from(playerSources.entries())) {
-          if (sources.has('manual')) {
-            sources.delete('manual');
+          if (sources.has('guild')) {
+            sources.delete('guild');
             if (sources.size === 0) {
-              removePlayer(key);
+              if (!pinnedPlayers.has(key)) {
+                removePlayer(key);
+              } else {
+                playerSources.set(key, sources);
+              }
             } else {
               playerSources.set(key, sources);
             }
           }
         }
+        
         renderTable();
         updateOverlaySize();
       } catch (err) {
@@ -2110,6 +3022,7 @@
     function bindMenus() {
       const btns = Array.from(document.querySelectorAll(".row-menu-btn"));
       const removes = Array.from(document.querySelectorAll(".remove-btn"));
+      const pins = Array.from(document.querySelectorAll('.pin-btn'));
 
       btns.forEach(btn => {
         btn.addEventListener("click", e => {
@@ -2126,8 +3039,32 @@
           const tr = b.closest("tr");
           const name = tr.getAttribute("data-name");
           queue = queue.filter(n => n.toLowerCase() !== name.toLowerCase());
-          removePlayer(name);
+          // Do not remove if pinned
+          if (!pinnedPlayers.has(String(name).toLowerCase())) {
+            removePlayer(name);
+          }
           closeAllMenus();
+        });
+      });
+
+      pins.forEach(b => {
+        b.addEventListener('click', e => {
+          e.stopPropagation();
+          const tr = b.closest('tr');
+          const name = tr.getAttribute('data-name');
+          const key = String(name || '').toLowerCase();
+          if (pinnedPlayers.has(key)) {
+            pinnedPlayers.delete(key);
+            b.textContent = 'Pin';
+            tr.classList.remove('pinned');
+          } else {
+            pinnedPlayers.add(key);
+            b.textContent = 'Unpin';
+            tr.classList.add('pinned');
+          }
+          savePinned();
+          closeAllMenus();
+          renderTable();
         });
       });
 
@@ -2242,6 +3179,58 @@
         }
       }
       
+      // Session panel specific logic
+      if (id === 'session') {
+        console.log('=== Session Panel Debug ===');
+        console.log('typeof basicSettings:', typeof basicSettings);
+        console.log('basicSettings exists:', !!basicSettings);
+        console.log('basicSettings object:', basicSettings);
+        
+        // Ensure basicSettings is available
+        if (typeof basicSettings === 'undefined' || !basicSettings) {
+          console.log('basicSettings not available, loading from localStorage');
+          basicSettings = JSON.parse(localStorage.getItem('basicSettings') || JSON.stringify(defaultBasic));
+          console.log('Loaded basicSettings:', basicSettings);
+        }
+        
+        // Get username from basicSettings (not localStorage)
+        const username = basicSettings.username?.trim();
+        console.log('Session panel opened, username from basicSettings:', username);
+        console.log('sessionUsername:', sessionUsername);
+        console.log('startStats:', startStats);
+        
+        if (!username) {
+          // No username set - show instructions
+          const sessionStats = document.getElementById('sessionStats');
+          const sessionIgn = document.getElementById('sessionIgn');
+          const sessionTime = document.getElementById('sessionTime');
+          
+          if (sessionStats) {
+            sessionStats.innerHTML = `
+              <div style="text-align:center;color:var(--muted);padding:40px 20px;">
+                <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-profile"/></svg>
+                <div style="font-size:16px;margin-bottom:8px;color:var(--text);">No Username Set</div>
+                <div style="font-size:13px;line-height:1.5;">
+                  Go to <strong>Profile</strong> and enter your Minecraft IGN to start tracking session stats.<br><br>
+                  Session stats show your progress since opening the app!
+                </div>
+              </div>
+            `;
+          }
+          if (sessionIgn) sessionIgn.textContent = 'No player selected';
+          if (sessionTime) sessionTime.textContent = 'Session not started';
+        } else if (username !== sessionUsername) {
+          console.log('Starting session because username changed:', username, '!==', sessionUsername);
+          startSession(username);
+        } else if (sessionUsername && startStats) {
+          console.log('Updating existing session');
+          updateSession();
+        } else {
+          console.log('Session state unclear - startStats:', !!startStats, 'sessionUsername:', sessionUsername);
+        }
+        console.log('=== End Session Panel Debug ===');
+      }
+      
       document.querySelectorAll('.panel').forEach(p => {
         p.classList.toggle('active', p.id === `panel-${id}`);
       });
@@ -2249,6 +3238,12 @@
       document.querySelectorAll('.nav > .nav-item').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-panel') === id);
       });
+      
+      // Update account stats when switching to profile panel
+      if (id === 'profile') {
+        setTimeout(() => updateAccountStats(), 100);
+      }
+      
       updateOverlaySize();
     }
 
@@ -2263,8 +3258,8 @@
   // Remove old settings submenu persistence (no longer needed)
   localStorage.removeItem('settingsExpanded');
   localStorage.removeItem('activeSettingsSection');
-  // Always start in home (Overlay) panel on launch
-  showPanel('home');
+  // Always start in Overlay panel on launch
+  showPanel('overlay');
 
     // Default color rules for each stat
     const DEFAULT_COLOR_RULES = {
@@ -2298,15 +3293,26 @@
       ],
       bedwarsScore: [
         { op: '>=', value: 1000, color: '#ff00ff' },
-        { op: '>=', value: 500, color: '#ff0000' },
-        { op: '>=', value: 250, color: '#ffff00' },
-        { op: '>=', value: 0, color: '#ffffff' }
+        { op: '>=', value: 500, color: '#ff69b4' },
+        { op: '>=', value: 300, color: '#dc143c' },
+        { op: '>=', value: 200, color: '#ff7f50' },
+        { op: '>=', value: 100, color: '#ffa500' },
+        { op: '>=', value: 70, color: '#ffff00' },
+        { op: '>=', value: 50, color: '#00ff00' },
+        { op: '>=', value: 30, color: '#00ff00' },
+        { op: '>=', value: 10, color: '#ffffff' },
+        { op: '>=', value: 0, color: '#808080' }
       ],
       bblr: [
-        { op: '>=', value: 10, color: '#ff00ff' },
-        { op: '>=', value: 5, color: '#00ff00' },
+        { op: '>=', value: 50, color: '#ff00ff' },
+        { op: '>=', value: 30, color: '#ff69b4' },
+        { op: '>=', value: 20, color: '#dc143c' },
+        { op: '>=', value: 10, color: '#ff7f50' },
+        { op: '>=', value: 5, color: '#ffa500' },
         { op: '>=', value: 3, color: '#ffff00' },
-        { op: '>=', value: 1, color: '#ffffff' },
+        { op: '>=', value: 2, color: '#00ff00' },
+        { op: '>=', value: 1, color: '#00ff00' },
+        { op: '>=', value: 0.5, color: '#ffffff' },
         { op: '>=', value: 0, color: '#808080' }
       ],
       fk: [
@@ -2331,16 +3337,16 @@
     let statSettings = JSON.parse(localStorage.getItem('statSettings') || JSON.stringify({
       visible: Object.keys(STATS),
       order: Object.keys(STATS),
-      layout: ['ws','fkdr','wlr','bblr','fk','wins'], // 6 slots by default
+      layout: ['ws','fkdr','wlr','bblr','fk','wins','mode'], 
       colorRules: DEFAULT_COLOR_RULES
     }));
     
     // Migration: Ensure all STATS are in visible array (for users with old localStorage)
     if (!statSettings.visible || !Array.isArray(statSettings.visible)) {
-      statSettings.visible = Object.keys(STATS);
+      statSettings.visible = Object.keys(STATS).filter(k => !STATS[k]?.disabled);
     } else {
       // Add any missing stats to visible
-      const allStats = Object.keys(STATS);
+      const allStats = Object.keys(STATS).filter(k => !STATS[k]?.disabled);
       for (const stat of allStats) {
         if (!statSettings.visible.includes(stat)) {
           statSettings.visible.push(stat);
@@ -2350,9 +3356,9 @@
     
     // Migration: Ensure order contains all stats
     if (!statSettings.order || !Array.isArray(statSettings.order)) {
-      statSettings.order = Object.keys(STATS);
+      statSettings.order = Object.keys(STATS).filter(k => !STATS[k]?.disabled);
     } else {
-      const allStats = Object.keys(STATS);
+      const allStats = Object.keys(STATS).filter(k => !STATS[k]?.disabled);
       for (const stat of allStats) {
         if (!statSettings.order.includes(stat)) {
           statSettings.order.push(stat);
@@ -2361,7 +3367,7 @@
     }
     
     if (!Array.isArray(statSettings.layout)) {
-      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins'];
+      statSettings.layout = ['ws','fkdr','wlr','bblr','fk','wins','mode'];
     }
     // Ensure layout has between 6 and 12 slots
     while (statSettings.layout.length < 6) {
@@ -2395,6 +3401,16 @@
     })();
 
     function saveStatSettings() {
+      // Purge disabled stats from layout and visible/order if present (migration)
+      try {
+        const disabledKeys = Object.keys(STATS).filter(k => STATS[k]?.disabled);
+        if (disabledKeys.length) {
+          statSettings.layout = statSettings.layout.map(x => (disabledKeys.includes(x) ? null : x));
+          statSettings.visible = (statSettings.visible || []).filter(k => !disabledKeys.includes(k));
+          statSettings.order = (statSettings.order || []).filter(k => !disabledKeys.includes(k));
+          if (disabledKeys.includes(sortKey)) { sortKey = null; }
+        }
+      } catch {}
       localStorage.setItem('statSettings', JSON.stringify(statSettings));
       renderTable();
       renderStatLayoutSlots();
@@ -2414,15 +3430,18 @@
           .map(cls => `<col class="${cls}">`).join('');
       }
       if (thead) {
+        // Include bedwarsScore header explicitly if part of dynamicStats; dynamicStats already filtered from layout.
         thead.innerHTML = `<tr>
-          <th data-sort-key="level">Lvl</th>
+          <th data-sort-key="level">${`Lvl${sortKey === 'level' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}`}</th>
           <th>Name</th>
           ${dynamicStats.map(s => {
             const stat = STATS[s];
             const sortable = stat.type === 'number';
-            // Im Overlay: Kürzel anzeigen
-            const label = stat.short || stat.name;
-            return `<th class="metric-h" ${sortable ? `data-sort-key="${s}"` : ''}>${label}</th>`;
+            let label = stat.short || stat.name;
+            if (sortable && sortKey === s) {
+              label += sortDir === 'asc' ? ' ▲' : ' ▼';
+            }
+            return `<th class="metric-h${sortKey === s ? ' sorted' : ''}" ${sortable ? `data-sort-key="${s}"` : ''}>${label}</th>`;
           }).join('')}
           <th></th>
         </tr>`;
@@ -2463,18 +3482,22 @@
           if (!key) return;
           
           // Toggle sort direction if clicking same column, else default to descending
+          // Neue Logik:
+          // - Erster Klick auf eine Spalte -> aufsteigend (klein -> groß)
+          // - Erneuter Klick toggelt wie bisher
+          // - Shift+Klick erzwingt sofort Gegenrichtung beim Initialisieren
+          const shift = window.event instanceof MouseEvent ? window.event.shiftKey : false;
           if (sortKey === key) {
             sortDir = sortDir === 'asc' ? 'desc' : 'asc';
           } else {
             sortKey = key;
-            sortDir = 'desc'; // Default to descending for new column
+            sortDir = shift ? 'desc' : 'asc'; // Default jetzt auf ASC; mit Shift direkt DESC
           }
+          // Hinweis für zukünftige Devs: Falls Nutzer lieber High->Low zuerst hätten,
+          // kann hier wieder auf 'desc' gewechselt oder ein Setting eingeführt werden.
           
           // Update visual indicators
-          document.querySelectorAll('thead th').forEach(h => {
-            h.classList.remove('sort-asc', 'sort-desc');
-          });
-          th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+            try { localStorage.setItem('sortKey', sortKey); localStorage.setItem('sortDir', sortDir); } catch {}
           
           // Re-render table with new sort
           renderTable();
@@ -2618,14 +3641,25 @@
       const palette = document.getElementById('layoutPalette');
       if (!palette) return;
       const used = new Set(statSettings.layout.filter(Boolean));
-      const stats = Object.keys(STATS).filter(k => !['level','name'].includes(k));
+      // Palette zeigt auch deaktivierte Stats (disabled:true) ausgegraut & nicht draggable
+      const stats = Object.keys(STATS)
+        .filter(k => !['level','name'].includes(k));
       
       console.log('[DEBUG] renderStatLayoutPalette - Total STATS:', Object.keys(STATS).length);
       console.log('[DEBUG] renderStatLayoutPalette - Filtered stats (no level/name):', stats.length, stats);
       console.log('[DEBUG] renderStatLayoutPalette - Currently used in layout:', Array.from(used));
       
   // In den Einstellungen bitte ausgeschriebene Namen anzeigen
-  palette.innerHTML = stats.map(k => `<div class="stat-pill" draggable="${used.has(k)?'false':'true'}" data-stat="${k}" ${used.has(k)?'data-used="1"':''}>${STATS[k].name}</div>`).join('');
+  palette.innerHTML = stats.map(k => {
+        const def = STATS[k];
+        const isUsed = used.has(k);
+        const isDisabled = !!def.disabled;
+        const draggable = (!isUsed && !isDisabled) ? 'true' : 'false';
+        const cls = `stat-pill${isDisabled ? ' disabled' : ''}`;
+        const usedAttr = isUsed ? 'data-used="1"' : '';
+        const disabledAttr = isDisabled ? 'data-disabled="1" title="Currently unavailable"' : '';
+        return `<div class="${cls}" draggable="${draggable}" data-stat="${k}" ${usedAttr} ${disabledAttr}>${def.name}</div>`;
+      }).join('');
       
       palette.querySelectorAll('.stat-pill[draggable="true"]').forEach(pill => {
         pill.addEventListener('dragstart', e => {
@@ -2961,16 +3995,19 @@
 
     let basicSettings = JSON.parse(localStorage.getItem('basicSettings') || JSON.stringify(defaultBasic));
 
-    function saveBasicSettings() {
+    function saveBasicSettings(opts) {
+      const options = Object.assign({ propagateUsername: true }, opts);
       localStorage.setItem('basicSettings', JSON.stringify(basicSettings));
       console.log('Basic settings saved:', basicSettings);
-        updateSidebarUsername();
-        // Ensure username entry exists when set
-        if (basicSettings.username && basicSettings.username.trim()) {
-          addPlayer(basicSettings.username.trim(), 'username');
-        }
-        // Inform main process / ChatLogger about username for mention detection
+      updateSidebarUsername();
+      // Ensure username entry exists when set
+      if (basicSettings.username && basicSettings.username.trim()) {
+        addPlayer(basicSettings.username.trim(), 'username');
+      }
+      // Only inform main process if requested (avoid spamming while typing or changing unrelated settings)
+      if (options.propagateUsername) {
         try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
+      }
     }
 
       function updateSidebarUsername() {
@@ -3108,12 +4145,196 @@
           removePlayerSource(prev, 'username');
         }
         basicSettings.username = next;
+        localStorage.setItem('username', next); // For session tracking (keep for compatibility)
         saveBasicSettings();
+        
+        // Start new session if username changed and we have a valid username
+        if (next && next !== sessionUsername) {
+          setTimeout(() => startSession(next), 100); // Small delay to ensure save completes
+        }
+      });
+      
+      // Start session on app load if username exists (delayed)
+      const savedUsername = basicSettings.username || '';
+      if (savedUsername) {
+        console.log('Found saved username on app load:', savedUsername);
+        localStorage.setItem('username', savedUsername);
+        // Wait a bit for IPC to be ready
+        setTimeout(() => {
+          if (window.ipcRenderer) {
+            console.log('Starting session on app load for:', savedUsername);
+            startSession(savedUsername);
+          } else {
+            console.log('IPC not ready, session start skipped');
+          }
+        }, 1000);
+      }
+    }
+
+    // API Management
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const pasteApiKeyBtn = document.getElementById('pasteApiKeyBtn');
+    const testApiKeyBtn = document.getElementById('testApiKeyBtn');
+    const fallbackKeyToggle = document.getElementById('fallbackKeyToggle');
+    const clearCacheBtn = document.getElementById('clearCacheBtn');
+    const refreshApiStatusBtn = document.getElementById('refreshApiStatusBtn');
+    const hypixelApiLink = document.getElementById('hypixelApiLink');
+    const backendStatus = document.getElementById('backendStatus');
+    const userKeyStatus = document.getElementById('userKeyStatus');
+
+    // Load API settings
+    const apiSettings = {
+      userApiKey: localStorage.getItem('nebula-api-key') || '',
+      useFallback: localStorage.getItem('nebula-use-fallback') !== 'false'
+    };
+
+    if (apiKeyInput) {
+      apiKeyInput.value = apiSettings.userApiKey;
+      apiKeyInput.addEventListener('change', () => {
+        apiSettings.userApiKey = apiKeyInput.value.trim();
+        localStorage.setItem('nebula-api-key', apiSettings.userApiKey);
+        updateApiStatus();
       });
     }
 
-      // Initialize sidebar username on load and ensure presence in list
-      updateSidebarUsername();
+    if (fallbackKeyToggle) {
+      fallbackKeyToggle.checked = apiSettings.useFallback;
+      fallbackKeyToggle.addEventListener('change', () => {
+        apiSettings.useFallback = fallbackKeyToggle.checked;
+        localStorage.setItem('nebula-use-fallback', apiSettings.useFallback.toString());
+        window.ipcRenderer.invoke('api:toggleFallback', apiSettings.useFallback);
+      });
+    }
+
+    if (pasteApiKeyBtn) {
+      pasteApiKeyBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text && text.length === 36) {
+            apiKeyInput.value = text.trim();
+            apiSettings.userApiKey = text.trim();
+            localStorage.setItem('nebula-api-key', apiSettings.userApiKey);
+            showNotification('API key pasted from clipboard', 'success');
+            updateApiStatus();
+          } else {
+            showNotification('Invalid API key format in clipboard', 'error');
+          }
+        } catch (err) {
+          showNotification('Could not access clipboard', 'error');
+        }
+      });
+    }
+
+    if (testApiKeyBtn) {
+      testApiKeyBtn.addEventListener('click', async () => {
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+          showNotification('Please enter an API key first', 'warning');
+          return;
+        }
+
+        testApiKeyBtn.textContent = 'Testing...';
+        testApiKeyBtn.disabled = true;
+
+        try {
+          const result = await window.ipcRenderer.invoke('api:setUserKey', apiKey);
+          if (result.success) {
+            showNotification('API key is valid!', 'success');
+            apiSettings.userApiKey = apiKey;
+            localStorage.setItem('nebula-api-key', apiKey);
+            updateApiStatus();
+          } else {
+            showNotification(result.error || 'API key validation failed', 'error');
+          }
+        } catch (err) {
+          showNotification('Failed to test API key', 'error');
+        } finally {
+          testApiKeyBtn.textContent = 'Test';
+          testApiKeyBtn.disabled = false;
+        }
+      });
+    }
+
+    if (clearCacheBtn) {
+      clearCacheBtn.addEventListener('click', async () => {
+        clearCacheBtn.textContent = 'Clearing...';
+        clearCacheBtn.disabled = true;
+
+        try {
+          await window.ipcRenderer.invoke('api:clearCache');
+          showNotification('API cache cleared', 'success');
+        } catch (err) {
+          showNotification('Failed to clear cache', 'error');
+        } finally {
+          clearCacheBtn.textContent = 'Clear Cache';
+          clearCacheBtn.disabled = false;
+        }
+      });
+    }
+
+    if (refreshApiStatusBtn) {
+      refreshApiStatusBtn.addEventListener('click', () => {
+        updateApiStatus();
+      });
+    }
+
+    if (hypixelApiLink) {
+      hypixelApiLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.ipcRenderer.invoke('external:open', 'https://developer.hypixel.net/');
+      });
+    }
+
+    // Update API status display
+    async function updateApiStatus() {
+      try {
+        const status = await window.ipcRenderer.invoke('api:getStatus');
+        
+        if (backendStatus) {
+          if (status.backendAvailable) {
+            if (status.backendThrottled) {
+              backendStatus.innerHTML = '<span style="color:#fbbf24;">●</span> Backend available (rate limited)';
+            } else {
+              backendStatus.innerHTML = '<span style="color:#10b981;">●</span> Backend available';
+            }
+          } else {
+            backendStatus.innerHTML = '<span style="color:#ef4444;">●</span> Backend unavailable - using fallback';
+          }
+        }
+
+        if (userKeyStatus) {
+          if (status.config.hasUserKey) {
+            if (status.userKeyValid) {
+              userKeyStatus.innerHTML = '<span style="color:#10b981;">●</span> User API key valid';
+            } else {
+              userKeyStatus.innerHTML = '<span style="color:#ef4444;">●</span> User API key invalid or expired';
+            }
+          } else {
+            userKeyStatus.innerHTML = '<span style="color:#9ca3af;">●</span> No user API key configured';
+          }
+        }
+
+        // Show overall system status
+        const hasWorkingApi = (status.backendAvailable && !status.backendThrottled) || 
+                             (status.config.useFallback && status.userKeyValid);
+        
+        if (!hasWorkingApi && status.hypixelApiDown) {
+          showNotification('Hypixel API appears to be down', 'warning');
+        }
+
+      } catch (err) {
+        console.error('Failed to update API status:', err);
+      }
+    }
+
+    // Initialize API status
+    updateApiStatus();
+    
+    // Auto-refresh status every 30 seconds
+    setInterval(updateApiStatus, 30000);
+
+    // Initialize sidebar username on load and ensure presence in list
+    updateSidebarUsername();
       if (basicSettings.username && basicSettings.username.trim()) {
         addPlayer(basicSettings.username.trim(), 'username');
         renderTable();
@@ -3176,6 +4397,19 @@
       console.log('Sources settings saved:', sourcesSettings);
     }
 
+    // Helper function to toggle subsection disabled state
+    function toggleSubsectionEnabled(containerId, enabled) {
+      const container = document.getElementById(containerId);
+      if (container) {
+        const inputs = container.querySelectorAll('input, button');
+        inputs.forEach(input => {
+          input.disabled = !enabled;
+        });
+        container.style.opacity = enabled ? '1' : '0.5';
+        container.style.pointerEvents = enabled ? 'auto' : 'none';
+      }
+    }
+
     // Bind Sources inputs
     const sourceGameToggle = document.getElementById('sourceGameToggle');
   const gameAddFromWho = document.getElementById('gameAddFromWho');
@@ -3204,8 +4438,10 @@
 
     if (sourceGameToggle) {
       sourceGameToggle.checked = sourcesSettings.game.enabled;
+      toggleSubsectionEnabled('gameSourceOptions', sourcesSettings.game.enabled);
       sourceGameToggle.addEventListener('change', () => {
         sourcesSettings.game.enabled = sourceGameToggle.checked;
+        toggleSubsectionEnabled('gameSourceOptions', sourcesSettings.game.enabled);
         saveSourcesSettings();
       });
     }
@@ -3251,8 +4487,18 @@
 
     if (sourcePartyToggle) {
       sourcePartyToggle.checked = sourcesSettings.party.enabled;
+      toggleSubsectionEnabled('partySourceOptions', sourcesSettings.party.enabled);
+      // Also control party invites toggle
+      if (sourcePartyInvitesToggle) {
+        sourcePartyInvitesToggle.disabled = !sourcesSettings.party.enabled;
+      }
       sourcePartyToggle.addEventListener('change', () => {
         sourcesSettings.party.enabled = sourcePartyToggle.checked;
+        toggleSubsectionEnabled('partySourceOptions', sourcesSettings.party.enabled);
+        // Also control party invites toggle
+        if (sourcePartyInvitesToggle) {
+          sourcePartyInvitesToggle.disabled = !sourcesSettings.party.enabled;
+        }
         saveSourcesSettings();
       });
     }
@@ -3307,8 +4553,10 @@
 
     if (sourceChatToggle) {
       sourceChatToggle.checked = sourcesSettings.chat.enabled;
+      toggleSubsectionEnabled('chatSourceOptions', sourcesSettings.chat.enabled);
       sourceChatToggle.addEventListener('change', () => {
         sourcesSettings.chat.enabled = sourceChatToggle.checked;
+        toggleSubsectionEnabled('chatSourceOptions', sourcesSettings.chat.enabled);
         saveSourcesSettings();
       });
     }
@@ -3330,18 +4578,22 @@
     }
 
     // Guild bindings
-    const sourceGuildToggle = document.getElementById('sourceGuildToggle');
+  const sourceGuildToggle = document.getElementById('sourceGuildToggle');
     const guildRemoveOnServerChange = document.getElementById('guildRemoveOnServerChange');
     const guildOnlineOnly = document.getElementById('guildOnlineOnly');
 
     if (sourceGuildToggle) {
       sourceGuildToggle.checked = !!sourcesSettings.guild?.enabled;
+      toggleSubsectionEnabled('guildSourceOptions', sourcesSettings.guild.enabled);
       sourceGuildToggle.addEventListener('change', () => {
         if (!sourcesSettings.guild) sourcesSettings.guild = {};
         sourcesSettings.guild.enabled = sourceGuildToggle.checked;
+        toggleSubsectionEnabled('guildSourceOptions', sourcesSettings.guild.enabled);
         saveSourcesSettings();
       });
     }
+
+    // Removed guildAddFromList toggle; guild additions are implicit when guild source is enabled.
 
     if (guildRemoveOnServerChange) {
       guildRemoveOnServerChange.checked = !!sourcesSettings.guild?.removeOnServerChange;
@@ -3364,8 +4616,10 @@
     // Manual bindings
     if (sourceManualToggle) {
       sourceManualToggle.checked = !!sourcesSettings.manual.enabled;
+      toggleSubsectionEnabled('manualSourceOptions', sourcesSettings.manual.enabled);
       sourceManualToggle.addEventListener('change', () => {
         sourcesSettings.manual.enabled = sourceManualToggle.checked;
+        toggleSubsectionEnabled('manualSourceOptions', sourcesSettings.manual.enabled);
         saveSourcesSettings();
       });
     }
@@ -3643,7 +4897,10 @@
             : 'Never synced - click Sync Now to upload your settings';
         }
         if (syncNowBtn) syncNowBtn.disabled = false;
-        if (accountStatsCard) accountStatsCard.style.display = 'block';
+        if (accountStatsCard) {
+          accountStatsCard.style.display = 'block';
+          updateAccountStats(); // Update stats when shown
+        }
       } else {
         // Logged out state
         if (avatar) {
@@ -3660,7 +4917,10 @@
         if (syncStatus) syncStatus.textContent = 'Not available';
         if (syncTime) syncTime.textContent = 'Login with Discord to enable cloud sync';
         if (syncNowBtn) syncNowBtn.disabled = true;
-        if (accountStatsCard) accountStatsCard.style.display = 'none';
+        if (accountStatsCard) {
+          accountStatsCard.style.display = 'block'; // Still show stats when logged out
+          updateAccountStats(); // Show local metrics
+        }
       }
 
       // Update Plus status (async for both logged in/out states)
@@ -3744,6 +5004,96 @@
         `;
         upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Try Demo</span>';
         upgradePlusBtn.disabled = false; // Enable demo even without login
+      }
+    }
+
+    // Update Account Statistics Display
+    async function updateAccountStats() {
+      const memberSinceEl = document.getElementById('memberSince');
+      const playersTrackedEl = document.getElementById('playersTracked');
+      const sessionsCountEl = document.getElementById('sessionsCount');
+      const totalLookupsEl = document.getElementById('totalLookups');
+
+      if (!memberSinceEl || !playersTrackedEl || !sessionsCountEl || !totalLookupsEl) {
+        console.warn('[Metrics] Account stats elements not found');
+        return;
+      }
+
+      try {
+        let finalMetrics = { ...accountMetrics };
+        let isCloudData = false;
+
+        // If logged in, try to sync with cloud
+        if (userProfile?.id) {
+          try {
+            const cloudResult = await ipcRenderer.invoke('metrics:get', userProfile.id);
+            if (cloudResult.success && cloudResult.data) {
+              isCloudData = cloudResult.source === 'cloud';
+              finalMetrics = {
+                memberSince: cloudResult.data.memberSince || accountMetrics.memberSince,
+                players: new Set([...accountMetrics.players, ...(cloudResult.data.players || [])]),
+                sessionsCount: Math.max(cloudResult.data.sessionsCount || 0, accountMetrics.sessionsCount),
+                totalLookups: Math.max(cloudResult.data.totalLookups || 0, accountMetrics.totalLookups)
+              };
+
+              // Push local data to cloud if we have more data
+              if (accountMetrics.totalLookups > (cloudResult.data.totalLookups || 0) ||
+                  accountMetrics.players.size > (cloudResult.data.playersTracked || 0)) {
+                const updateData = {
+                  memberSince: Math.min(accountMetrics.memberSince, cloudResult.data.memberSince || Date.now()),
+                  playersTracked: Math.max(accountMetrics.players.size, cloudResult.data.playersTracked || 0),
+                  sessionsCount: Math.max(accountMetrics.sessionsCount, cloudResult.data.sessionsCount || 0),
+                  totalLookups: Math.max(accountMetrics.totalLookups, cloudResult.data.totalLookups || 0)
+                };
+                
+                ipcRenderer.invoke('metrics:update', userProfile.id, updateData).then(result => {
+                  if (result.success) {
+                    console.log('[Metrics] Local data synced to cloud');
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.warn('[Metrics] Cloud sync failed, using local data:', error);
+          }
+        }
+
+        // Update UI
+        const memberSinceDate = new Date(finalMetrics.memberSince);
+        memberSinceEl.textContent = memberSinceDate.toLocaleDateString();
+        playersTrackedEl.textContent = finalMetrics.players.size.toLocaleString();
+        sessionsCountEl.textContent = finalMetrics.sessionsCount.toLocaleString();
+        totalLookupsEl.textContent = finalMetrics.totalLookups.toLocaleString();
+
+        // Add visual indicator for data source
+        const indicator = isCloudData ? '☁️' : '💾';
+        const title = isCloudData ? 'Data synced from cloud' : 'Local data only';
+        [memberSinceEl, playersTrackedEl, sessionsCountEl, totalLookupsEl].forEach(el => {
+          el.setAttribute('title', title);
+          el.style.opacity = isCloudData ? '1' : '0.8';
+        });
+
+        console.log('[Metrics] Display updated:', {
+          source: isCloudData ? 'cloud' : 'local',
+          ...finalMetrics,
+          players: finalMetrics.players.size
+        });
+
+      } catch (error) {
+        console.error('[Metrics] Failed to update display:', error);
+        // Fallback to local data
+        memberSinceEl.textContent = new Date(accountMetrics.memberSince).toLocaleDateString();
+        playersTrackedEl.textContent = accountMetrics.players.size.toString();
+        sessionsCountEl.textContent = accountMetrics.sessionsCount.toString();
+        totalLookupsEl.textContent = accountMetrics.totalLookups.toString();
+      }
+    }
+
+    // Auto-update account stats when switching to profile panel
+    function scheduleAccountStatsUpdate() {
+      const activePanel = document.querySelector('.panel.active');
+      if (activePanel && activePanel.id === 'panel-profile') {
+        updateAccountStats();
       }
     }
 
@@ -4002,7 +5352,7 @@
       const okBtn = document.getElementById('notificationOkBtn');
       
       if (userProfile && authTokens) {
-        // LOGGED IN USER: Direct purchase options (no trial mentioned)
+        // LOGGED IN USER: Direct purchase options 
         messageEl.innerHTML = `
           <div style="text-align:left;padding:12px 0">
             <h3 style="margin:0 0 12px 0;color:var(--accent)">Upgrade to Nebula Plus</h3>
@@ -4195,7 +5545,7 @@
             updatePlusStatus();
           } else {
             // Fallback: Manual check or demo activation
-            showNotification('🔄 Checking payment status... This may take a moment.');
+            showNotification('Checking payment status... This may take a moment.');
             
             // For demo purposes, you could activate demo plus here
             // Or implement a webhook-based verification system

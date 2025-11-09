@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc",
+    "dist": "npm run build && electron-builder",
     "start": "npm run build && electron ./dist/main.js",
     "dev": "ts-node ./src/main.ts"
   },
@@ -15,13 +16,52 @@
     "@types/node-fetch": "^2.6.13",
     "@types/tail": "^2.2.3",
     "electron": "^39.1.0",
+    "electron-builder": "^26.0.12",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
+    "electron-updater": "^6.6.2",
     "firebase": "^12.5.0",
     "node-fetch": "^2.6.7",
     "tail": "^2.2.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JonasLmbt/Nebula.git"
+  },
+  "build": {
+    "appId": "com.jonaslmbt.nebula",
+    "productName": "Nebula",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JonasLmbt",
+        "repo": "Nebula"
+      }
+    ]
   }
 }

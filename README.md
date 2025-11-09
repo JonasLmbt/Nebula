@@ -57,6 +57,38 @@ HYPIXEL_KEY=your-key-here
 - Quick iteration (main process): `npm run dev`
 - Build only: `npm run build`
 
+### Distributables & Updates
+
+Nebula kann als Windows‑Installer gebaut und automatisch aktualisiert werden (electron-builder + electron-updater).
+
+1) Lokalen Installer bauen
+
+```powershell
+npm run dist
+```
+
+Die Artefakte liegen in `release/` (NSIS Installer und Portable EXE). Hinweis: Falls der lokale Build auf Windows wegen fehlender Symlink‑Rechte fehlschlägt, nutze den GitHub Actions Build (siehe unten).
+
+2) Releases via GitHub Actions
+
+- Erstelle ein Git‑Tag im Format `vX.Y.Z` und pushe es:
+
+```powershell
+git tag v1.0.1
+git push --tags
+```
+
+- Die Action `.github/workflows/release.yml` baut auf `windows-latest` und lädt die Artefakte (EXE, `latest.yml`, Blockmaps) zum GitHub Release hoch.
+
+3) Auto‑Update für Nutzer
+
+- Die App prüft im gepackten Modus automatisch auf Updates und lädt diese im Hintergrund.
+- Beim nächsten Neustart ist die neue Version aktiv. Optional kann per IPC `update:install` sofort neu gestartet werden.
+
+Voraussetzungen/Technik:
+- `package.json > build.publish` zeigt auf `github` (Repo: `JonasLmbt/Nebula`).
+- Der Auto‑Updater ist nur aktiv, wenn die App gepackt läuft (`app.isPackaged`).
+
 ## Usage
 
 1. Start the overlay
