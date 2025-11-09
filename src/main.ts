@@ -6,48 +6,278 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import 'dotenv/config';
+import EventEmitter from 'events';
+import { Tail } from 'tail';
 // Lazy-load chat logger with a robust path resolution for packaged builds
 // Some packagers keep main.js inside dist/, others flatten it to the app root. We probe
 // several candidates and only require a file that actually exists, to avoid crashes.
-type ChatLoggerCtor = new () => any;
-function loadChatLogger(): ChatLoggerCtor {
-  const appPath = (() => { try { return app.getAppPath(); } catch { return __dirname; } })();
-  const candidates = [
-    path.join(__dirname, 'chat-logger.js'),
-    path.join(__dirname, 'chat-logger'),
-    path.join(__dirname, 'dist', 'chat-logger.js'),
-    path.join(__dirname, 'dist', 'chat-logger'),
-    path.join(appPath, 'dist', 'chat-logger.js'),
-    path.join(appPath, 'dist', 'chat-logger'),
-    path.join(appPath, 'chat-logger.js'),
-    path.join(appPath, 'chat-logger'),
-  ];
-  const tried: Record<string, string> = {};
-  for (const file of candidates) {
-    try {
-      const exists = fs.existsSync(file);
-      tried[file] = exists ? 'exists' : 'missing';
-      if (!exists) continue;
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require(file);
-      if (mod && mod.MinecraftChatLogger) {
-        console.log('[ChatLogger] Loaded from', file);
-        return mod.MinecraftChatLogger as ChatLoggerCtor;
+// --- Embedded Chat Logger (to avoid runtime module resolution issues in packaged build) ---
+class MinecraftChatLogger extends EventEmitter {
+  private tail?: Tail;
+  private logPath?: string;
+  private clientPaths: Record<string,string> = buildClientPaths();
+  public players = new Set<string>();
+  public partyMembers = new Set<string>();
+  public guildMembers = new Set<string>();
+  public guildSource = new Set<string>();
+  public inLobby = false;
+  public inGuildList = false;
+  private guildListTimeout?: NodeJS.Timeout;
+  public username?: string;
+  public chosenClient?: string;
+  public detectedClient?: string;
+  private awaitingInviteContinuation: boolean = false;
+
+  constructor(opts?: { client?: string; manualPath?: string; username?: string }) {
+    super();
+    this.username = opts?.username;
+    this.chosenClient = opts?.client;
+    if (opts?.manualPath) {
+      this.logPath = fs.existsSync(opts.manualPath) ? opts.manualPath : undefined;
+    } else if (this.chosenClient && this.clientPaths[this.chosenClient]) {
+      this.logPath = this.clientPaths[this.chosenClient];
+    } else {
+      const auto = autoDetectLatest(this.clientPaths);
+      if (auto) {
+        this.detectedClient = auto[0];
+        this.logPath = auto[1];
       }
-    } catch (err) {
-      tried[file] = 'error:' + String(err);
+    }
+    if (!this.logPath) {
+      setImmediate(() => this.emit('error', new Error('No Minecraft log file found')));
+      return;
+    }
+    this.startTail(this.logPath);
+  }
+
+  private refreshClientPaths() {
+    this.clientPaths = buildClientPaths();
+  }
+
+  public setClient(client: string) {
+    this.refreshClientPaths();
+    if (!client || !this.clientPaths[client]) return;
+    this.chosenClient = client;
+    const newPath = this.clientPaths[client];
+    if (newPath !== this.logPath) {
+      this.switchLogPath(newPath);
     }
   }
-  console.error('[ChatLogger] All candidate resolutions failed', { __dirname, appPath, tried });
-  // Provide a stub so the app still launches instead of crashing the main process.
-  const events = require('events');
-  class StubChatLogger extends events.EventEmitter {
-    username = '';
-    autoDetect() { return undefined; }
-    switchLogPath(_p: string) {/* noop */}
-    setClient(_c: string) {/* noop */}
+
+  public autoDetect() {
+    this.refreshClientPaths();
+    const auto = autoDetectLatest(this.clientPaths);
+    if (auto) {
+      this.detectedClient = auto[0];
+      if (!this.chosenClient) this.switchLogPath(auto[1]);
+      return auto;
+    }
+    return undefined;
   }
-  return StubChatLogger;
+
+  private startTail(p: string) {
+    try {
+      this.tail = new Tail(p, { useWatchFile: true, nLines: 1, fsWatchOptions: { interval: 200 } });
+      this.tail.on('line', this.handleLine.bind(this));
+      this.tail.on('error', (err: any) => this.emit('error', err));
+    } catch (e) {
+      setImmediate(() => this.emit('error', e));
+    }
+  }
+
+  public switchLogPath(newPath: string) {
+    if (!newPath || newPath === this.logPath) return;
+    this.stop();
+    this.logPath = newPath;
+    this.players.clear();
+    this.partyMembers.clear();
+    this.inLobby = false;
+    this.startTail(newPath);
+    this.emit('logPathChanged', { path: newPath, client: this.chosenClient || this.detectedClient });
+  }
+
+  private stripColorCodes(s: string) {
+    return s.replace(/(§|�)[0-9a-fk-or]/gi, '').trim();
+  }
+
+  private finishGuildList(): void {
+    this.inGuildList = false;
+    if (this.guildListTimeout) { clearTimeout(this.guildListTimeout); this.guildListTimeout = undefined; }
+    if (this.guildMembers.size > 0) {
+      this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+      this.players.clear();
+      this.guildSource.clear();
+      this.guildMembers.forEach(member => { this.players.add(member); this.guildSource.add(member); });
+      this.emit('playersUpdated', Array.from(this.players));
+    }
+  }
+
+  private handleLine(line: string) {
+    const chatIndex = line.indexOf('[CHAT]');
+    if (chatIndex === -1) {
+      if (this.awaitingInviteContinuation) {
+        const trimmed = this.stripColorCodes(line.trim());
+        if (trimmed) {
+          if (/^You have 60 seconds to accept\.?/i.test(trimmed) || /Click here to join!?/i.test(trimmed)) {
+            this.awaitingInviteContinuation = false;
+          }
+        }
+      }
+      return;
+    }
+    const raw = line.substring(chatIndex + 6).trim();
+    const msg = this.stripColorCodes(raw);
+    if (!msg) return;
+    const cleanName = (name: string) => name.includes('[') ? name.substring(name.indexOf(']') + 1).trim() : name.trim();
+    if (msg.includes('Sending you to') && !msg.includes(':')) { this.players.clear(); this.inLobby = false; this.emit('serverChange'); return; }
+    if ((msg.includes('joined the lobby!') || msg.includes('rewards!')) && !msg.includes(':')) { this.inLobby = true; this.emit('lobbyJoined'); return; }
+    if (msg.indexOf('ONLINE:') !== -1 && msg.indexOf(',') !== -1) {
+      if (this.inLobby) {
+        const toRemove: string[] = []; this.players.forEach(p => { if (!this.guildSource.has(p)) toRemove.push(p); });
+        toRemove.forEach(p => this.players.delete(p));
+      } else { this.players.clear(); }
+      this.inLobby = false;
+      const who = msg.substring(8).split(', ').map(s => cleanName(s)).filter((s): s is string => !!s);
+      who.forEach(p => { if (p) this.players.add(p); });
+      this.emit('playersUpdated', Array.from(this.players));
+      return;
+    }
+    if ((msg.indexOf('has quit') !== -1 || msg.indexOf('disconnected') !== -1) && msg.indexOf(':') === -1) {
+      const [firstToken] = msg.split(' '); const leftPlayer = cleanName(firstToken || '');
+      if (leftPlayer && this.players.has(leftPlayer)) { this.players.delete(leftPlayer); this.emit('playersUpdated', Array.from(this.players)); }
+      return;
+    }
+    if (msg.indexOf('FINAL KILL') !== -1 && msg.indexOf(':') === -1) {
+      const [killToken] = msg.split(' '); const killedPlayer = cleanName(killToken || '');
+      this.emit('finalKill', killedPlayer);
+      if (killedPlayer && this.players.has(killedPlayer)) { this.players.delete(killedPlayer); this.emit('playersUpdated', Array.from(this.players)); }
+      return;
+    }
+    if (this.inLobby && (msg.startsWith('Party Leader:') || msg.startsWith('Party Moderators:') || msg.startsWith('Party Members:'))) {
+      const tmsg = msg.substring(msg.indexOf(':') + 2);
+      const members = tmsg.split(' ').map(s => s.trim()).filter(m => /^[a-zA-Z0-9_]+$/.test(m)).map(s => cleanName(s)).filter((s): s is string => !!s);
+      members.forEach(m => { if (m) this.partyMembers.add(m); });
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+    if (msg.indexOf('has invited you to join their party!') !== -1 && msg.indexOf(':') === -1) {
+      const inviteMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has invited you to join their party!/);
+      if (inviteMatch) { const inviter = cleanName(inviteMatch[1]); if (inviter) { this.emit('partyInvite', inviter); this.awaitingInviteContinuation = true; } return; }
+      const cutIdx = msg.indexOf('has invited'); if (cutIdx > 0) { const inviterRaw = msg.substring(0, cutIdx).trim(); const inviter = cleanName(inviterRaw.includes(']') ? inviterRaw.substring(inviterRaw.lastIndexOf(']') + 1).trim() : inviterRaw); if (inviter) this.emit('partyInvite', inviter); return; }
+    }
+    if (msg.indexOf(' invited ') !== -1 && msg.indexOf(' to the party!') !== -1 && msg.indexOf(':') === -1) {
+      const outgoingMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) invited (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) to the party!/);
+      if (outgoingMatch) { const inviter = cleanName(outgoingMatch[1]); const invitee = cleanName(outgoingMatch[2]); if (this.username && inviter && inviter.toLowerCase() === this.username.toLowerCase()) { this.emit('partyInvite', invitee); } return; }
+    }
+    if (msg.indexOf('party invite') !== -1 && msg.indexOf('has expired') !== -1 && msg.indexOf(':') === -1) {
+      const fromMatch = msg.match(/^The party invite from (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has expired/);
+      if (fromMatch) { const expiredPlayer = cleanName(fromMatch[1]); if (expiredPlayer) this.emit('partyInviteExpired', expiredPlayer); return; }
+      const toMatch = msg.match(/^The party invite to (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has expired/);
+      if (toMatch) { const expiredPlayer = cleanName(toMatch[1]); if (expiredPlayer) this.emit('partyInviteExpired', expiredPlayer); return; }
+    }
+    if (msg.startsWith('You have joined ') && msg.includes("'s party!") && msg.indexOf(':') === -1) {
+      this.partyMembers.clear();
+      const afterJoined = msg.substring('You have joined '.length, msg.indexOf("'s party!"));
+      const leader = cleanName(afterJoined.includes(']') ? afterJoined.substring(afterJoined.lastIndexOf(']') + 1).trim() : afterJoined.trim());
+      if (leader) this.partyMembers.add(leader);
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+    if (msg.startsWith("You'll be partying with:") && msg.indexOf(':') === "You'll be partying with:".length - 1) {
+      const listPart = msg.substring(msg.indexOf(':') + 1).trim();
+      const rawMembers = listPart.split(',').map(s => s.trim()).filter(Boolean);
+      rawMembers.forEach(r => { const m = cleanName(r.includes(']') ? r.substring(r.lastIndexOf(']') + 1).trim() : r); if (m) this.partyMembers.add(m); });
+      this.emit('partyUpdated', Array.from(this.partyMembers));
+      return;
+    }
+    if ((msg.endsWith(' joined the party!') || msg.endsWith(' joined the party.') || msg.includes(' joined the party!')) && msg.indexOf(':') === -1 && !msg.startsWith('You ')) {
+      const beforeJoined = msg.substring(0, msg.indexOf(' joined')).trim();
+      const joinedName = cleanName(beforeJoined.includes(']') ? beforeJoined.substring(beforeJoined.lastIndexOf(']') + 1).trim() : beforeJoined);
+      if (joinedName) { this.partyMembers.add(joinedName); this.emit('partyUpdated', Array.from(this.partyMembers)); }
+      return;
+    }
+    if (this.inLobby && msg.indexOf('to join their party!') !== -1 && msg.indexOf(':') === -1) {
+      const beforeHas = msg.substring(0, msg.indexOf('has')-1); const parts = beforeHas.split(' ');
+      const inviter = parts[0].indexOf('[') !== -1 ? cleanName(parts[1]) : cleanName(parts[0]); this.emit('partyInvite', inviter); return;
+    }
+    if (msg.indexOf('joined the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
+      let pjoin = msg.split(' ')[0]; if (pjoin.indexOf('[') !== -1) pjoin = msg.split(' ')[1];
+      const joined = cleanName(pjoin || ''); if (joined) this.partyMembers.add(joined); this.emit('partyUpdated', Array.from(this.partyMembers)); return;
+    }
+    if (msg.includes('disbanded') && msg.indexOf(':') === -1) { this.partyMembers.clear(); this.emit('partyCleared'); return; }
+    if (msg.indexOf('You left the party') !== -1 && msg.indexOf(':') === -1) { this.partyMembers.clear(); this.emit('partyCleared'); return; }
+    if (msg.indexOf('left the party') !== -1 && msg.indexOf(':') === -1) { let pleft = msg.split(' ')[0]; if (pleft.indexOf('[') !== -1) pleft = msg.split(' ')[1]; const leftPlayer = cleanName(pleft || ''); if (leftPlayer) this.partyMembers.delete(leftPlayer); this.emit('partyUpdated', Array.from(this.partyMembers)); if (leftPlayer && this.players.has(leftPlayer)) { this.players.delete(leftPlayer); this.emit('playersUpdated', Array.from(this.players)); } return; }
+    if (msg.indexOf('The game starts in 1 second!') !== -1 && msg.indexOf(':') === -1) { setTimeout(() => this.emit('gameStart'), 1100); return; }
+    if (msg.indexOf('Guild Name: ') === 0 || msg.trim().match(/^-{2,}\s+\w+\s+-{2,}$/)) {
+      if (!this.inGuildList) { this.inGuildList = true; this.guildMembers.clear(); if (this.guildListTimeout) clearTimeout(this.guildListTimeout); this.guildListTimeout = setTimeout(() => { if (this.inGuildList) this.finishGuildList(); }, 15000); }
+      this.emit('message', { name: '', text: msg }); return;
+    }
+    if (this.inGuildList) {
+      const cleanLine = msg.trim();
+      if (cleanLine === '' || /^-{2,}\s+.+\s+-{2,}$/.test(cleanLine) || /^Guild Name:/i.test(cleanLine)) { this.emit('message', { name: '', text: msg }); return; }
+      if (/^Total Members:/i.test(cleanLine) || /^Online Members:/i.test(cleanLine) || /^Offline Members:/i.test(cleanLine)) { this.emit('message', { name: '', text: msg }); this.finishGuildList(); return; }
+      const working = cleanLine.replace(/[●]/g, '').trim();
+      const multiMatches = Array.from(working.matchAll(/\[[^\]]+\]\s+([A-Za-z0-9_]{3,16})\s*\?*/g));
+      if (multiMatches.length > 0) { multiMatches.forEach(m => { const nm = m[1]; if (nm) this.guildMembers.add(nm); }); this.emit('guildMembersUpdated', Array.from(this.guildMembers)); this.emit('message', { name: '', text: msg }); return; }
+      const singleRank = working.match(/^\[[^\]]+\]\s+([A-Za-z0-9_]{3,16})\s*\?*$/);
+      if (singleRank) { const nm = singleRank[1]; this.guildMembers.add(nm); this.emit('guildMembersUpdated', Array.from(this.guildMembers)); this.emit('message', { name: '', text: msg }); return; }
+      const plainMatch = working.match(/^([A-Za-z0-9_]{3,16})\s*\?*$/);
+      if (plainMatch) { const nm = plainMatch[1]; this.guildMembers.add(nm); this.emit('guildMembersUpdated', Array.from(this.guildMembers)); this.emit('message', { name: '', text: msg }); return; }
+      if (this.inGuildList) { this.emit('message', { name: '', text: msg }); return; }
+    }
+    if (msg.indexOf('Guild > ') === 0 && msg.indexOf(':') === -1) {
+      const clean = msg.substring('Guild > '.length).trim();
+      let m = clean.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) left\.$/);
+      if (m) { const nm = m[1]; if (this.guildMembers.has(nm)) this.guildMembers.delete(nm); this.emit('guildMemberLeft', nm); this.emit('guildMembersUpdated', Array.from(this.guildMembers)); return; }
+      m = clean.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) joined\.$/);
+      if (m) { return; }
+    }
+    if (msg.indexOf('Total Members:') === 0 || msg.indexOf('Online Members:') === 0 || msg.indexOf('Offline Members:') === 0) {
+      this.finishGuildList(); this.emit('message', { name: '', text: msg }); return;
+    }
+    if (msg.includes(':')) {
+      if (this.inGuildList) { this.finishGuildList(); }
+      const idx = msg.indexOf(':'); const prefix = msg.substring(0, idx).trim(); const text = msg.substring(idx + 1).trim(); if (!text) return;
+      let extracted = prefix; if (prefix.includes(']')) extracted = prefix.substring(prefix.lastIndexOf(']') + 1).trim();
+      const playerName = (extracted || '').includes('[') ? extracted.substring(extracted.indexOf(']') + 1).trim() : extracted.trim();
+      if (playerName && /^[A-Za-z0-9_]{3,16}$/.test(playerName)) { this.emit('message', { name: playerName, text }); if (this.username && text.toLowerCase().includes(this.username.toLowerCase())) { this.emit('usernameMention', playerName); } }
+      return;
+    }
+  }
+
+  stop() { try { this.tail?.unwatch(); } catch {/* noop */} }
+}
+
+// Helper functions for client log path detection
+const BASE_CLIENT_PATHS: Record<string, string> = {
+  badlion: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'blclient', 'minecraft', 'latest.log'),
+  vanilla: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
+  pvplounge: path.join(process.env.APPDATA || '', '.pvplounge', 'logs', 'latest.log'),
+  labymod: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'fml-client-latest.log'),
+  feather: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
+};
+function detectLunarPath(): string | undefined {
+  const candidates = [
+    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8', 'logs', 'latest.log'),
+    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8.9', 'logs', 'latest.log'),
+    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', 'multiver', 'logs', 'latest.log'),
+  ];
+  let newest: { p?: string; m: number } = { p: undefined, m: 0 };
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) { const s = fs.statSync(p); const m = s.mtimeMs || s.mtime.getTime(); if (m > newest.m) newest = { p, m }; } } catch {}
+  }
+  return newest.p;
+}
+function buildClientPaths(): Record<string, string> {
+  const lunar = detectLunarPath();
+  return { ...BASE_CLIENT_PATHS, ...(lunar ? { lunar } : {}) };
+}
+function autoDetectLatest(pathsMap: Record<string,string>): [string, string] | undefined {
+  let best: { client?: string; path?: string; m: number } = { m: 0 };
+  for (const [client, p] of Object.entries(pathsMap)) {
+    try { if (fs.existsSync(p)) { const s = fs.statSync(p); const m = s.mtimeMs || s.mtime.getTime(); if (m > best.m) best = { client, path: p, m }; } } catch {}
+  }
+  return best.client && best.path ? [best.client, best.path] : undefined;
 }
 
 let nicksWin: BrowserWindow | null = null;
@@ -145,8 +375,7 @@ app.whenReady().then(() => {
 
   // Start chat logger to detect local Minecraft chat and forward player lists to renderer
   try {
-    const ChatLogger = loadChatLogger();
-    let chat = new ChatLogger();
+    let chat = new MinecraftChatLogger();
     chat.on('playersUpdated', (players: string[]) => {
       if (win) win.webContents.send('chat:players', players);
     });
