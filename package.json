@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Nebula — a lightweight Bedwars stats overlay.",
   "main": "dist/main.js",
   "author": "Jonas Lambrecht",
@@ -49,8 +49,7 @@
       "target": [
         "nsis",
         "portable"
-      ],
-      "console": true
+      ]
     },
     "nsis": {
       "oneClick": true,
