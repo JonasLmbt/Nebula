@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import fetch from 'node-fetch';
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
 import EventEmitter from 'events';
 import { Tail } from 'tail';
 // Diagnostic: log version and environment early (helps packaged startup investigation)
@@ -43,6 +43,70 @@ try {
 } catch (e) {
   console.warn('[Nebula:init] failed to read package.json for diagnostics', e);
 }
+
+// Load environment configuration for both dev and packaged builds.
+// We look for .env in several plausible locations and merge without overriding existing vars.
+// Additionally, we try a JSON config (nebula.config.json) to allow easy editing after install.
+(function loadEnvironment() {
+  const loadedFrom: string[] = [];
+  const tryEnv = (p: string) => {
+    try {
+      if (fs.existsSync(p)) {
+        dotenv.config({ path: p, override: false });
+        loadedFrom.push(p);
+      }
+    } catch {}
+  };
+  const tryJson = (p: string) => {
+    try {
+      if (fs.existsSync(p)) {
+        const raw = fs.readFileSync(p, 'utf8');
+        const cfg = JSON.parse(raw);
+        for (const [k, v] of Object.entries(cfg || {})) {
+          if (process.env[k] == null || process.env[k] === '') {
+            if (typeof v === 'string') process.env[k] = v;
+          }
+        }
+        loadedFrom.push(p);
+      }
+    } catch {}
+  };
+
+  // Candidate paths (order: cwd → exe dir → resources → userData → project root fallback)
+  try {
+    tryEnv(path.join(process.cwd(), '.env'));
+  } catch {}
+  try {
+    const exeDir = path.dirname(app.getPath('exe'));
+    tryEnv(path.join(exeDir, '.env'));
+    tryJson(path.join(exeDir, 'nebula.config.json'));
+  } catch {}
+  try {
+    // When packaged, resourcesPath points to app.asar.unpacked or resources folder
+    // (asar disabled in current config, but keep for completeness)
+    tryEnv(path.join(process.resourcesPath || '', '.env'));
+    tryJson(path.join(process.resourcesPath || '', 'nebula.config.json'));
+  } catch {}
+  try {
+    const ud = app.getPath('userData');
+    tryEnv(path.join(ud, '.env'));
+    tryJson(path.join(ud, 'nebula.config.json'));
+  } catch {}
+  try {
+    // Project root when running un-packaged via ts-node or dist/main.js
+    tryEnv(path.join(__dirname, '..', '.env'));
+  } catch {}
+
+  if (loadedFrom.length) {
+    try {
+      const logDir = app.getPath('userData');
+      fs.appendFileSync(path.join(logDir, 'startup.log'), `[${new Date().toISOString()}] env-loaded ${JSON.stringify(loadedFrom)}\n`);
+    } catch {}
+    console.log('[Nebula:env] Loaded from:', loadedFrom.join(' | '));
+  } else {
+    console.log('[Nebula:env] No external env/config files found; relying on process.env only');
+  }
+})();
 // Lazy-load chat logger with a robust path resolution for packaged builds
 // Some packagers keep main.js inside dist/, others flatten it to the app root. We probe
 // several candidates and only require a file that actually exists, to avoid crashes.
@@ -993,7 +1057,8 @@ function generatePKCE() {
 // Open Discord OAuth2 URL in browser
 ipcMain.handle('auth:discord:login', async () => {
   if (!DISCORD_CLIENT_ID) {
-    return { error: 'Discord Client ID not configured. Please add DISCORD_CLIENT_ID to .env file.' };
+    const hint = 'Add DISCORD_CLIENT_ID to %APPDATA%/Nebula/.env or nebula.config.json (user data), or place a .env next to the executable. Restart the app afterwards.';
+    return { error: `Discord Client ID not configured. ${hint}` };
   }
 
   // Generate PKCE parameters for this auth session
@@ -1016,7 +1081,8 @@ ipcMain.handle('auth:discord:login', async () => {
 // Exchange Discord auth code for tokens (called by renderer after redirect)
 ipcMain.handle('auth:discord:exchange', async (_e, code: string) => {
   if (!DISCORD_CLIENT_ID) {
-    return { error: 'Discord Client ID not configured in .env' };
+    const hint = 'Add DISCORD_CLIENT_ID to %APPDATA%/Nebula/.env or nebula.config.json (user data), or place a .env next to the executable. Restart the app afterwards.';
+    return { error: `Discord Client ID not configured. ${hint}` };
   }
 
   if (!currentCodeVerifier) {

@@ -5366,7 +5366,7 @@
               <button id="yearlyPlanBtn" style="background:linear-gradient(135deg,#20B2AA,#17A2B8);color:white;border:2px solid #20B2AA;padding:16px 24px;border-radius:12px;cursor:pointer;font-weight:500;font-size:14px;transition:all 0.2s ease;min-width:140px;position:relative;box-shadow:0 4px 12px rgba(32,178,170,0.3)">
                 <div style="position:absolute;top:-8px;right:-8px;background:#FF6B35;color:white;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">-16%</div>
                 � Yearly<br>
-                <span style="font-size:18px;font-weight:700">€20</span><br>
+                <span style="font-size:18px;font-weight:700">€19.99</span><br>
                 <small style="opacity:0.9">save €4/year</small>
               </button>
             </div>
@@ -5426,7 +5426,7 @@
         };
       }
 
-      // Handle yearly plan (€20/year - save 16%!)
+      // Handle yearly plan (€19.99/year - save 16%!)
       const yearlyPlanBtn = document.getElementById('yearlyPlanBtn');
       if (yearlyPlanBtn) {
         yearlyPlanBtn.onclick = async () => {
@@ -5440,7 +5440,7 @@
               return;
             }
             
-            showNotification('💎 Opening yearly payment (€20/year - save 16%)...');
+            showNotification('💎 Opening yearly payment (€19.99/year - save 16%)...');
             
             // After a delay, show payment verification dialog
             setTimeout(() => {
