@@ -8,6 +8,16 @@ import fetch from 'node-fetch';
 import 'dotenv/config';
 import EventEmitter from 'events';
 import { Tail } from 'tail';
+// Diagnostic: log version and environment early (helps packaged startup investigation)
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const pkg = require('../package.json');
+  const version = pkg?.version;
+  const chatLoggerExists = fs.existsSync(path.join(__dirname, 'chat-logger.js'));
+  console.log('[Nebula:init]', { version, __dirname, chatLoggerExists });
+} catch (e) {
+  console.warn('[Nebula:init] failed to read package.json for diagnostics', e);
+}
 // Lazy-load chat logger with a robust path resolution for packaged builds
 // Some packagers keep main.js inside dist/, others flatten it to the app root. We probe
 // several candidates and only require a file that actually exists, to avoid crashes.
