@@ -3,7 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
-import crypto from 'crypto';
 
 dotenv.config();
 
@@ -16,6 +15,62 @@ const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 if (!HYPIXEL_KEY) {
   console.warn('[Backend] HYPIXEL_KEY missing – /api/player will return error until set.');
 }
+
+interface KeyStatus {
+  valid: boolean;
+  error?: string;
+  owner?: string;
+  ratelimit?: number;
+  remaining?: number;
+}
+
+let keyStatus: KeyStatus = { valid: false, error: HYPIXEL_KEY ? 'Not yet verified' : 'Missing HYPIXEL_KEY' };
+
+// New key verification using punishmentStats (the /key endpoint is deprecated)
+async function verifyHypixelKey(): Promise<KeyStatus> {
+  if (!HYPIXEL_KEY) {
+    keyStatus = { valid: false, error: 'Missing HYPIXEL_KEY' };
+    return keyStatus;
+  }
+  try {
+    const res = await fetch('https://api.hypixel.net/punishmentStats', {
+      headers: { 'API-Key': HYPIXEL_KEY },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.status === 403) {
+      keyStatus = { valid: false, error: '403 Forbidden: Key invalid OR server IP not whitelisted' };
+      return keyStatus;
+    }
+    if (res.status === 429) {
+      keyStatus = { valid: false, error: '429 Rate limited while verifying key' };
+      return keyStatus;
+    }
+    if (!res.ok) {
+      keyStatus = { valid: false, error: `HTTP ${res.status}` };
+      return keyStatus;
+    }
+    const data: any = await res.json();
+    if (data.success !== true) {
+      keyStatus = { valid: false, error: data.cause || 'Unexpected response (success != true)' };
+      return keyStatus;
+    }
+    // punishmentStats does not expose owner/limits; mark key simply as valid
+    keyStatus = { valid: true };
+    return keyStatus;
+  } catch (err: any) {
+    if (err.name === 'TimeoutError') {
+      keyStatus = { valid: false, error: 'Timeout verifying key' };
+    } else {
+      keyStatus = { valid: false, error: err.message || 'Network error verifying key' };
+    }
+    return keyStatus;
+  }
+}
+
+// Initial async verification (non-blocking)
+verifyHypixelKey().then(s => {
+  console.log('[Backend] Key verification:', s);
+}).catch(e => console.warn('[Backend] Key verify failed:', e));
 
 // Configurable TTL (default 5m)
 const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000);
@@ -55,6 +110,9 @@ async function getUUID(name: string): Promise<string | null> {
 async function fetchHypixelPlayer(uuid: string) {
   const url = `https://api.hypixel.net/player?uuid=${uuid}`;
   const res = await fetch(url, { headers: { 'API-Key': HYPIXEL_KEY }, signal: AbortSignal.timeout(8000) });
+  if (res.status === 403) {
+    throw new Error('Hypixel player API error 403 (invalid key or IP not whitelisted)');
+  }
   if (!res.ok) throw new Error('Hypixel player API error ' + res.status);
   const json: any = await res.json();
   if (!json.success) throw new Error('Hypixel response not successful');
@@ -148,10 +206,19 @@ app.get('/api/player/:name', async (req: Request, res: Response) => {
     const guild = await fetchHypixelGuild(uuid);
     const stats = processBedwarsStats(player, rawName, guild);
     playerCache.set(key, { data: stats, timestamp: Date.now() });
-    res.json(stats);
+    return res.json(stats);
   } catch (err: any) {
     console.error('[Backend] Failed to fetch stats for', rawName, err);
-    res.status(500).json({ error: 'Failed to fetch player stats', detail: err.message || String(err) });
+    // Refined error classification
+    const message = err.message || String(err);
+    if (/403/.test(message)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        detail: message,
+        hint: 'Prüfe: (1) Server-IP in Hypixel Whitelist? (2) API-Key noch gültig? Im Spiel /api new ausführen und Backend neu starten.'
+      });
+    }
+    return res.status(500).json({ error: 'Failed to fetch player stats', detail: message });
   }
 });
 
@@ -159,6 +226,29 @@ app.get('/api/player/:name', async (req: Request, res: Response) => {
 app.post('/api/plus/verify', (_req: Request, res: Response) => {
   // Implement: verify Stripe session server-side, update Firestore, return { success, expiresAt }
   res.status(501).json({ error: 'Not implemented' });
+});
+
+// Debug endpoint for runtime inspection
+app.get('/debug', (_req: Request, res: Response) => {
+  res.json({
+    key: {
+      present: !!HYPIXEL_KEY,
+      status: keyStatus,
+    },
+    cache: {
+      players: playerCache.size,
+      uuid: uuidCache.size,
+      ttlMs: CACHE_TTL_MS
+    },
+    rateLimit: {
+      windowMs: RATE_LIMIT_WINDOW,
+      maxPerIpPerWindow: RATE_LIMIT_MAX
+    },
+    environment: {
+      node: process.version,
+      port: process.env.PORT || 3001
+    }
+  });
 });
 
 // Basic security headers (helmet already sets many)
