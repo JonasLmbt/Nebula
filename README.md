@@ -129,3 +129,7 @@ Default paths checked (in order of recency):
 - 150ms delay between requests
 - 10-minute cache for player stats
 - Automatic UUID caching
+
+## License
+
+This project is licensed under the MIT License – see the `LICENSE` file for details.
