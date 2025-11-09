@@ -7,24 +7,40 @@ import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 // Lazy-load chat logger with a robust path resolution for packaged builds
-// In some packager setups, main.js may be flattened to app root while helpers remain under dist/.
-// We resolve both possibilities at runtime to avoid "Cannot find module './chat-logger'" in production.
+// Some packagers keep main.js inside dist/, others flatten it to the app root. We probe
+// several candidates and only require a file that actually exists, to avoid crashes.
 type ChatLoggerCtor = new () => any;
 function loadChatLogger(): ChatLoggerCtor {
+  const candidates = [
+    // 1) Typical dev/tsc or packaged with preserved structure
+    path.join(__dirname, 'chat-logger'),
+    // 2) If main.js was flattened to app root and helpers remained in dist/
+    path.join(__dirname, 'dist', 'chat-logger'),
+    // 3) Defensive: resolve relative to compiled output’s parent (…/app.asar or …/dist)
+    path.join(__dirname, '..', 'dist', 'chat-logger'),
+  ];
+
+  for (const base of candidates) {
+    try {
+      // Check with and without explicit .js to handle asar virtual paths
+      const withJs = base.endsWith('.js') ? base : `${base}.js`;
+      if (fs.existsSync(withJs) || fs.existsSync(base)) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        return require(base).MinecraftChatLogger as ChatLoggerCtor;
+      }
+    } catch {/* try next */}
+  }
+  // Final attempt (may provide a clearer error message in some environments)
   try {
-    // Most common (dev/tsc): dist/main.js sits next to dist/chat-logger.js
-    // or packaged keeping relative structure
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('./chat-logger').MinecraftChatLogger as ChatLoggerCtor;
-  } catch (e1) {
-    try {
-      // Some packagers flatten main.js to app root but leave helpers in dist/
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      return require(path.join(__dirname, 'dist', 'chat-logger')).MinecraftChatLogger as ChatLoggerCtor;
-    } catch (e2) {
-      console.error('[Init] Failed to resolve chat-logger module', { __dirname, e1: String(e1), e2: String(e2) });
-      throw e2;
-    }
+  } catch (err) {
+    console.error('[Init] Failed to resolve chat-logger module', {
+      __dirname,
+      candidates,
+      err: String(err),
+    });
+    throw err;
   }
 }
 
