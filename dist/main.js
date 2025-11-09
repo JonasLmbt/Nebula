@@ -44,7 +44,482 @@ const fs = __importStar(require("fs"));
 const crypto = __importStar(require("crypto"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 require("dotenv/config");
-const chat_logger_1 = require("./chat-logger");
+const events_1 = __importDefault(require("events"));
+const tail_1 = require("tail");
+// Diagnostic: log version and environment early (helps packaged startup investigation)
+try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = require('../package.json');
+    const version = pkg?.version;
+    const chatLoggerPath = path.join(__dirname, 'chat-logger.js');
+    const chatLoggerExists = fs.existsSync(chatLoggerPath);
+    console.log('[Nebula:init]', { version, __dirname, chatLoggerExists });
+    // also mirror to a log file for users without console
+    try {
+        const logDir = electron_1.app.getPath('userData');
+        fs.appendFileSync(path.join(logDir, 'startup.log'), `[${new Date().toISOString()}] init ${JSON.stringify({ version, __dirname, chatLoggerExists })}\n`);
+    }
+    catch { }
+    // If some stale code still attempts to require('./chat-logger'), guarantee a stub file exists
+    if (!chatLoggerExists) {
+        try {
+            const stub = [
+                "const { EventEmitter } = require('events');",
+                "class MinecraftChatLogger extends EventEmitter {",
+                "  constructor(){ super(); this.username=''; }",
+                "  autoDetect(){ return undefined; }",
+                "  switchLogPath(_p){}",
+                "  setClient(_c){}",
+                "}",
+                "module.exports = { MinecraftChatLogger };\n",
+            ].join('\n');
+            fs.writeFileSync(chatLoggerPath, stub, 'utf8');
+            console.log('[Nebula:init] Wrote chat-logger stub at runtime');
+        }
+        catch (e) {
+            console.warn('[Nebula:init] Failed to write chat-logger stub', e);
+        }
+    }
+}
+catch (e) {
+    console.warn('[Nebula:init] failed to read package.json for diagnostics', e);
+}
+// Lazy-load chat logger with a robust path resolution for packaged builds
+// Some packagers keep main.js inside dist/, others flatten it to the app root. We probe
+// several candidates and only require a file that actually exists, to avoid crashes.
+// --- Embedded Chat Logger (to avoid runtime module resolution issues in packaged build) ---
+class MinecraftChatLogger extends events_1.default {
+    constructor(opts) {
+        super();
+        this.clientPaths = buildClientPaths();
+        this.players = new Set();
+        this.partyMembers = new Set();
+        this.guildMembers = new Set();
+        this.guildSource = new Set();
+        this.inLobby = false;
+        this.inGuildList = false;
+        this.awaitingInviteContinuation = false;
+        this.username = opts?.username;
+        this.chosenClient = opts?.client;
+        if (opts?.manualPath) {
+            this.logPath = fs.existsSync(opts.manualPath) ? opts.manualPath : undefined;
+        }
+        else if (this.chosenClient && this.clientPaths[this.chosenClient]) {
+            this.logPath = this.clientPaths[this.chosenClient];
+        }
+        else {
+            const auto = autoDetectLatest(this.clientPaths);
+            if (auto) {
+                this.detectedClient = auto[0];
+                this.logPath = auto[1];
+            }
+        }
+        if (!this.logPath) {
+            setImmediate(() => this.emit('error', new Error('No Minecraft log file found')));
+            return;
+        }
+        this.startTail(this.logPath);
+    }
+    refreshClientPaths() {
+        this.clientPaths = buildClientPaths();
+    }
+    setClient(client) {
+        this.refreshClientPaths();
+        if (!client || !this.clientPaths[client])
+            return;
+        this.chosenClient = client;
+        const newPath = this.clientPaths[client];
+        if (newPath !== this.logPath) {
+            this.switchLogPath(newPath);
+        }
+    }
+    autoDetect() {
+        this.refreshClientPaths();
+        const auto = autoDetectLatest(this.clientPaths);
+        if (auto) {
+            this.detectedClient = auto[0];
+            if (!this.chosenClient)
+                this.switchLogPath(auto[1]);
+            return auto;
+        }
+        return undefined;
+    }
+    startTail(p) {
+        try {
+            this.tail = new tail_1.Tail(p, { useWatchFile: true, nLines: 1, fsWatchOptions: { interval: 200 } });
+            this.tail.on('line', this.handleLine.bind(this));
+            this.tail.on('error', (err) => this.emit('error', err));
+        }
+        catch (e) {
+            setImmediate(() => this.emit('error', e));
+        }
+    }
+    switchLogPath(newPath) {
+        if (!newPath || newPath === this.logPath)
+            return;
+        this.stop();
+        this.logPath = newPath;
+        this.players.clear();
+        this.partyMembers.clear();
+        this.inLobby = false;
+        this.startTail(newPath);
+        this.emit('logPathChanged', { path: newPath, client: this.chosenClient || this.detectedClient });
+    }
+    stripColorCodes(s) {
+        return s.replace(/(§|�)[0-9a-fk-or]/gi, '').trim();
+    }
+    finishGuildList() {
+        this.inGuildList = false;
+        if (this.guildListTimeout) {
+            clearTimeout(this.guildListTimeout);
+            this.guildListTimeout = undefined;
+        }
+        if (this.guildMembers.size > 0) {
+            this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+            this.players.clear();
+            this.guildSource.clear();
+            this.guildMembers.forEach(member => { this.players.add(member); this.guildSource.add(member); });
+            this.emit('playersUpdated', Array.from(this.players));
+        }
+    }
+    handleLine(line) {
+        const chatIndex = line.indexOf('[CHAT]');
+        if (chatIndex === -1) {
+            if (this.awaitingInviteContinuation) {
+                const trimmed = this.stripColorCodes(line.trim());
+                if (trimmed) {
+                    if (/^You have 60 seconds to accept\.?/i.test(trimmed) || /Click here to join!?/i.test(trimmed)) {
+                        this.awaitingInviteContinuation = false;
+                    }
+                }
+            }
+            return;
+        }
+        const raw = line.substring(chatIndex + 6).trim();
+        const msg = this.stripColorCodes(raw);
+        if (!msg)
+            return;
+        const cleanName = (name) => name.includes('[') ? name.substring(name.indexOf(']') + 1).trim() : name.trim();
+        if (msg.includes('Sending you to') && !msg.includes(':')) {
+            this.players.clear();
+            this.inLobby = false;
+            this.emit('serverChange');
+            return;
+        }
+        if ((msg.includes('joined the lobby!') || msg.includes('rewards!')) && !msg.includes(':')) {
+            this.inLobby = true;
+            this.emit('lobbyJoined');
+            return;
+        }
+        if (msg.indexOf('ONLINE:') !== -1 && msg.indexOf(',') !== -1) {
+            if (this.inLobby) {
+                const toRemove = [];
+                this.players.forEach(p => { if (!this.guildSource.has(p))
+                    toRemove.push(p); });
+                toRemove.forEach(p => this.players.delete(p));
+            }
+            else {
+                this.players.clear();
+            }
+            this.inLobby = false;
+            const who = msg.substring(8).split(', ').map(s => cleanName(s)).filter((s) => !!s);
+            who.forEach(p => { if (p)
+                this.players.add(p); });
+            this.emit('playersUpdated', Array.from(this.players));
+            return;
+        }
+        if ((msg.indexOf('has quit') !== -1 || msg.indexOf('disconnected') !== -1) && msg.indexOf(':') === -1) {
+            const [firstToken] = msg.split(' ');
+            const leftPlayer = cleanName(firstToken || '');
+            if (leftPlayer && this.players.has(leftPlayer)) {
+                this.players.delete(leftPlayer);
+                this.emit('playersUpdated', Array.from(this.players));
+            }
+            return;
+        }
+        if (msg.indexOf('FINAL KILL') !== -1 && msg.indexOf(':') === -1) {
+            const [killToken] = msg.split(' ');
+            const killedPlayer = cleanName(killToken || '');
+            this.emit('finalKill', killedPlayer);
+            if (killedPlayer && this.players.has(killedPlayer)) {
+                this.players.delete(killedPlayer);
+                this.emit('playersUpdated', Array.from(this.players));
+            }
+            return;
+        }
+        if (this.inLobby && (msg.startsWith('Party Leader:') || msg.startsWith('Party Moderators:') || msg.startsWith('Party Members:'))) {
+            const tmsg = msg.substring(msg.indexOf(':') + 2);
+            const members = tmsg.split(' ').map(s => s.trim()).filter(m => /^[a-zA-Z0-9_]+$/.test(m)).map(s => cleanName(s)).filter((s) => !!s);
+            members.forEach(m => { if (m)
+                this.partyMembers.add(m); });
+            this.emit('partyUpdated', Array.from(this.partyMembers));
+            return;
+        }
+        if (msg.indexOf('has invited you to join their party!') !== -1 && msg.indexOf(':') === -1) {
+            const inviteMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has invited you to join their party!/);
+            if (inviteMatch) {
+                const inviter = cleanName(inviteMatch[1]);
+                if (inviter) {
+                    this.emit('partyInvite', inviter);
+                    this.awaitingInviteContinuation = true;
+                }
+                return;
+            }
+            const cutIdx = msg.indexOf('has invited');
+            if (cutIdx > 0) {
+                const inviterRaw = msg.substring(0, cutIdx).trim();
+                const inviter = cleanName(inviterRaw.includes(']') ? inviterRaw.substring(inviterRaw.lastIndexOf(']') + 1).trim() : inviterRaw);
+                if (inviter)
+                    this.emit('partyInvite', inviter);
+                return;
+            }
+        }
+        if (msg.indexOf(' invited ') !== -1 && msg.indexOf(' to the party!') !== -1 && msg.indexOf(':') === -1) {
+            const outgoingMatch = msg.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) invited (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) to the party!/);
+            if (outgoingMatch) {
+                const inviter = cleanName(outgoingMatch[1]);
+                const invitee = cleanName(outgoingMatch[2]);
+                if (this.username && inviter && inviter.toLowerCase() === this.username.toLowerCase()) {
+                    this.emit('partyInvite', invitee);
+                }
+                return;
+            }
+        }
+        if (msg.indexOf('party invite') !== -1 && msg.indexOf('has expired') !== -1 && msg.indexOf(':') === -1) {
+            const fromMatch = msg.match(/^The party invite from (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has expired/);
+            if (fromMatch) {
+                const expiredPlayer = cleanName(fromMatch[1]);
+                if (expiredPlayer)
+                    this.emit('partyInviteExpired', expiredPlayer);
+                return;
+            }
+            const toMatch = msg.match(/^The party invite to (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has expired/);
+            if (toMatch) {
+                const expiredPlayer = cleanName(toMatch[1]);
+                if (expiredPlayer)
+                    this.emit('partyInviteExpired', expiredPlayer);
+                return;
+            }
+        }
+        if (msg.startsWith('You have joined ') && msg.includes("'s party!") && msg.indexOf(':') === -1) {
+            this.partyMembers.clear();
+            const afterJoined = msg.substring('You have joined '.length, msg.indexOf("'s party!"));
+            const leader = cleanName(afterJoined.includes(']') ? afterJoined.substring(afterJoined.lastIndexOf(']') + 1).trim() : afterJoined.trim());
+            if (leader)
+                this.partyMembers.add(leader);
+            this.emit('partyUpdated', Array.from(this.partyMembers));
+            return;
+        }
+        if (msg.startsWith("You'll be partying with:") && msg.indexOf(':') === "You'll be partying with:".length - 1) {
+            const listPart = msg.substring(msg.indexOf(':') + 1).trim();
+            const rawMembers = listPart.split(',').map(s => s.trim()).filter(Boolean);
+            rawMembers.forEach(r => { const m = cleanName(r.includes(']') ? r.substring(r.lastIndexOf(']') + 1).trim() : r); if (m)
+                this.partyMembers.add(m); });
+            this.emit('partyUpdated', Array.from(this.partyMembers));
+            return;
+        }
+        if ((msg.endsWith(' joined the party!') || msg.endsWith(' joined the party.') || msg.includes(' joined the party!')) && msg.indexOf(':') === -1 && !msg.startsWith('You ')) {
+            const beforeJoined = msg.substring(0, msg.indexOf(' joined')).trim();
+            const joinedName = cleanName(beforeJoined.includes(']') ? beforeJoined.substring(beforeJoined.lastIndexOf(']') + 1).trim() : beforeJoined);
+            if (joinedName) {
+                this.partyMembers.add(joinedName);
+                this.emit('partyUpdated', Array.from(this.partyMembers));
+            }
+            return;
+        }
+        if (this.inLobby && msg.indexOf('to join their party!') !== -1 && msg.indexOf(':') === -1) {
+            const beforeHas = msg.substring(0, msg.indexOf('has') - 1);
+            const parts = beforeHas.split(' ');
+            const inviter = parts[0].indexOf('[') !== -1 ? cleanName(parts[1]) : cleanName(parts[0]);
+            this.emit('partyInvite', inviter);
+            return;
+        }
+        if (msg.indexOf('joined the party') !== -1 && msg.indexOf(':') === -1 && this.inLobby) {
+            let pjoin = msg.split(' ')[0];
+            if (pjoin.indexOf('[') !== -1)
+                pjoin = msg.split(' ')[1];
+            const joined = cleanName(pjoin || '');
+            if (joined)
+                this.partyMembers.add(joined);
+            this.emit('partyUpdated', Array.from(this.partyMembers));
+            return;
+        }
+        if (msg.includes('disbanded') && msg.indexOf(':') === -1) {
+            this.partyMembers.clear();
+            this.emit('partyCleared');
+            return;
+        }
+        if (msg.indexOf('You left the party') !== -1 && msg.indexOf(':') === -1) {
+            this.partyMembers.clear();
+            this.emit('partyCleared');
+            return;
+        }
+        if (msg.indexOf('left the party') !== -1 && msg.indexOf(':') === -1) {
+            let pleft = msg.split(' ')[0];
+            if (pleft.indexOf('[') !== -1)
+                pleft = msg.split(' ')[1];
+            const leftPlayer = cleanName(pleft || '');
+            if (leftPlayer)
+                this.partyMembers.delete(leftPlayer);
+            this.emit('partyUpdated', Array.from(this.partyMembers));
+            if (leftPlayer && this.players.has(leftPlayer)) {
+                this.players.delete(leftPlayer);
+                this.emit('playersUpdated', Array.from(this.players));
+            }
+            return;
+        }
+        if (msg.indexOf('The game starts in 1 second!') !== -1 && msg.indexOf(':') === -1) {
+            setTimeout(() => this.emit('gameStart'), 1100);
+            return;
+        }
+        if (msg.indexOf('Guild Name: ') === 0 || msg.trim().match(/^-{2,}\s+\w+\s+-{2,}$/)) {
+            if (!this.inGuildList) {
+                this.inGuildList = true;
+                this.guildMembers.clear();
+                if (this.guildListTimeout)
+                    clearTimeout(this.guildListTimeout);
+                this.guildListTimeout = setTimeout(() => { if (this.inGuildList)
+                    this.finishGuildList(); }, 15000);
+            }
+            this.emit('message', { name: '', text: msg });
+            return;
+        }
+        if (this.inGuildList) {
+            const cleanLine = msg.trim();
+            if (cleanLine === '' || /^-{2,}\s+.+\s+-{2,}$/.test(cleanLine) || /^Guild Name:/i.test(cleanLine)) {
+                this.emit('message', { name: '', text: msg });
+                return;
+            }
+            if (/^Total Members:/i.test(cleanLine) || /^Online Members:/i.test(cleanLine) || /^Offline Members:/i.test(cleanLine)) {
+                this.emit('message', { name: '', text: msg });
+                this.finishGuildList();
+                return;
+            }
+            const working = cleanLine.replace(/[●]/g, '').trim();
+            const multiMatches = Array.from(working.matchAll(/\[[^\]]+\]\s+([A-Za-z0-9_]{3,16})\s*\?*/g));
+            if (multiMatches.length > 0) {
+                multiMatches.forEach(m => { const nm = m[1]; if (nm)
+                    this.guildMembers.add(nm); });
+                this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+                this.emit('message', { name: '', text: msg });
+                return;
+            }
+            const singleRank = working.match(/^\[[^\]]+\]\s+([A-Za-z0-9_]{3,16})\s*\?*$/);
+            if (singleRank) {
+                const nm = singleRank[1];
+                this.guildMembers.add(nm);
+                this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+                this.emit('message', { name: '', text: msg });
+                return;
+            }
+            const plainMatch = working.match(/^([A-Za-z0-9_]{3,16})\s*\?*$/);
+            if (plainMatch) {
+                const nm = plainMatch[1];
+                this.guildMembers.add(nm);
+                this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+                this.emit('message', { name: '', text: msg });
+                return;
+            }
+            if (this.inGuildList) {
+                this.emit('message', { name: '', text: msg });
+                return;
+            }
+        }
+        if (msg.indexOf('Guild > ') === 0 && msg.indexOf(':') === -1) {
+            const clean = msg.substring('Guild > '.length).trim();
+            let m = clean.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) left\.$/);
+            if (m) {
+                const nm = m[1];
+                if (this.guildMembers.has(nm))
+                    this.guildMembers.delete(nm);
+                this.emit('guildMemberLeft', nm);
+                this.emit('guildMembersUpdated', Array.from(this.guildMembers));
+                return;
+            }
+            m = clean.match(/^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) joined\.$/);
+            if (m) {
+                return;
+            }
+        }
+        if (msg.indexOf('Total Members:') === 0 || msg.indexOf('Online Members:') === 0 || msg.indexOf('Offline Members:') === 0) {
+            this.finishGuildList();
+            this.emit('message', { name: '', text: msg });
+            return;
+        }
+        if (msg.includes(':')) {
+            if (this.inGuildList) {
+                this.finishGuildList();
+            }
+            const idx = msg.indexOf(':');
+            const prefix = msg.substring(0, idx).trim();
+            const text = msg.substring(idx + 1).trim();
+            if (!text)
+                return;
+            let extracted = prefix;
+            if (prefix.includes(']'))
+                extracted = prefix.substring(prefix.lastIndexOf(']') + 1).trim();
+            const playerName = (extracted || '').includes('[') ? extracted.substring(extracted.indexOf(']') + 1).trim() : extracted.trim();
+            if (playerName && /^[A-Za-z0-9_]{3,16}$/.test(playerName)) {
+                this.emit('message', { name: playerName, text });
+                if (this.username && text.toLowerCase().includes(this.username.toLowerCase())) {
+                    this.emit('usernameMention', playerName);
+                }
+            }
+            return;
+        }
+    }
+    stop() { try {
+        this.tail?.unwatch();
+    }
+    catch { /* noop */ } }
+}
+// Helper functions for client log path detection
+const BASE_CLIENT_PATHS = {
+    badlion: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'blclient', 'minecraft', 'latest.log'),
+    vanilla: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
+    pvplounge: path.join(process.env.APPDATA || '', '.pvplounge', 'logs', 'latest.log'),
+    labymod: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'fml-client-latest.log'),
+    feather: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
+};
+function detectLunarPath() {
+    const candidates = [
+        path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8', 'logs', 'latest.log'),
+        path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8.9', 'logs', 'latest.log'),
+        path.join(process.env.APPDATA || '', '.lunarclient', 'offline', 'multiver', 'logs', 'latest.log'),
+    ];
+    let newest = { p: undefined, m: 0 };
+    for (const p of candidates) {
+        try {
+            if (fs.existsSync(p)) {
+                const s = fs.statSync(p);
+                const m = s.mtimeMs || s.mtime.getTime();
+                if (m > newest.m)
+                    newest = { p, m };
+            }
+        }
+        catch { }
+    }
+    return newest.p;
+}
+function buildClientPaths() {
+    const lunar = detectLunarPath();
+    return { ...BASE_CLIENT_PATHS, ...(lunar ? { lunar } : {}) };
+}
+function autoDetectLatest(pathsMap) {
+    let best = { m: 0 };
+    for (const [client, p] of Object.entries(pathsMap)) {
+        try {
+            if (fs.existsSync(p)) {
+                const s = fs.statSync(p);
+                const m = s.mtimeMs || s.mtime.getTime();
+                if (m > best.m)
+                    best = { client, path: p, m };
+            }
+        }
+        catch { }
+    }
+    return best.client && best.path ? [best.client, best.path] : undefined;
+}
 let nicksWin = null;
 let win = null;
 function initAutoUpdate() {
@@ -139,9 +614,21 @@ async function createWindow() {
 electron_1.app.whenReady().then(() => {
     createWindow();
     initAutoUpdate();
+    // capture uncaught errors to file as well
+    try {
+        process.on('uncaughtException', (err) => {
+            try {
+                const logDir = electron_1.app.getPath('userData');
+                fs.appendFileSync(path.join(logDir, 'startup.log'), `[${new Date().toISOString()}] uncaught ${String(err)}\n`);
+            }
+            catch { }
+            console.error('Uncaught error in main process:', err);
+        });
+    }
+    catch { }
     // Start chat logger to detect local Minecraft chat and forward player lists to renderer
     try {
-        let chat = new chat_logger_1.MinecraftChatLogger();
+        let chat = new MinecraftChatLogger();
         chat.on('playersUpdated', (players) => {
             if (win)
                 win.webContents.send('chat:players', players);
@@ -646,19 +1133,23 @@ class HypixelCache {
         this.uuidCache.clear();
     }
 }
-// Zentraler Cache-Manager
+// Zentraler Cache-Manager (only initialized if HYPIXEL_KEY is available)
 const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
 // --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
 electron_1.ipcMain.handle('bedwars:stats', async (_e, name) => {
-    // Try enhanced API system first
+    // Try enhanced API system first (backend or user key)
     try {
         return await apiRouter.getStats(name);
     }
     catch (error) {
         console.log('[API] Enhanced system failed, using original:', error);
-        // Fallback to original system
+        // Fallback to original system if user has provided a key
         if (!process.env.HYPIXEL_KEY) {
-            return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
+            return {
+                error: 'No API key configured. The app needs either a backend service or a local Hypixel API key to function.',
+                hint: 'For advanced users: Add HYPIXEL_KEY to .env file. Get your key with /api new on Hypixel.',
+                missingConfig: true
+            };
         }
         return hypixel.getStats(name);
     }
@@ -715,7 +1206,11 @@ function generatePKCE() {
 // Open Discord OAuth2 URL in browser
 electron_1.ipcMain.handle('auth:discord:login', async () => {
     if (!DISCORD_CLIENT_ID) {
-        return { error: 'Discord Client ID not configured. Please add DISCORD_CLIENT_ID to .env file.' };
+        return {
+            error: 'Discord login is not available in this build.',
+            hint: 'This feature requires Discord OAuth configuration. Contact the developer for a version with Discord integration.',
+            featureDisabled: true
+        };
     }
     // Generate PKCE parameters for this auth session
     const { code_verifier, code_challenge } = generatePKCE();
@@ -871,6 +1366,16 @@ electron_1.ipcMain.handle('auth:discord:refresh', async (_e, refreshToken) => {
 });
 // Get Firebase configuration for renderer process
 electron_1.ipcMain.handle('firebase:getConfig', async () => {
+    // Return config only if Firebase is configured
+    const hasFirebase = !!(process.env.FIREBASE_API_KEY &&
+        process.env.FIREBASE_PROJECT_ID);
+    if (!hasFirebase) {
+        return {
+            error: 'Firebase is not configured in this build',
+            hint: 'Cloud sync features are disabled. Settings will be saved locally only.',
+            featureDisabled: true
+        };
+    }
     return {
         apiKey: process.env.FIREBASE_API_KEY,
         authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -886,6 +1391,13 @@ let firestore = null;
 async function initFirebaseMain() {
     if (firebaseApp)
         return true; // Already initialized
+    // Check if Firebase is configured
+    const hasFirebase = !!(process.env.FIREBASE_API_KEY &&
+        process.env.FIREBASE_PROJECT_ID);
+    if (!hasFirebase) {
+        console.log('[Firebase Main] Not configured - cloud features disabled');
+        return false;
+    }
     try {
         const { initializeApp } = require('firebase/app');
         const { getFirestore, doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
@@ -914,7 +1426,11 @@ async function initFirebaseMain() {
 // Firebase Cloud Sync Handlers
 electron_1.ipcMain.handle('firebase:upload', async (_e, userId, settings) => {
     if (!await initFirebaseMain()) {
-        return { error: 'Firebase not initialized' };
+        return {
+            error: 'Cloud sync is not available in this build',
+            hint: 'Settings will be saved locally only. Cloud sync requires Firebase configuration.',
+            featureDisabled: true
+        };
     }
     try {
         const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
@@ -934,7 +1450,11 @@ electron_1.ipcMain.handle('firebase:upload', async (_e, userId, settings) => {
 });
 electron_1.ipcMain.handle('firebase:download', async (_e, userId) => {
     if (!await initFirebaseMain()) {
-        return { error: 'Firebase not initialized' };
+        return {
+            error: 'Cloud sync is not available in this build',
+            hint: 'Using local settings only. Cloud sync requires Firebase configuration.',
+            featureDisabled: true
+        };
     }
     try {
         const { doc, getDoc } = require('firebase/firestore');
@@ -969,7 +1489,7 @@ electron_1.ipcMain.handle('metrics:get', async (_e, userId) => {
         totalLookups: 0
     };
     if (!userId || !await initFirebaseMain()) {
-        return { success: true, data: localMetrics, source: 'local' };
+        return { success: true, data: localMetrics, source: 'local', cloudDisabled: !userId };
     }
     try {
         const { doc, getDoc } = require('firebase/firestore');
@@ -995,7 +1515,11 @@ electron_1.ipcMain.handle('metrics:get', async (_e, userId) => {
 // Update account metrics in cloud
 electron_1.ipcMain.handle('metrics:update', async (_e, userId, metrics) => {
     if (!userId || !await initFirebaseMain()) {
-        return { error: 'Firebase not available or no user ID' };
+        return {
+            error: 'Cloud metrics not available',
+            hint: 'Metrics will be tracked locally only.',
+            featureDisabled: true
+        };
     }
     try {
         const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
@@ -1027,7 +1551,12 @@ electron_1.ipcMain.handle('metrics:getUserId', async () => {
 // Plus subscription check via Firebase
 electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
     if (!await initFirebaseMain()) {
-        return { isPlus: false, error: 'Firebase not initialized' };
+        return {
+            isPlus: false,
+            error: 'Plus features not available',
+            hint: 'This build does not include Plus subscription features.',
+            featureDisabled: true
+        };
     }
     try {
         const { doc, getDoc } = require('firebase/firestore');
@@ -1092,62 +1621,59 @@ electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { 
         return { error: String(error) };
     }
 });
-// Verify plus purchase with real Stripe API
+// Verify plus purchase via backend (secure: Stripe secret stays server-side)
+// Backend endpoint should: validate Stripe session, update Firestore, return { success, expiresAt, message }.
 electron_1.ipcMain.handle('plus:verify', async (_e, userId, sessionId) => {
-    if (!await initFirebaseMain()) {
-        return { error: 'Firebase not initialized' };
+    // Basic parameter checks
+    if (!sessionId) {
+        return { error: 'No payment session ID provided' };
     }
+    if (!userId) {
+        return { error: 'Missing userId' };
+    }
+    const backendUrl = process.env.BACKEND_API_URL;
+    if (!backendUrl) {
+        return { error: 'Backend not configured (BACKEND_API_URL missing)' };
+    }
+    // Compose request – prefer POST for sensitive IDs
+    const verifyEndpoint = backendUrl.replace(/\/$/, '') + '/api/plus/verify';
+    let response;
     try {
-        const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-        if (!stripeSecretKey || stripeSecretKey === 'sk_test_your_secret_key_here') {
-            return { error: 'Stripe not configured. Please add your Stripe Secret Key to .env file.' };
-        }
-        // If no sessionId provided, return error
-        if (!sessionId) {
-            return { error: 'No payment session ID provided' };
-        }
-        // Verify session with Stripe API
-        const stripeResponse = await (0, node_fetch_1.default)(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
-            headers: {
-                'Authorization': `Bearer ${stripeSecretKey}`
-            }
+        response = await (0, node_fetch_1.default)(verifyEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ userId, sessionId })
         });
-        if (!stripeResponse.ok) {
-            return { error: 'Invalid payment session' };
-        }
-        const session = await stripeResponse.json();
-        // Check if payment was successful
-        if (session.payment_status !== 'paid') {
-            return { error: 'Payment not completed' };
-        }
-        const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
-        // Add 1 month of plus
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-        const plusDocRef = doc(firestore, 'plus', userId);
-        await setDoc(plusDocRef, {
-            plan: 'plus',
-            status: 'active',
-            stripeSessionId: sessionId,
-            purchasedAt: serverTimestamp(),
-            expiresAt: expiresAt,
-            features: {
-                unlimitedNicks: true,
-                customThemes: true,
-                advancedStats: true,
-                prioritySupport: true
-            }
-        });
-        console.log('[Plus] Activated for user:', userId);
-        return {
-            success: true,
-            expiresAt: expiresAt.getTime(),
-            message: 'Plus activated successfully!'
-        };
     }
-    catch (error) {
-        console.error('[Plus] Verification failed:', error);
-        return { error: String(error) };
+    catch (networkErr) {
+        console.error('[Plus] Backend verify network error:', networkErr);
+        return { error: 'Network error contacting backend' };
     }
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        console.error('[Plus] Backend verify failed status:', response.status, text);
+        return { error: 'Backend verification failed' };
+    }
+    let data;
+    try {
+        data = await response.json();
+    }
+    catch (parseErr) {
+        console.error('[Plus] Backend JSON parse error:', parseErr);
+        return { error: 'Invalid backend response' };
+    }
+    if (data.error) {
+        return { error: data.error };
+    }
+    if (!data.success) {
+        return { error: 'Verification unsuccessful' };
+    }
+    // Expect expiresAt (ms) from server
+    return {
+        success: true,
+        expiresAt: data.expiresAt || null,
+        message: data.message || 'Plus activated successfully!'
+    };
 });
 // Get monthly test day info
 electron_1.ipcMain.handle('plus:getTestDayInfo', async (_e, userId) => {
@@ -1327,10 +1853,120 @@ class HypixelApiRouter {
         }
         return false;
     }
-    // Use the existing HypixelCache system for now
+    // Main stats fetching method with 3-tier fallback
     async getStats(name) {
-        // For now, delegate to the original system
-        return hypixel.getStats(name);
+        const normalizedName = name.toLowerCase();
+        // 1. Check cache first
+        const cached = this.cache.get(normalizedName);
+        if (cached && Date.now() - cached.timestamp < this.config.cacheTimeout) {
+            console.log(`[API] Cache hit for ${name}`);
+            return cached.data;
+        }
+        // 2. Try backend first if available
+        if (this.config.backendUrl && !this.backendDown) {
+            try {
+                const backendResult = await this.fetchFromBackend(name);
+                if (backendResult && !backendResult.error) {
+                    // Cache successful backend result
+                    this.cache.set(normalizedName, {
+                        data: backendResult,
+                        timestamp: Date.now()
+                    });
+                    console.log(`[API] Backend success for ${name}`);
+                    return backendResult;
+                }
+            }
+            catch (error) {
+                console.log(`[API] Backend failed for ${name}, trying fallback:`, error);
+                this.backendDown = true;
+                // Continue to next tier
+            }
+        }
+        // 3. Try user's API key if available and fallback is enabled
+        if (this.config.userApiKey && this.config.useFallbackKey && this.userKeyValid) {
+            try {
+                const result = await hypixel.getStats(name);
+                if (result && !result.error) {
+                    // Cache successful result
+                    this.cache.set(normalizedName, {
+                        data: result,
+                        timestamp: Date.now()
+                    });
+                    console.log(`[API] User key success for ${name}`);
+                    return result;
+                }
+                if (result && result.error) {
+                    // Check if it's a key validity error
+                    if (result.error.includes('403') || result.error.includes('Invalid')) {
+                        this.userKeyValid = false;
+                    }
+                }
+            }
+            catch (error) {
+                console.log(`[API] User key failed for ${name}:`, error);
+                // Continue to error
+            }
+        }
+        // 4. All methods failed
+        return {
+            error: 'Unable to fetch player stats. All API sources are unavailable.',
+            details: {
+                backendAvailable: !this.backendDown,
+                userKeyAvailable: !!this.config.userApiKey,
+                userKeyValid: this.userKeyValid
+            },
+            hint: this.config.userApiKey
+                ? 'Your API key may be invalid or rate limited. Try again later.'
+                : 'No API key configured. Add HYPIXEL_KEY to .env for offline mode.',
+            missingConfig: !this.config.backendUrl && !this.config.userApiKey
+        };
+    }
+    async fetchFromBackend(name) {
+        if (!this.config.backendUrl)
+            throw new Error('No backend URL configured');
+        // Rate limiting for backend requests
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastBackendRequest;
+        if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+            await new Promise(r => setTimeout(r, this.MIN_REQUEST_INTERVAL - timeSinceLastRequest));
+        }
+        this.lastBackendRequest = Date.now();
+        // Queue management
+        while (this.queue.size >= this.MAX_CONCURRENT) {
+            await new Promise(r => setTimeout(r, 100));
+        }
+        try {
+            this.queue.add(name);
+            const response = await (0, node_fetch_1.default)(`${this.config.backendUrl}/api/player/${encodeURIComponent(name)}`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(10000),
+                headers: {
+                    'User-Agent': 'Nebula-Overlay/1.0',
+                    'Accept': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                if (response.status === 429) {
+                    this.backendThrottled = true;
+                    throw new Error('Backend rate limit reached');
+                }
+                if (response.status === 503) {
+                    throw new Error('Backend service unavailable');
+                }
+                throw new Error(`Backend returned ${response.status}`);
+            }
+            const data = await response.json();
+            // Backend should return stats in the same format as our local processing
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            // Reset throttle status on success
+            this.backendThrottled = false;
+            return data;
+        }
+        finally {
+            this.queue.delete(name);
+        }
     }
     // Public methods for status and configuration
     getStatus() {
