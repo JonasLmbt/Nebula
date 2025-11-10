@@ -258,6 +258,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 
 const PORT = Number(process.env.PORT || 3001);
-app.listen(PORT, () => {
-  console.log(`[Backend] Listening on port ${PORT} (cache TTL: ${CACHE_TTL_MS}ms)`);
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`[Backend] Listening on http://${HOST}:${PORT} (cache TTL: ${CACHE_TTL_MS}ms)`);
 });
