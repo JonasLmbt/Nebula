@@ -3,15 +3,19 @@ import cors from 'cors';
 import helmet from 'helmet';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
+import dns from 'dns';
 
 dotenv.config();
+
+// Prefer IPv4 when both are available to reduce Hypixel whitelist mismatch (IPv6 often not whitelisted)
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
-const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
+const HYPIXEL_KEY = (process.env.HYPIXEL_KEY || '').trim();
 if (!HYPIXEL_KEY) {
   console.warn('[Backend] HYPIXEL_KEY missing – /api/player will return error until set.');
 }
@@ -25,6 +29,17 @@ interface KeyStatus {
 }
 
 let keyStatus: KeyStatus = { valid: false, error: HYPIXEL_KEY ? 'Not yet verified' : 'Missing HYPIXEL_KEY' };
+
+// Outbound IP probes (helps diagnose 403 due to wrong IP family)
+interface IpReport { v4: string | null; v6: string | null; lastProbe: number; }
+let ipReport: IpReport = { v4: null, v6: null, lastProbe: Date.now() };
+async function probeOutboundIPs() {
+  try { ipReport.v4 = await fetch('https://api.ipify.org', { signal: AbortSignal.timeout(4000) }).then(r => r.text()).catch(() => null); } catch {}
+  try { ipReport.v6 = await fetch('https://api64.ipify.org', { signal: AbortSignal.timeout(4000) }).then(r => r.text()).catch(() => null); } catch {}
+  ipReport.lastProbe = Date.now();
+}
+probeOutboundIPs().catch(()=>{});
+setInterval(() => probeOutboundIPs().catch(()=>{}), 60 * 60 * 1000); // hourly refresh
 
 // New key verification using punishmentStats (the /key endpoint is deprecated)
 async function verifyHypixelKey(): Promise<KeyStatus> {
@@ -69,7 +84,8 @@ async function verifyHypixelKey(): Promise<KeyStatus> {
 
 // Initial async verification (non-blocking)
 verifyHypixelKey().then(s => {
-  console.log('[Backend] Key verification:', s);
+  const masked = HYPIXEL_KEY ? HYPIXEL_KEY.slice(0,8)+'...' : '<none>';
+  console.log('[Backend] Key verification:', { status: s, keyMasked: masked });
 }).catch(e => console.warn('[Backend] Key verify failed:', e));
 
 // Configurable TTL (default 5m)
@@ -234,6 +250,9 @@ app.get('/debug', (_req: Request, res: Response) => {
     key: {
       present: !!HYPIXEL_KEY,
       status: keyStatus,
+      length: HYPIXEL_KEY ? HYPIXEL_KEY.length : 0,
+      masked: HYPIXEL_KEY ? HYPIXEL_KEY.slice(0,8)+'...' : null,
+      patternValid: /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(HYPIXEL_KEY)
     },
     cache: {
       players: playerCache.size,
@@ -244,6 +263,7 @@ app.get('/debug', (_req: Request, res: Response) => {
       windowMs: RATE_LIMIT_WINDOW,
       maxPerIpPerWindow: RATE_LIMIT_MAX
     },
+    outboundIP: ipReport,
     environment: {
       node: process.version,
       port: process.env.PORT || 3001

@@ -1853,6 +1853,7 @@ class HypixelApiRouter {
   // Main stats fetching method with 3-tier fallback
   async getStats(name: string): Promise<any> {
     const normalizedName = name.toLowerCase();
+    let backendErrorDetail: string | undefined;
     
     // 1. Check cache first
     const cached = this.cache.get(normalizedName);
@@ -1874,9 +1875,16 @@ class HypixelApiRouter {
           console.log(`[API] Backend success for ${name}`);
           return backendResult;
         }
+        if (backendResult && backendResult.error) {
+          backendErrorDetail = backendResult.error + (backendResult.hint ? ` | ${backendResult.hint}` : '');
+        }
       } catch (error) {
         console.log(`[API] Backend failed for ${name}, trying fallback:`, error);
-        this.backendDown = true;
+        backendErrorDetail = (error as Error)?.message || String(error);
+        // Nur als 'down' markieren bei echten Verbindungsfehlern/Timeouts
+        if (backendErrorDetail && /fetch|network|timeout|ENOTFOUND|ECONNREFUSED|EHOSTUNREACH/i.test(backendErrorDetail)) {
+          this.backendDown = true;
+        }
         // Continue to next tier
       }
     }
@@ -1909,6 +1917,7 @@ class HypixelApiRouter {
     // 4. All methods failed
     return {
       error: 'Unable to fetch player stats. All API sources are unavailable.',
+      backendError: backendErrorDetail,
       details: {
         backendAvailable: !this.backendDown,
         userKeyAvailable: !!this.config.userApiKey,
@@ -1950,21 +1959,30 @@ class HypixelApiRouter {
       });
       
       if (!response.ok) {
+        let bodyText = '';
+        try { bodyText = await response.text(); } catch {}
+        // Versuche JSON zu parsen, um detail/hint zu extrahieren
+        let body: any = undefined;
+        try { body = bodyText ? JSON.parse(bodyText) : undefined; } catch {}
+        const msgFromBody = body?.error || body?.detail || bodyText || '';
         if (response.status === 429) {
           this.backendThrottled = true;
           throw new Error('Backend rate limit reached');
         }
+        if (response.status === 403) {
+          throw new Error(`Backend returned 403${msgFromBody ? `: ${msgFromBody}` : ''}`);
+        }
         if (response.status === 503) {
           throw new Error('Backend service unavailable');
         }
-        throw new Error(`Backend returned ${response.status}`);
+        throw new Error(`Backend returned ${response.status}${msgFromBody ? `: ${msgFromBody}` : ''}`);
       }
       
       const data = await response.json();
       
       // Backend should return stats in the same format as our local processing
       if (data.error) {
-        throw new Error(data.error);
+        return { error: data.error, hint: data.hint };
       }
       
       // Reset throttle status on success
