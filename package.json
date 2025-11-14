@@ -6,7 +6,7 @@
   "author": "Jonas Lambrecht",
   "license": "MIT",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir dist\\renderer 2> NUL && copy src\\renderer\\index.html dist\\renderer\\index.html",
     "dist": "npm run build && electron-builder --publish always",
     "start": "npm run build && electron .",
     "dev": "ts-node ./src/main.ts"

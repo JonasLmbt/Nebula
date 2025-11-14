@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import * as path from 'path';
+import * as path from 'path'; 
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import fetch from 'node-fetch';
@@ -84,7 +84,7 @@ async function createWindow() {
   // Clear cache before loading to ensure fresh content
   await win.webContents.session.clearCache();
   
-  win.loadFile(path.join(__dirname, '../src/renderer/index.html'));
+  win.loadFile(path.join(__dirname, 'renderer/index.html'));
 
   // Optional: open DevTools for debugging
   const shouldOpenDevTools = process.env.NEBULA_DEVTOOLS === '1' || process.env.NODE_ENV === 'development';
