@@ -7,6 +7,8 @@ import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './chat-logger';
+import { normalizeHypixelBedwarsStats } from "./hypixelNormalizer"; 
+
 
 let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
@@ -401,142 +403,7 @@ class HypixelCache {
   }
 
   private async processBedwarsStats(player: any, requestedName: string, guild: any | null) {
-    const bw = player?.stats?.Bedwars || {};
-    const stars = bw.Experience ? Math.floor(bw.Experience / 5000) : 0;
-    const fk = bw.final_kills_bedwars ?? 0;
-    const fd = bw.final_deaths_bedwars ?? 0;
-    const wins = bw.wins_bedwars ?? 0;
-    const losses = bw.losses_bedwars ?? 0;
-    const ws = bw.winstreak ?? 0;
-    const bblr = (bw.beds_broken_bedwars ?? 0) / Math.max(1, bw.beds_lost_bedwars ?? 1);
-
-  // --- Most Played Mode Heuristic ---------------------------------------
-  // Determine likely most played mode using (wins + losses)
-  // Prefixes per Hypixel naming convention:
-  // eight_one_*  -> Solo
-  // eight_two_*  -> Doubles
-  // four_three_* -> 3s
-  // four_four_*  -> 4s
-  // two_four_*   -> 4v4
-    const MODE_PREFIX: Array<{ key: string; label: string }> = [
-      { key: 'eight_one', label: 'Solo' },
-      { key: 'eight_two', label: 'Doubles' },
-      { key: 'four_three', label: '3s' },
-      { key: 'four_four', label: '4s' },
-      { key: 'two_four', label: '4v4' },
-    ];
-    let mostPlayed: string | null = null;
-    let mostGames = -1;
-    try {
-      for (const m of MODE_PREFIX) {
-        const w = bw[`${m.key}_wins_bedwars`] ?? 0;
-        const l = bw[`${m.key}_losses_bedwars`] ?? 0;
-        const games = (Number(w) || 0) + (Number(l) || 0);
-        if (games > mostGames) {
-          mostGames = games;
-          mostPlayed = games > 0 ? m.label : null;
-        }
-      }
-    } catch { /* ignore mode calc errors */ }
-
-    // Determine rank/prefix and a display color
-    const getRankInfo = (p: any) => {
-      // Precedence (Hypixel specifics): custom prefix > special rank field (rank) > monthlyPackageRank (SUPERSTAR) > newPackageRank > packageRank
-      // The previous implementation chose newPackageRank first, causing MVP++ (SUPERSTAR) and YOUTUBER to degrade to MVP+.
-      const prefix = p?.prefix; // may contain § color codes + brackets
-      const rank = p?.rank; // staff / youtube ranks live here (e.g. YOUTUBER, ADMIN)
-      const monthly = p?.monthlyPackageRank; // SUPERSTAR for MVP++
-      const newPkg = p?.newPackageRank; // MVP_PLUS etc.
-      const pkg = p?.packageRank; // legacy
-      const displayname = p?.displayname;
-
-      const stripColor = (s: string) => s ? s.replace(/§[0-9a-fk-or]/gi, '').trim() : s;
-
-      // If prefix exists, prefer it entirely (extract bracketed portion if present)
-      if (prefix) {
-        const raw = stripColor(prefix);
-        const m = raw.match(/\[(.+?)\]/);
-        return { tag: m ? `[${m[1]}]` : raw, color: '#FFFFFF' };
-      }
-
-      // Displayname may itself have leading bracket tag (rare custom formatting)
-      if (displayname) {
-        const dn = stripColor(displayname);
-        const match = dn.match(/^\s*\[(.+?)\]/);
-        if (match) return { tag: `[${match[1]}]`, color: '#FFFFFF' };
-      }
-
-      // Helper mapping
-      const map: Record<string, { tag: string; color: string }> = {
-        VIP: { tag: '[VIP]', color: '#55FF55' },
-        VIP_PLUS: { tag: '[VIP+]', color: '#55FF55' },
-        MVP: { tag: '[MVP]', color: '#55FFFF' },
-        MVP_PLUS: { tag: '[MVP+]', color: '#55FFFF' },
-        SUPERSTAR: { tag: '[MVP++]', color: '#FFAA00' }, // MVP++ monthly
-        MVP_PLUS_PLUS: { tag: '[MVP++]', color: '#FFAA00' }, // sometimes appears explicitly
-        YOUTUBER: { tag: '[YOUTUBE]', color: '#FF5555' },
-        YT: { tag: '[YOUTUBE]', color: '#FF5555' },
-        ADMIN: { tag: '[ADMIN]', color: '#FF5555' },
-        OWNER: { tag: '[OWNER]', color: '#FF5555' },
-        MOD: { tag: '[MOD]', color: '#55AAFF' },
-        HELPER: { tag: '[HELPER]', color: '#55AAFF' }
-      };
-
-      // Evaluate rank fields by precedence
-      const candidates = [rank, monthly, newPkg, pkg].filter(Boolean).map((r: string) => String(r).toUpperCase());
-      for (const c of candidates) {
-        if (map[c]) return map[c];
-        // Pattern handling inside loop to allow early precedence
-        if (c.includes('SUPERSTAR') || c.includes('MVP_PLUS_PLUS') || c.includes('PLUS_PLUS')) return map['SUPERSTAR'];
-        if (c.includes('VIP')) return map['VIP'];
-        if (c.includes('MVP') && c.includes('PLUS')) return map['MVP_PLUS'];
-        if (c === 'MVP') return map['MVP'];
-        if (c === 'YOUTUBER' || c === 'YT') return map['YOUTUBER'];
-      }
-
-      // No rank detected (NORMAL)
-      return { tag: null, color: null };
-    };
-
-    const rankInfo = getRankInfo(player ?? {});
-
-    return {
-      name: player.displayname ?? requestedName,
-      level: stars,
-      experience: bw.Experience ?? 0,
-      ws,
-      fkdr: +(fk / Math.max(1, fd)).toFixed(2),
-      wlr: +(wins / Math.max(1, losses)).toFixed(2),
-      bblr: +bblr.toFixed(2),
-      fk,
-      fd,
-      wins,
-      losses,
-      bedsBroken: bw.beds_broken_bedwars ?? 0,
-      bedsLost: bw.beds_lost_bedwars ?? 0,
-      kills: bw.kills_bedwars ?? 0,
-      deaths: bw.deaths_bedwars ?? 0,
-      mode: mostPlayed, // Neuer "Most Played Mode" (heuristisch wins+losses)
-      // Derived efficiencies
-      winsPerLevel: +(wins / Math.max(1, stars)).toFixed(2),
-      fkPerLevel: +(fk / Math.max(1, stars)).toFixed(2),
-      bedwarsScore: +((fk / Math.max(1, fd)) * (wins / Math.max(1, losses)) * (stars / 100)).toFixed(2),
-      // Network Level (approximate formula from Hypixel experience curve)
-      networkLevel: (() => {
-        const exp = player?.networkExp ?? player?.networkExperience ?? 0;
-        // Hypixel formula: level = (Math.sqrt(2*exp + 30625) / 50) - 2.5
-        const lvl = (Math.sqrt(2 * exp + 30625) / 50) - 2.5;
-        return Math.max(0, Math.floor(lvl));
-      })(),
-  // Guild data from separate endpoint (if available)
-      guildName: guild?.name ?? null,
-      guildTag: guild?.tag ?? null,
-      mfkdr: null, // Monthly Final K/D Ratio
-      mwlr: null,  // Monthly Win/Loss Ratio
-      mbblr: null, // Monthly Bed Break/Loss Ratio
-      rankTag: rankInfo.tag,
-      rankColor: rankInfo.color,
-    };
+    return normalizeHypixelBedwarsStats(player, requestedName, guild);
   }
 
   async getStats(name: string) {
@@ -1423,8 +1290,58 @@ class HypixelApiRouter {
 
   // Use the existing HypixelCache system for now
   async getStats(name: string): Promise<any> {
-    // For now, delegate to the original system
-    return hypixel.getStats(name);
+    const normalizedName = name.toLowerCase();
+    // 0. Cache
+    const cached = this.cache.get(normalizedName);
+    if (cached && Date.now() - cached.timestamp < (this.config.cacheTimeout || 5 * 60 * 1000)) {
+      console.log('[API] Returning cached stats for', cached.data);
+      return cached.data;
+    }
+
+    // 1. .env-Key (process.env.HYPIXEL_KEY)
+    if (process.env.HYPIXEL_KEY && process.env.HYPIXEL_KEY.trim().length > 0) {
+      try {
+        const result = await hypixel.getStats(name);
+        if (!result?.error) {
+          this.cache.set(normalizedName, { data: result, timestamp: Date.now() });
+          console.log('[API] Returning stats using .env HYPIXEL_KEY for', result);
+          return result;
+        }
+      } catch (e) { /* ignore, try next */ }
+    }
+
+    // 2. User-Key (falls in config.userApiKey, nicht .env)
+    if (this.config.userApiKey && this.config.userApiKey.trim().length > 0 && this.config.userApiKey !== process.env.HYPIXEL_KEY) {
+      try {
+        const userHypixel = new HypixelCache(this.config.userApiKey);
+        const result = await userHypixel.getStats(name);
+        if (!result?.error) {
+          this.cache.set(normalizedName, { data: result, timestamp: Date.now() });
+          console.log('[API] Returning stats using user API key for', result);
+          return result;
+        }
+      } catch (e) { /* ignore, try next */ }
+    }
+
+    // 3. Backend
+    try {
+      const backendUrl = `http://188.245.182.162:3000/api/player?name=${encodeURIComponent(name)}`;
+      const res = await fetch(backendUrl);
+      if (!res.ok) throw new Error('Backend not available');
+      const data = await res.json();
+
+      // Backend returns raw Hypixel response: { success, player, ... }
+      const player = data && data.player ? data.player : data;
+
+      // No guild info from backend (yet), so we pass null
+      const result = normalizeHypixelBedwarsStats(player, name, null);
+
+      this.cache.set(normalizedName, { data: result, timestamp: Date.now() });
+      console.log('[API] Returning stats using backend for', result);
+      return result;
+    } catch (e: any) {
+      return { error: 'All API sources failed: ' + (e && e.message ? e.message : String(e)) };
+    }
   }
 
   // Public methods for status and configuration
@@ -1457,8 +1374,7 @@ class HypixelApiRouter {
   clearCache() {
     this.cache.clear();
     this.uuidCache.clear();
-    // Also clear original cache
-    hypixel.clearCache();
+    try { (hypixel as any)?.clearCache?.(); } catch {}
   }
 
   async verifyUserApiKey(apiKey: string): Promise<{ valid: boolean, error?: string }> {

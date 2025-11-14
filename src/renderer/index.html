@@ -1176,8 +1176,8 @@
                 <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
                   <div style="display:flex;gap:8px;align-items:center;width:100%">
                     <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;" disabled />
-                    <button id="usernameEditBtn" type="button" style="padding:11px 18px;border:0;border-radius:8px;background:var(--accent);color:#0b1e24;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                      Change
+                    <button id="usernameLockBtn" type="button" style="padding:11px 14px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="IGN bearbeiten">
+                      <svg id="lockIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;transition:opacity 0.2s;"><path id="lockBody" d="M5 11h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path id="lockShackle" d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </button>
                   </div>
                   <small style="color:var(--muted);font-size:12px;line-height:1.4;">Used for chat mentions and automatic adding to the list. Changes sync with your Discord account when logged in.</small>
@@ -1658,62 +1658,53 @@
         sessionUuid = normalized.uuid || rawResult.uuid || null;
         if (usernameInput) {
           usernameInput.value = basicSettings.username || '';
-          const editBtn = document.getElementById('usernameEditBtn');
-          let editing = false;
-          const applyUsername = () => {
-            const prev = (basicSettings.username || '').trim();
-            const next = (usernameInput.value || '').trim();
-            if (prev && prev !== next) {
-              removePlayerSource(prev, 'username');
+          let locked = true;
+          let lastValue = usernameInput.value;
+          const lockBtn = document.getElementById('usernameLockBtn');
+          const lockIcon = document.getElementById('lockIcon');
+          function setLockState(state) {
+            locked = state;
+            usernameInput.disabled = locked;
+            // SVG-Icon optisch anpassen
+            if (lockIcon) {
+              // Schloss zu: Shackle geschlossen, volle Deckkraft
+              lockIcon.style.opacity = locked ? '0.7' : '1';
+              const shackle = lockIcon.querySelector('#lockShackle');
+              if (shackle) {
+                shackle.setAttribute('d', locked
+                  ? 'M7 11V7a5 5 0 0 1 10 0v4' // geschlossen
+                  : 'M7 11V7a5 5 0 0 1 10 0v2' // offen (kürzer)
+                );
+              }
             }
-            basicSettings.username = next;
-            localStorage.setItem('username', next);
-            updateSidebarUsername();
-            try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
-            if (next && next !== sessionUsername) {
-              startSession(next);
+            if (!locked) {
+              usernameInput.focus();
+              usernameInput.select();
+              lastValue = usernameInput.value;
             }
-          };
-
-          // Initial state: not editing
-          usernameInput.disabled = true;
-          if (editBtn) {
-            editBtn.addEventListener('click', () => {
-              editing = !editing;
-              if (editing) {
-                // Enter edit mode
-                usernameInput.disabled = false;
-                usernameInput.focus();
-                usernameInput.select();
-                editBtn.textContent = 'Save';
+          }
+          if (lockBtn) {
+            lockBtn.addEventListener('click', () => {
+              if (locked) {
+                setLockState(false);
               } else {
-                // Save
-                usernameInput.disabled = true;
-                editBtn.textContent = 'Change';
-                applyUsername();
+                setLockState(true);
+                // Nur übernehmen, wenn sich der Wert geändert hat
+                const prev = (basicSettings.username || '').trim();
+                const next = (usernameInput.value || '').trim();
+                if (prev !== next) {
+                  if (prev) removePlayerSource(prev, 'username');
+                  basicSettings.username = next;
+                  localStorage.setItem('username', next);
+                  updateSidebarUsername();
+                  try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
+                  if (next && next !== sessionUsername) {
+                    startSession(next);
+                  }
+                }
               }
             });
           }
-
-          // Enter key saves, Escape cancels
-          usernameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-              if (editing) {
-                editing = false;
-                usernameInput.disabled = true;
-                if (editBtn) editBtn.textContent = 'Change';
-                applyUsername();
-              }
-            } else if (e.key === 'Escape') {
-              if (editing) {
-                editing = false;
-                usernameInput.value = basicSettings.username || '';
-                usernameInput.disabled = true;
-                if (editBtn) editBtn.textContent = 'Change';
-              }
-            }
-          });
-
           // Start session on app load if username exists (delayed)
           const savedUsername = basicSettings.username || '';
           if (savedUsername) {
@@ -1828,6 +1819,7 @@
     
     if (sessionUsername) {
       sessionIgn.textContent = sessionUsername;
+      console.log(sessionUuid);
       if (sessionUuid) {
         sessionAvatar.src = `https://crafatar.com/avatars/${sessionUuid}?size=48&default=MHF_Steve&overlay`;
       } else {
@@ -4003,10 +3995,6 @@
       // Ensure username entry exists when set
       if (basicSettings.username && basicSettings.username.trim()) {
         addPlayer(basicSettings.username.trim(), 'username');
-      }
-      // Only inform main process if requested (avoid spamming while typing or changing unrelated settings)
-      if (options.propagateUsername) {
-        try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
       }
     }
 
