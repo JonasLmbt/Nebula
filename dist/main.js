@@ -1241,7 +1241,7 @@ class HypixelApiRouter {
             // No guild info from backend (yet), so we pass null
             const result = (0, hypixelNormalizer_1.normalizeHypixelBedwarsStats)(player, name, null);
             this.cache.set(normalizedName, { data: result, timestamp: Date.now() });
-            console.log('[API] Returning stats using backend.');
+            console.log('[API] Returning stats using backend for', result);
             return result;
         }
         catch (e) {
