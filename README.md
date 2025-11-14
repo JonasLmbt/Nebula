@@ -44,7 +44,6 @@ npm install
 
 2. Create environment file:
 ```bash
-cp .env.example .env
 ```
 
 3. Add your Hypixel API key to `.env`:

@@ -1,14 +1,14 @@
 {
   "name": "nebula",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Nebula — a lightweight Bedwars stats overlay.",
   "main": "dist/main.js",
   "author": "Jonas Lambrecht",
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "dist": "npm run build && electron-builder",
-    "start": "npm run build && electron ./dist/main.js",
+    "dist": "npm run build && electron-builder --publish always",
+    "start": "npm run build && electron .",
     "dev": "ts-node ./src/main.ts"
   },
   "devDependencies": {
@@ -35,13 +35,16 @@
     "appId": "com.jonaslmbt.nebula",
     "productName": "Nebula",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "assets/**/*",
       "package.json",
-      "!**/*.map"
+      "!**/*.map",
+      "!src/**/*",
+      "!node_modules/.cache/**/*"
     ],
     "asar": true,
     "win": {

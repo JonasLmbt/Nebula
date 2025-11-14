@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
-// Auto-Update (only active when packaged)
 const electron_updater_1 = require("electron-updater");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
@@ -49,7 +48,6 @@ const hypixelNormalizer_1 = require("./hypixelNormalizer");
 let nicksWin = null;
 let win = null;
 function initAutoUpdate() {
-    // Skip in dev/unpackaged mode
     if (!electron_1.app.isPackaged) {
         return;
     }

@@ -11,7 +11,7 @@ Nebula is a small Electron app (TypeScript) — an overlay that shows Hypixel Be
 - Renderer runs with `nodeIntegration: true` and `contextIsolation: false` (you can `require('electron')` directly in `index.html`).
 - The renderer is not bundled — edit `src/renderer/index.html` directly for UI changes.
 - The main process compiles via `tsc`; the built entry is `dist/main.js`.
-- Environment: copy `.env.example` → `.env` and set `HYPIXEL_KEY` (Hypixel API key). Without a key, `bedwars:stats` returns an error object.
+- Environment: copy `.env` and set `HYPIXEL_KEY` (Hypixel API key). Without a key, `bedwars:stats` returns an error object.
 
 ## IPC channels (integration points)
 - `bedwars:stats` (invoke) — expects `(name: string)`; returns an object or `{ error: string }` (implemented in `src/main.ts`).

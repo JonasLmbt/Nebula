@@ -1,5 +1,4 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, shell } from 'electron';
-// Auto-Update (only active when packaged)
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -14,7 +13,6 @@ let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
 
 function initAutoUpdate() {
-  // Skip in dev/unpackaged mode
   if (!app.isPackaged) {
     return;
   }
