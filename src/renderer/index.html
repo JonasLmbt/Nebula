@@ -1175,10 +1175,10 @@
               <div class="settings-row" style="margin: 0;">
                 <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
                   <div style="display:flex;gap:8px;align-items:center;width:100%">
-                    <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;" disabled />
-                    <button id="usernameLockBtn" type="button" style="padding:11px 14px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="IGN bearbeiten">
+                    <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;"/>
+                    <!-- <button id="usernameLockBtn" type="button" style="padding:11px 14px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="IGN bearbeiten">
                       <svg id="lockIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;transition:opacity 0.2s;"><path id="lockBody" d="M5 11h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path id="lockShackle" d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    </button>
+                    </button> -->
                   </div>
                   <small style="color:var(--muted);font-size:12px;line-height:1.4;">Used for chat mentions and automatic adding to the list. Changes sync with your Discord account when logged in.</small>
                 </div>
@@ -1208,10 +1208,9 @@
                 <div style="font-size:12px;color:var(--muted);line-height:1.6">
                   <b style="color:var(--text)">Plus features:</b><br>
                   • Unlimited nickname entries<br>
-                  • Custom color themes & UI layouts<br>
                   • Advanced statistics & session history<br>
                   • Priority support & early features<br>
-                  • Export/Import settings backups<br><br>
+                  • Supporting Nebula development <3<br>
                   <b style="color:var(--accent)">Only €1.99/month</b>
                 </div>
               </div>
@@ -1657,54 +1656,52 @@
         startStats = normalized; // store normalized for diff calculations
         sessionUuid = normalized.uuid || rawResult.uuid || null;
         if (usernameInput) {
-          usernameInput.value = basicSettings.username || '';
-          let locked = true;
-          let lastValue = usernameInput.value;
-          const lockBtn = document.getElementById('usernameLockBtn');
-          const lockIcon = document.getElementById('lockIcon');
-          function setLockState(state) {
-            locked = state;
-            usernameInput.disabled = locked;
-            // SVG-Icon optisch anpassen
-            if (lockIcon) {
-              // Schloss zu: Shackle geschlossen, volle Deckkraft
-              lockIcon.style.opacity = locked ? '0.7' : '1';
-              const shackle = lockIcon.querySelector('#lockShackle');
-              if (shackle) {
-                shackle.setAttribute('d', locked
-                  ? 'M7 11V7a5 5 0 0 1 10 0v4' // geschlossen
-                  : 'M7 11V7a5 5 0 0 1 10 0v2' // offen (kürzer)
-                );
-              }
+          // Initial value from settings (or from normalized stats if you prefer)
+          usernameInput.value = (basicSettings.username || '').trim();
+
+          const applyUsernameChange = () => {
+            const prev = (basicSettings.username || '').trim();
+            const next = (usernameInput.value || '').trim();
+
+            if (prev === next) return;
+
+            // Remove old player source if needed
+            if (prev) {
+              removePlayerSource(prev, 'username');
             }
-            if (!locked) {
-              usernameInput.focus();
-              usernameInput.select();
-              lastValue = usernameInput.value;
-            }
-          }
-          if (lockBtn) {
-            lockBtn.addEventListener('click', () => {
-              if (locked) {
-                setLockState(false);
-              } else {
-                setLockState(true);
-                // Nur übernehmen, wenn sich der Wert geändert hat
-                const prev = (basicSettings.username || '').trim();
-                const next = (usernameInput.value || '').trim();
-                if (prev !== next) {
-                  if (prev) removePlayerSource(prev, 'username');
-                  basicSettings.username = next;
-                  localStorage.setItem('username', next);
-                  updateSidebarUsername();
-                  try { require('electron').ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
-                  if (next && next !== sessionUsername) {
-                    startSession(next);
-                  }
-                }
+
+            basicSettings.username = next;
+            localStorage.setItem('username', next);
+            updateSidebarUsername();
+
+            // Use the preload bridge instead of require('electron')
+            try {
+              if (window.ipcRenderer) {
+                window.ipcRenderer.send('set:username', basicSettings.username || '');
+              } else if (window.electronAPI && window.electronAPI.setUsername) {
+                window.electronAPI.setUsername(basicSettings.username || '');
               }
-            });
-          }
+            } catch (e) {
+              console.error('Failed to send username IPC update:', e);
+            }
+
+            // Restart session if IGN changed
+            if (next && next !== sessionUsername) {
+              startSession(next);
+            }
+          };
+
+          // Trigger on blur (user leaves the field)
+          usernameInput.addEventListener('blur', applyUsernameChange);
+
+          // Optional: also trigger on Enter key
+          usernameInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              applyUsernameChange();
+              usernameInput.blur();
+            }
+          });
+
           // Start session on app load if username exists (delayed)
           const savedUsername = basicSettings.username || '';
           if (savedUsername) {
@@ -5354,7 +5351,7 @@
               <button id="yearlyPlanBtn" style="background:linear-gradient(135deg,#20B2AA,#17A2B8);color:white;border:2px solid #20B2AA;padding:16px 24px;border-radius:12px;cursor:pointer;font-weight:500;font-size:14px;transition:all 0.2s ease;min-width:140px;position:relative;box-shadow:0 4px 12px rgba(32,178,170,0.3)">
                 <div style="position:absolute;top:-8px;right:-8px;background:#FF6B35;color:white;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700">-16%</div>
                 � Yearly<br>
-                <span style="font-size:18px;font-weight:700">€20</span><br>
+                <span style="font-size:18px;font-weight:700">€19.99</span><br>
                 <small style="opacity:0.9">save €4/year</small>
               </button>
             </div>
@@ -5414,7 +5411,7 @@
         };
       }
 
-      // Handle yearly plan (€20/year - save 16%!)
+      // Handle yearly plan (€19.99/year - save 16%!)
       const yearlyPlanBtn = document.getElementById('yearlyPlanBtn');
       if (yearlyPlanBtn) {
         yearlyPlanBtn.onclick = async () => {
@@ -5428,7 +5425,7 @@
               return;
             }
             
-            showNotification('💎 Opening yearly payment (€20/year - save 16%)...');
+            showNotification('💎 Opening yearly payment (€19.99/year - save 16%)...');
             
             // After a delay, show payment verification dialog
             setTimeout(() => {
