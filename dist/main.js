@@ -45,8 +45,16 @@ const node_fetch_1 = __importDefault(require("node-fetch"));
 require("dotenv/config");
 const chat_logger_1 = require("./chat-logger");
 const hypixelNormalizer_1 = require("./hypixelNormalizer");
+console.log("[Nebula:boot] main.ts top reached");
+process.on("uncaughtException", (err) => {
+    console.error("[Nebula:uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+    console.error("[Nebula:unhandledRejection]", reason);
+});
 let nicksWin = null;
 let win = null;
+const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 function initAutoUpdate() {
     if (!electron_1.app.isPackaged) {
         return;
@@ -125,12 +133,12 @@ async function createWindow() {
     win.setTitle('Nebula');
     // Clear cache before loading to ensure fresh content
     await win.webContents.session.clearCache();
-    win.loadFile(path.join(__dirname, '../src/renderer/index.html'));
+    win.loadFile(path.join(__dirname, 'renderer/index.html'));
     // Optional: open DevTools for debugging
-    const shouldOpenDevTools = process.env.NEBULA_DEVTOOLS === '1' || process.env.NODE_ENV === 'development';
-    if (shouldOpenDevTools) {
-        win.webContents.openDevTools({ mode: 'detach' });
-    }
+    //const shouldOpenDevTools = process.env.NEBULA_DEVTOOLS === '1' || process.env.NODE_ENV === 'development';
+    //if (shouldOpenDevTools) {
+    //  win.webContents.openDevTools({ mode: 'detach' });
+    //}
     win.on('closed', () => {
         win = null;
     });
@@ -513,7 +521,7 @@ class HypixelCache {
     }
 }
 // Zentraler Cache-Manager
-const hypixel = new HypixelCache(process.env.HYPIXEL_KEY || '');
+const hypixel = new HypixelCache(HYPIXEL_KEY);
 // --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
 electron_1.ipcMain.handle('bedwars:stats', async (_e, name) => {
     // Try enhanced API system first
@@ -523,7 +531,7 @@ electron_1.ipcMain.handle('bedwars:stats', async (_e, name) => {
     catch (error) {
         console.log('[API] Enhanced system failed, using original:', error);
         // Fallback to original system
-        if (!process.env.HYPIXEL_KEY) {
+        if (!HYPIXEL_KEY) {
             return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
         }
         return hypixel.getStats(name);
@@ -563,8 +571,7 @@ electron_1.ipcMain.handle('window:setBounds', (_e, bounds) => {
 // Note: Set DISCORD_CLIENT_ID in .env (Client Secret optional for desktop apps)
 // Create your Discord app at: https://discord.com/developers/applications
 // Important: Enable "Public Client" toggle in OAuth2 settings for desktop apps!
-const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
-const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || ''; // Optional for public clients
+const DISCORD_CLIENT_ID = '1436687708142702692';
 const DISCORD_REDIRECT_URI = 'http://localhost:3000/auth/discord/callback'; // Your backend callback URL
 // PKCE (Proof Key for Code Exchange) - required for Public Client apps
 let currentCodeVerifier = null;
@@ -614,14 +621,8 @@ electron_1.ipcMain.handle('auth:discord:exchange', async (_e, code) => {
             redirect_uri: DISCORD_REDIRECT_URI,
             code_verifier: currentCodeVerifier, // PKCE parameter (required for Public Client)
         };
-        // IMPORTANT: Only add client_secret if explicitly set and non-empty
-        // Public Client apps should NOT include client_secret
-        if (DISCORD_CLIENT_SECRET && DISCORD_CLIENT_SECRET.trim().length > 0) {
-            tokenParams.client_secret = DISCORD_CLIENT_SECRET;
-        }
         console.log('[Discord] Token exchange params:', {
             client_id: DISCORD_CLIENT_ID,
-            has_secret: !!DISCORD_CLIENT_SECRET,
             redirect_uri: DISCORD_REDIRECT_URI,
             code_length: code.length
         });
@@ -706,10 +707,6 @@ electron_1.ipcMain.handle('auth:discord:refresh', async (_e, refreshToken) => {
             grant_type: 'refresh_token',
             refresh_token: refreshToken,
         };
-        // Add client_secret only if provided
-        if (DISCORD_CLIENT_SECRET) {
-            refreshParams.client_secret = DISCORD_CLIENT_SECRET;
-        }
         const response = await (0, node_fetch_1.default)('https://discord.com/api/oauth2/token', {
             method: 'POST',
             headers: {
@@ -738,12 +735,12 @@ electron_1.ipcMain.handle('auth:discord:refresh', async (_e, refreshToken) => {
 // Get Firebase configuration for renderer process
 electron_1.ipcMain.handle('firebase:getConfig', async () => {
     return {
-        apiKey: process.env.FIREBASE_API_KEY,
-        authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.FIREBASE_APP_ID
+        apiKey: 'AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I',
+        authDomain: 'nebula-502f4.firebaseapp.com',
+        projectId: 'nebula-502f4',
+        storageBucket: 'nebula-502f4.firebasestorage.app',
+        messagingSenderId: '228435926597',
+        appId: '1:228435926597:web:6a36ab3dc7040494ec0d2c'
     };
 });
 // Initialize Firebase in main process
@@ -756,12 +753,12 @@ async function initFirebaseMain() {
         const { initializeApp } = require('firebase/app');
         const { getFirestore, doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
         const firebaseConfig = {
-            apiKey: process.env.FIREBASE_API_KEY,
-            authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-            appId: process.env.FIREBASE_APP_ID
+            apiKey: 'AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I',
+            authDomain: 'nebula-502f4.firebaseapp.com',
+            projectId: 'nebula-502f4',
+            storageBucket: 'nebula-502f4.firebasestorage.app',
+            messagingSenderId: '228435926597',
+            appId: '1:228435926597:web:6a36ab3dc7040494ec0d2c'
         };
         if (!firebaseConfig.apiKey) {
             console.error('[Firebase Main] No API key found');
@@ -1145,8 +1142,7 @@ class HypixelApiRouter {
         this.MIN_REQUEST_INTERVAL = 150; // 150ms between requests
         this.MAX_CONCURRENT = 3;
         this.config = {
-            backendUrl: process.env.BACKEND_API_URL,
-            userApiKey: process.env.HYPIXEL_KEY || '',
+            userApiKey: HYPIXEL_KEY,
             useFallbackKey: true,
             cacheTimeout: 5 * 60 * 1000, // 5 minutes
         };
@@ -1202,8 +1198,8 @@ class HypixelApiRouter {
             console.log('[API] Returning cached stats for', cached.data);
             return cached.data;
         }
-        // 1. .env-Key (process.env.HYPIXEL_KEY)
-        if (process.env.HYPIXEL_KEY && process.env.HYPIXEL_KEY.trim().length > 0) {
+        // 1. .env-Key (HYPIXEL_KEY)
+        if (HYPIXEL_KEY && HYPIXEL_KEY.trim().length > 0) {
             try {
                 const result = await hypixel.getStats(name);
                 if (!result?.error) {
@@ -1215,7 +1211,7 @@ class HypixelApiRouter {
             catch (e) { /* ignore, try next */ }
         }
         // 2. User-Key (falls in config.userApiKey, nicht .env)
-        if (this.config.userApiKey && this.config.userApiKey.trim().length > 0 && this.config.userApiKey !== process.env.HYPIXEL_KEY) {
+        if (this.config.userApiKey && this.config.userApiKey.trim().length > 0 && this.config.userApiKey !== HYPIXEL_KEY) {
             try {
                 const userHypixel = new HypixelCache(this.config.userApiKey);
                 const result = await userHypixel.getStats(name);
@@ -1320,15 +1316,10 @@ class HypixelApiRouter {
 }
 // Initialize enhanced API Router
 const apiRouter = new HypixelApiRouter({
-    userApiKey: process.env.HYPIXEL_KEY || '',
+    userApiKey: HYPIXEL_KEY,
     useFallbackKey: true,
     cacheTimeout: 5 * 60 * 1000
 });
-// const apiRouter = new HypixelApiRouter({
-//   userApiKey: process.env.HYPIXEL_KEY || '',
-//   useFallbackKey: true,
-//   cacheTimeout: 5 * 60 * 1000
-// });
 // --- IPC: Enhanced API Management ---
 electron_1.ipcMain.handle('api:getStatus', async () => {
     return apiRouter.getStatus();
