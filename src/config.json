@@ -1,0 +1,16 @@
+{
+  "discordClientId": "1436687708142702692",
+  "firebase": {
+    "apiKey": "AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I",
+    "authDomain": "nebula-502f4.firebaseapp.com",
+    "projectId": "nebula-502f4",
+    "storageBucket": "nebula-502f4.firebasestorage.app",
+    "messagingSenderId": "228435926597",
+    "appId": "1:228435926597:web:6a36ab3dc7040494ec0d2c"
+  },
+  "hypixelKey": "",
+  "backendApiUrl": "http://188.245.182.162:3000/api/player",
+  "stripeSecretKey":"",
+  "NEBULA_DEVTOOLS": "0",
+  "NODE_ENV": "production"
+}
