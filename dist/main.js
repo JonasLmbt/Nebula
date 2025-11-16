@@ -894,39 +894,31 @@ electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
     }
     try {
         const { doc, getDoc } = require('firebase/firestore');
-        // Check for paid plus first
-        const userDocRef = doc(firestore, 'plus', userId);
+        const userDocRef = doc(firestore, 'users', userId);
         const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const expiresAt = data.expiresAt ? data.expiresAt.toMillis() : 0;
-            const now = Date.now();
-            if (expiresAt > now) {
-                return {
-                    isPlus: true,
-                    type: 'paid',
-                    expiresAt: expiresAt,
-                    plan: data.plan || 'plus',
-                    status: data.status || 'active'
-                };
-            }
+        if (!docSnap.exists()) {
+            // kein User-Dokument -> kein Plus
+            return { isPlus: false };
         }
-        // Check for active test day
-        const testDocRef = doc(firestore, 'testDays', userId);
-        const testSnap = await getDoc(testDocRef);
-        if (testSnap.exists()) {
-            const testData = testSnap.data();
-            const testExpiresAt = testData.testExpiresAt;
-            if (testExpiresAt && new Date(testExpiresAt.toDate()) > new Date()) {
-                return {
-                    isPlus: true,
-                    type: 'test',
-                    expiresAt: testExpiresAt.toMillis(),
-                    plan: 'test-plus',
-                    status: 'active-test'
-                };
-            }
+        const data = docSnap.data();
+        const plus = data.plus;
+        // kein plus-Feld oder keine expiresAt -> kein Plus
+        if (!plus || !plus.expiresAt) {
+            return { isPlus: false };
         }
+        const expiresAtMs = plus.expiresAt.toMillis();
+        const now = Date.now();
+        if (expiresAtMs > now && (plus.status || 'active') === 'active') {
+            // aktives Plus
+            return {
+                isPlus: true,
+                type: 'paid',
+                expiresAt: expiresAtMs,
+                plan: plus.plan || 'plus',
+                status: plus.status || 'active',
+            };
+        }
+        // abgelaufen oder nicht active
         return { isPlus: false };
     }
     catch (error) {
@@ -934,177 +926,35 @@ electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
         return { isPlus: false, error: String(error) };
     }
 });
-// Create Stripe checkout session (simplified - Stripe handles trials)
+// Create Stripe checkout session via backend API
 electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { plan: 'monthly' }) => {
     try {
-        // Use real Stripe payment links with built-in 7-day trials
-        const checkoutUrl = options.plan === 'yearly'
-            ? 'https://buy.stripe.com/9B65kCfLT3Iv7Gn5JO5wI02' // Yearly: €19.99/year (save €4)
-            : 'https://buy.stripe.com/9B65kC43b92P4ubc8c5wI01'; // Monthly: €1.99/month
-        console.log('[Plus] Opening Stripe checkout:', checkoutUrl, 'Plan:', options.plan);
+        const plan = options?.plan ?? 'monthly';
+        // Base URL of your backend (you can also move this to a config file)
+        const backendBaseUrl = process.env.NEBULA_BACKEND_URL || 'https://nebula-overlay.online';
+        const response = await (0, node_fetch_1.default)(`${backendBaseUrl}/api/plus/create-checkout-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, plan })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.url) {
+            const errMsg = data?.error || `Failed to create checkout session (status ${response.status})`;
+            console.error('[Plus] Backend checkout session error:', errMsg);
+            return { error: errMsg };
+        }
+        const checkoutUrl = data.url;
+        console.log('[Plus] Opening Stripe checkout from backend:', checkoutUrl, 'Plan:', plan);
         await electron_1.shell.openExternal(checkoutUrl);
         return {
             success: true,
-            message: options.plan === 'yearly'
-                ? '� Yearly plan selected! €19.99/year (save 16%)'
-                : '� Monthly plan selected! €1.99/month'
+            message: plan === 'yearly'
+                ? 'Yearly plan selected! €19.99/year (save 16%)'
+                : 'Monthly plan selected! €1.99/month'
         };
     }
     catch (error) {
         console.error('[Plus] Checkout failed:', error);
-        return { error: String(error) };
-    }
-});
-// Verify plus purchase with real Stripe API
-electron_1.ipcMain.handle('plus:verify', async (_e, userId, sessionId) => {
-    if (!await initFirebaseMain()) {
-        return { error: 'Firebase not initialized' };
-    }
-    try {
-        const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-        if (!stripeSecretKey || stripeSecretKey === 'sk_test_your_secret_key_here') {
-            return { error: 'Stripe not configured. Please add your Stripe Secret Key to .env file.' };
-        }
-        // If no sessionId provided, return error
-        if (!sessionId) {
-            return { error: 'No payment session ID provided' };
-        }
-        // Verify session with Stripe API
-        const stripeResponse = await (0, node_fetch_1.default)(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
-            headers: {
-                'Authorization': `Bearer ${stripeSecretKey}`
-            }
-        });
-        if (!stripeResponse.ok) {
-            return { error: 'Invalid payment session' };
-        }
-        const session = await stripeResponse.json();
-        // Check if payment was successful
-        if (session.payment_status !== 'paid') {
-            return { error: 'Payment not completed' };
-        }
-        const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
-        // Add 1 month of plus
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-        const plusDocRef = doc(firestore, 'plus', userId);
-        await setDoc(plusDocRef, {
-            plan: 'plus',
-            status: 'active',
-            stripeSessionId: sessionId,
-            purchasedAt: serverTimestamp(),
-            expiresAt: expiresAt,
-            features: {
-                unlimitedNicks: true,
-                customThemes: true,
-                advancedStats: true,
-                prioritySupport: true
-            }
-        });
-        console.log('[Plus] Activated for user:', userId);
-        return {
-            success: true,
-            expiresAt: expiresAt.getTime(),
-            message: 'Plus activated successfully!'
-        };
-    }
-    catch (error) {
-        console.error('[Plus] Verification failed:', error);
-        return { error: String(error) };
-    }
-});
-// Get monthly test day info
-electron_1.ipcMain.handle('plus:getTestDayInfo', async (_e, userId) => {
-    if (!await initFirebaseMain()) {
-        return { error: 'Firebase not initialized' };
-    }
-    try {
-        const { doc, getDoc } = require('firebase/firestore');
-        const testDocRef = doc(firestore, 'testDays', userId);
-        const docSnap = await getDoc(testDocRef);
-        const now = new Date();
-        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        if (!docSnap.exists()) {
-            return {
-                canUseTestDay: true,
-                currentMonth,
-                message: 'You can use your monthly 24h Plus test!'
-            };
-        }
-        const data = docSnap.data();
-        const lastUsedMonth = data.lastUsedMonth;
-        const isTestActive = data.testExpiresAt && new Date(data.testExpiresAt.toDate()) > now;
-        if (lastUsedMonth === currentMonth && !isTestActive) {
-            return {
-                canUseTestDay: false,
-                currentMonth,
-                message: 'Monthly test day already used. Try again next month!'
-            };
-        }
-        if (isTestActive) {
-            const expiresAt = new Date(data.testExpiresAt.toDate());
-            const hoursLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (60 * 60 * 1000));
-            return {
-                canUseTestDay: false,
-                currentMonth,
-                isActive: true,
-                expiresAt: expiresAt.toISOString(),
-                message: `Test Plus active! ${hoursLeft} hours left.`
-            };
-        }
-        return {
-            canUseTestDay: true,
-            currentMonth,
-            message: 'You can use your monthly 24h Plus test!'
-        };
-    }
-    catch (error) {
-        console.error('[Plus] Test day info failed:', error);
-        return { error: String(error) };
-    }
-});
-// Activate monthly test day
-electron_1.ipcMain.handle('plus:activateTestDay', async (_e, userId) => {
-    if (!await initFirebaseMain()) {
-        return { error: 'Firebase not initialized' };
-    }
-    try {
-        const { doc, getDoc, setDoc, serverTimestamp } = require('firebase/firestore');
-        // Check if test day is available first
-        const testDocRef = doc(firestore, 'testDays', userId);
-        const docSnap = await getDoc(testDocRef);
-        const now = new Date();
-        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        // Check if already used this month
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const lastUsedMonth = data.lastUsedMonth;
-            const isTestActive = data.testExpiresAt && new Date(data.testExpiresAt.toDate()) > now;
-            if (isTestActive) {
-                const expiresAt = new Date(data.testExpiresAt.toDate());
-                const hoursLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (60 * 60 * 1000));
-                return { error: `Test Plus already active! ${hoursLeft} hours left.` };
-            }
-            if (lastUsedMonth === currentMonth) {
-                return { error: 'Monthly test day already used. Try again next month!' };
-            }
-        }
-        // Activate 24h test
-        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
-        await setDoc(testDocRef, {
-            lastUsedMonth: currentMonth,
-            testStartedAt: serverTimestamp(),
-            testExpiresAt: expiresAt,
-            updatedAt: serverTimestamp()
-        });
-        console.log('[Plus] 24h test day activated for user:', userId);
-        return {
-            success: true,
-            expiresAt: expiresAt.toISOString(),
-            message: '🎉 24h Plus test activated!'
-        };
-    }
-    catch (error) {
-        console.error('[Plus] Test day activation failed:', error);
         return { error: String(error) };
     }
 });
@@ -1225,7 +1075,7 @@ class HypixelApiRouter {
         }
         // 3. Backend
         try {
-            const backendUrl = `http://188.245.182.162:3000/api/player?name=${encodeURIComponent(name)}`;
+            const backendUrl = `https://nebula-overlay.online/api/player?name=${encodeURIComponent(name)}`;
             const res = await (0, node_fetch_1.default)(backendUrl);
             if (!res.ok)
                 throw new Error('Backend not available');

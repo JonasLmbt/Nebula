@@ -1210,7 +1210,7 @@
                   • Unlimited nickname entries<br>
                   • Advanced statistics & session history<br>
                   • Priority support & early features<br>
-                  • Supporting Nebula development <3<br>
+                  • Support Nebula development <3<br>
                   <b style="color:var(--accent)">Only €1.99/month</b>
                 </div>
               </div>
@@ -1411,7 +1411,7 @@
     }
 
     // Auto-resize overlay logic (defined early so it can be called anywhere)
-  const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
+    const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
     const MIN_HEIGHT = 120; // minimum window height for empty overlay
     const DEFAULT_HEIGHT = 560; // default full height
     let resizeTimeout = null;
@@ -2742,14 +2742,21 @@
     saveNickBtn?.addEventListener('click', () => {
       const nick = nickInput.value.trim();
       const real = realNameInput.value.trim();
-      
+
+      // Limit für nicht-Plus-Nutzer
+      const isPlus = (localStorage.getItem('demoPlus') === 'true') || (window.userProfile && window.userProfile.isPlus);
+      if (!isPlus && nicks.length >= 5) {
+        showNotification('Maximum of 5 nicknames without Plus allowed. Upgrade to Plus for unlimited entries!');
+        return;
+      }
+
       if (nick && real) {
         if (!nicks.some(n => n.nick.toLowerCase() === nick.toLowerCase())) {
           nicks.push({nick, real});
           saveNicks();
           renderNicks();
           renderTable();
-          
+
           // Reset form
           nickInput.value = '';
           realNameInput.value = '';
