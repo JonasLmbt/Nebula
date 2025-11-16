@@ -1437,9 +1437,7 @@
             return;
         }
         if (!allowAuto || !activePanel || activePanel !== panelOverlay) {
-          const table = document.getElementById('table');
-          const rc = table?.querySelectorAll('tbody tr').length || 0;
-          if (rc === 0) ipcRenderer.invoke('window:setBounds', { height: MIN_HEIGHT });
+          // Keine Größenanpassung außerhalb des Overlays
           return;
         }
 

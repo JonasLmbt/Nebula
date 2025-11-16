@@ -961,9 +961,22 @@ electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { 
 // Open Stripe Customer Portal for subscription management
 electron_1.ipcMain.handle('premium:manageSubscription', async (_e, userId) => {
     try {
-        // For now, open Stripe customer portal link
-        // In production: You'd create a customer portal session via API
-        const customerPortalUrl = 'https://billing.stripe.com/p/login/test_your_portal_link';
+        if (!userId) {
+            return { error: 'No userId provided' };
+        }
+        const backendBaseUrl = process.env.NEBULA_BACKEND_URL || 'https://nebula-overlay.online';
+        const response = await (0, node_fetch_1.default)(`${backendBaseUrl}/api/plus/create-customer-portal-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.url) {
+            const errMsg = data?.error || `Failed to create customer portal session (status ${response.status})`;
+            console.error('[Plus] Customer portal backend error:', errMsg);
+            return { error: errMsg };
+        }
+        const customerPortalUrl = data.url;
         console.log('[Plus] Opening customer portal for user:', userId);
         await electron_1.shell.openExternal(customerPortalUrl);
         return {
