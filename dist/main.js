@@ -40,11 +40,10 @@ const electron_1 = require("electron");
 const electron_updater_1 = require("electron-updater");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
-const crypto = __importStar(require("crypto"));
 const node_fetch_1 = __importDefault(require("node-fetch"));
 require("dotenv/config");
-const chat_logger_1 = require("./chat-logger");
-const hypixelNormalizer_1 = require("./hypixelNormalizer");
+const chat_logger_1 = require("./logs/chat-logger");
+const hypixelNormalizer_1 = require("./logs/hypixelNormalizer");
 console.log("[Nebula:boot] main.ts top reached");
 process.on("uncaughtException", (err) => {
     console.error("[Nebula:uncaughtException]", err);
@@ -126,14 +125,15 @@ async function createWindow() {
         title: 'Nebula',
         icon: iconPath,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            preload: path.join(__dirname, 'renderer', 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
         },
     });
     win.setTitle('Nebula');
     // Clear cache before loading to ensure fresh content
     await win.webContents.session.clearCache();
-    win.loadFile(path.join(__dirname, 'renderer/index.html'));
+    win.loadFile(path.join(__dirname, "renderer", "index.html"));
     // Optional: open DevTools for debugging
     //const shouldOpenDevTools = process.env.NEBULA_DEVTOOLS === '1' || process.env.NODE_ENV === 'development';
     //if (shouldOpenDevTools) {
@@ -378,27 +378,6 @@ electron_1.ipcMain.handle('window:resize', (_e, payload) => {
     }
     win.setBounds({ x: nx, y: ny, width: nw, height: nh }, false);
 });
-function createNicksWindow() {
-    nicksWin = new electron_1.BrowserWindow({
-        width: 400,
-        height: 500,
-        transparent: true,
-        frame: false,
-        resizable: true,
-        minimizable: true,
-        maximizable: false,
-        alwaysOnTop: true,
-        title: 'Nebula - Nicks',
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-        },
-    });
-    nicksWin.loadFile(path.join(__dirname, '../src/renderer/nicks.html'));
-    nicksWin.on('closed', () => {
-        nicksWin = null;
-    });
-}
 // Hypixel Cache & Rate Limiter
 class HypixelCache {
     constructor(apiKey) {
@@ -568,167 +547,35 @@ electron_1.ipcMain.handle('window:setBounds', (_e, bounds) => {
     }
 });
 // --- Discord OAuth2 Authentication ---
-// Note: Set DISCORD_CLIENT_ID in .env (Client Secret optional for desktop apps)
-// Create your Discord app at: https://discord.com/developers/applications
-// Important: Enable "Public Client" toggle in OAuth2 settings for desktop apps!
-const DISCORD_CLIENT_ID = '1436687708142702692';
-const DISCORD_REDIRECT_URI = 'http://localhost:3000/auth/discord/callback'; // Your backend callback URL
-// PKCE (Proof Key for Code Exchange) - required for Public Client apps
-let currentCodeVerifier = null;
-// Generate PKCE code_verifier and code_challenge
-function generatePKCE() {
-    // Generate random code_verifier (43-128 chars, base64url)
-    const verifier = crypto.randomBytes(32).toString('base64url');
-    // Create code_challenge (SHA256 hash of verifier, base64url encoded)
-    const challenge = crypto.createHash('sha256')
-        .update(verifier)
-        .digest('base64url');
-    return { code_verifier: verifier, code_challenge: challenge };
-}
+const DISCORD_LOGIN_URL = "https://nebula-overlay.online/api/auth/discord/login";
 // Open Discord OAuth2 URL in browser
-electron_1.ipcMain.handle('auth:discord:login', async () => {
-    if (!DISCORD_CLIENT_ID) {
-        return { error: 'Discord Client ID not configured. Please add DISCORD_CLIENT_ID to .env file.' };
-    }
-    // Generate PKCE parameters for this auth session
-    const { code_verifier, code_challenge } = generatePKCE();
-    currentCodeVerifier = code_verifier;
-    console.log('[Discord] Generated PKCE challenge for auth session');
-    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify&code_challenge=${code_challenge}&code_challenge_method=S256`;
-    try {
-        await electron_1.shell.openExternal(authUrl);
-        return { success: true, message: 'Discord login opened in browser. Complete the login and return here.' };
-    }
-    catch (err) {
-        console.error('Failed to open Discord auth URL:', err);
-        return { error: 'Failed to open browser for Discord login.' };
-    }
+electron_1.ipcMain.handle("auth:discord:login", async () => {
+    await electron_1.shell.openExternal("https://nebula-overlay.online/api/auth/discord/login");
+    return { success: true };
 });
-// Exchange Discord auth code for tokens (called by renderer after redirect)
-electron_1.ipcMain.handle('auth:discord:exchange', async (_e, code) => {
-    if (!DISCORD_CLIENT_ID) {
-        return { error: 'Discord Client ID not configured in .env' };
-    }
-    if (!currentCodeVerifier) {
-        return { error: 'No PKCE code_verifier found. Please restart the login flow.' };
-    }
+electron_1.ipcMain.handle("auth:discord:getUser", async () => {
     try {
-        // Build token request body with PKCE code_verifier
-        const tokenParams = {
-            client_id: DISCORD_CLIENT_ID,
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: DISCORD_REDIRECT_URI,
-            code_verifier: currentCodeVerifier, // PKCE parameter (required for Public Client)
-        };
-        console.log('[Discord] Token exchange params:', {
-            client_id: DISCORD_CLIENT_ID,
-            redirect_uri: DISCORD_REDIRECT_URI,
-            code_length: code.length
+        const res = await (0, node_fetch_1.default)("https://nebula-overlay.online/api/auth/me", {
+            credentials: "include"
         });
-        // Exchange code for access token
-        const tokenResponse = await (0, node_fetch_1.default)('https://discord.com/api/oauth2/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams(tokenParams).toString(),
-        });
-        if (!tokenResponse.ok) {
-            const errorText = await tokenResponse.text();
-            console.error('[Discord] Token exchange failed:', errorText);
-            console.error('[Discord] Request params:', new URLSearchParams(tokenParams).toString());
-            return { error: `Failed to exchange Discord auth code: ${errorText}` };
-        }
-        const tokenData = await tokenResponse.json();
-        // Fetch user info
-        const userResponse = await (0, node_fetch_1.default)('https://discord.com/api/users/@me', {
-            headers: {
-                Authorization: `Bearer ${tokenData.access_token}`,
-            },
-        });
-        if (!userResponse.ok) {
-            return { error: 'Failed to fetch Discord user info' };
-        }
-        const userData = await userResponse.json();
-        // Return user data and tokens
-        return {
-            success: true,
-            user: {
-                id: userData.id,
-                username: userData.username,
-                discriminator: userData.discriminator,
-                avatar: userData.avatar
-                    ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-                    : null,
-                tag: `${userData.username}#${userData.discriminator}`,
-            },
-            tokens: {
-                accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
-                expiresIn: tokenData.expires_in,
-            },
-        };
-        // Clear code_verifier after successful exchange
-        currentCodeVerifier = null;
-        return {
-            success: true,
-            user: {
-                id: userData.id,
-                username: userData.username,
-                discriminator: userData.discriminator,
-                avatar: userData.avatar
-                    ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png`
-                    : null,
-                tag: `${userData.username}#${userData.discriminator}`,
-            },
-            tokens: {
-                accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
-                expiresIn: tokenData.expires_in,
-            },
-        };
+        const data = await res.json();
+        return data;
     }
     catch (err) {
-        console.error('Discord auth exchange error:', err);
-        // Clear code_verifier on error too
-        currentCodeVerifier = null;
+        console.error("[Electron] getUser failed:", err);
         return { error: String(err) };
     }
 });
-// Refresh Discord access token
-electron_1.ipcMain.handle('auth:discord:refresh', async (_e, refreshToken) => {
-    if (!DISCORD_CLIENT_ID) {
-        return { error: 'Discord Client ID not configured' };
-    }
+electron_1.ipcMain.handle("auth:logout", async () => {
     try {
-        const refreshParams = {
-            client_id: DISCORD_CLIENT_ID,
-            grant_type: 'refresh_token',
-            refresh_token: refreshToken,
-        };
-        const response = await (0, node_fetch_1.default)('https://discord.com/api/oauth2/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams(refreshParams).toString(),
+        const res = await (0, node_fetch_1.default)("https://nebula-overlay.online/api/auth/logout", {
+            method: "POST",
+            credentials: "include"
         });
-        if (!response.ok) {
-            return { error: 'Failed to refresh Discord token' };
-        }
-        const data = await response.json();
-        return {
-            success: true,
-            tokens: {
-                accessToken: data.access_token,
-                refreshToken: data.refresh_token,
-                expiresIn: data.expires_in,
-            },
-        };
+        return res.json();
     }
     catch (err) {
-        console.error('Discord token refresh error:', err);
+        console.error("[Electron] logout failed:", err);
         return { error: String(err) };
     }
 });
