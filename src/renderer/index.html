@@ -1,1311 +1,885 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nebula</title>
 
-  <style>
-  :root{
-    --bg: rgba(20,20,28,0.78);
-    --panel: rgba(255,255,255,0.06);
-    --text: #e9e9f1;
-    --muted: #9aa0aa;
-  --accent: #66eaff; /* updated according to latest style snippet */
-    --accent-soft: rgba(102,234,255,0.25);
-    --good: #43d17f;
-    --warn: #e0c14d;
-    --bad: #e05a5a;
-    --row: rgba(255,255,255,0.03);
-    --row-hover: rgba(255,255,255,0.06);
-    --menu: #1f2230;
-    --shadow: 0 12px 30px rgba(0,0,0,0.35);
-    --grip: 8px;
-  }
+  <head>
 
-  /* Reset / Base */
-  html,body{margin:0;height:100%}
-  body{
-    background:var(--bg);
-    color:var(--text);
-    font:14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Arial, sans-serif;
-    -webkit-font-smoothing:antialiased;
-    user-select:none;
-  }
-  /* Hide scrollbars */
-  *::-webkit-scrollbar{width:0;height:0;background:transparent}
-  *{scrollbar-width:none;-ms-overflow-style:none}
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nebula</title>
+    <link rel="stylesheet" href="./styles/styles.css" />
 
-  /* Topbar */
-  .topbar{
-    display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);
-    -webkit-app-region:drag;
-  }
-  .brand{display:flex;align-items:center}
-  .brand img{height:32px;opacity:.95;display:block} /* reduced for precise topbar spacing */
-  .spacer{flex:1}
-  .icon-btn,.search{ -webkit-app-region:no-drag }
-  .icon-btn{
-    width:30px;height:30px;display:grid;place-items:center;border-radius:8px;border:0;
-    background:transparent;color:#cfd6e3;cursor:pointer; /* Farbe laut neuem Snippet */
-  }
-  .icon-btn:hover{background:var(--row-hover);color:var(--accent)}
-  /* Unified icon styling (SVG sprite via <use>) */
-  .icon{width:16px;height:16px;display:block;opacity:.9}
-  /* Inline icon utility: keep SVG inline within text without breaking lines */
-  .icon-inline{display:inline-block;vertical-align:text-bottom;line-height:0}
-  .nav-icon .icon{width:18px;height:18px;opacity:.85}
-  .icon-btn--danger:hover{background:rgba(224,90,90,0.20);color:#ff6b6b;filter:drop-shadow(0 0 6px rgba(255,107,107,0.25))}
+  </head>
 
-  /* Search */
-  .search{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--row);border-radius:12px}
-  .search .svg{width:14px;height:14px;opacity:.6}
-  .search input{background:transparent;border:0;outline:0;color:var(--text);width:280px;font-size:13px}
+  <body>
+    <!-- Nebula icon sprite (stroke=2, round caps/joins, currentColor) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 0 1-9 9 9 9 0 1 1 6.3-15.3"/><path d="M21 3v6h-6"/>
+      </symbol>
+      <symbol id="i-clear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 13h10l1-13"/><path d="M10 10v7M14 10v7"/>
+      </symbol>
+      <symbol id="i-min" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
 
-  /* Content / Table */
-  /* Reduced vertical padding to tighten space above table */
-  .content{padding:4px 10px 4px}
-  .table-wrap{padding:0 6px 4px;overflow-x:auto}
-  table{width:100%;border-collapse:collapse;table-layout:auto;box-sizing:border-box}
-  #table{font-size:var(--table-font-size,14px)}
-  colgroup col.c-lvl{min-width:64px;width:auto}
-  colgroup col.c-name{min-width:140px;width:auto}
-  colgroup col.c-ws{min-width:50px;width:auto}
-  colgroup col.c-fkdr, colgroup col.c-wlr, colgroup col.c-bblr{min-width:70px;width:auto}
-  colgroup col.c-fk, colgroup col.c-wins{min-width:80px;width:auto}
-  colgroup col.c-actions{min-width:50px;width:50px}
+      <!-- Sidebar -->
+      <symbol id="i-overlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>
+      </symbol>
+      <symbol id="i-nicks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="8.5" r="3"/><path d="M2.5 19c1.6-3 4-4.5 6.5-4.5s4.9 1.5 6.5 4.5"/>
+        <path d="M16 5h4M16 9h6M16 13h5" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M4 12h2.5M17.5 12H20"/>
+        <path d="M12 4v2.5M12 17.5V20"/>
+        <path d="M6.6 6.6l1.8 1.8M15.6 15.6l1.8 1.8"/>
+        <path d="M6.6 17.4l1.8-1.8M15.6 8.4l1.8-1.8"/>
+      </symbol>
+      <symbol id="i-basic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h12"/><circle cx="16" cy="7" r="2.5"/>
+        <path d="M4 17h8"/><circle cx="10" cy="17" r="2.5"/>
+      </symbol>
+      <symbol id="i-client" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2"/>
+        <path d="M7 9h5M7 13h3M14 13h3"/>
+        <path d="M14 9h3"/>
+      </symbol>
+      <symbol id="i-appearance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="7"/><path d="M5 12h14M12 5v14"/>
+      </symbol>
+      <symbol id="i-sources" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 16l6-6 4 4 8-8"/><path d="M14 6h7v7"/>
+      </symbol>
+      <symbol id="i-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 5v14M15 5v14"/>
+      </symbol>
+      <symbol id="i-shortcuts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M9 14h6"/>
+      </symbol>
+      <symbol id="i-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20c1.8-3.2 4.7-5 8-5s6.2 1.8 8 5"/>
+      </symbol>
+      <!-- Additional icons for settings subitems -->
+      <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 2v6h6"/>
+      </symbol>
+      <symbol id="i-ghost" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2c-4.42 0-8 3.58-8 8v12l2-2 2 2 2-2 2 2 2-2 2 2 2-2V10c0-4.42-3.58-8-8-8zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 1a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+      </symbol>
+      <symbol id="i-party" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+      </symbol>
+      <symbol id="i-discord" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.565 18.565 0 0 0-5.487 0 12.923 12.923 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026 13.83 13.83 0 0 0 1.226-1.963.074.074 0 0 0-.041-.104 13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/>
+      </symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+      </symbol>
+      <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6"/>
+        <circle cx="12" cy="12" r="2"/>
+      </symbol>
+      <!-- Self/Own user indicator -->
+      <symbol id="i-self" viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M4 20c1.8-3.2 4.7-5 8-5s6.2 1.8 8 5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="6" r="3" fill="currentColor"/>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20,6 9,17 4,12"/>
+      </symbol>
+      <!-- Step icons for Discord login guide -->
+      <symbol id="i-step-1" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
+        <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">1</text>
+      </symbol>
+      <symbol id="i-step-2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
+        <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">2</text>
+      </symbol>
+      <symbol id="i-step-3" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
+        <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">3</text>
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="7" cy="7" r="3"/>
+        <path d="m21 12-4.4-4.4a1.5 1.5 0 0 0-2.12 0L9.5 12.5a1.5 1.5 0 0 0 0 2.12L14 19l7-7z"/>
+        <path d="M16 8 2 22"/>
+        <path d="m8 16 6-6"/>
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="m9 12 2 2 4-4"/>
+      </symbol>
+      <symbol id="i-session" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 1v6"/>
+        <path d="M12 17v6"/>
+        <path d="m4.2 4.2 4.2 4.2"/>
+        <path d="m15.6 15.6 4.2 4.2"/>
+        <path d="M1 12h6"/>
+        <path d="M17 12h6"/>
+        <path d="m4.2 19.8 4.2-4.2"/>
+        <path d="m15.6 8.4 4.2-4.2"/>
+      </symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 3l5 5-5 5-4-4-6 6-2-2 6-6-4-4 5-5z"/>
+      </symbol>
+    </svg>
+    <div class="topbar">
+      <button id="menuBtn" class="icon-btn" aria-label="Menu" title="Menu">
+        <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+        </svg>
+      </button>
+    <div class="brand"><img src="../../assets/nebula-lettering.svg" alt="Nebula"></div>
+      <div class="spacer"></div>
 
-  thead th{
-    text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:3px 6px;cursor:pointer; /* reduced vertical padding */
-    -webkit-app-region:no-drag;
-  }
-  th.metric-h, td.metric{ text-align:right;font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1,"lnum" 1 }
-  tbody td{
-    padding:2px 6px;border-top:1px solid rgba(255,255,255,0.06);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; /* tighter rows */
-    line-height:1.3;
-  }
-  tbody tr:hover{background:var(--row-hover)}
-  .lvl{font-weight:600}
-  .name{font-weight:600;color:#6bd3ff}
-  .rank-tag{font-weight:700;margin-right:6px}
-  .metric{text-align:right}
-  .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+      <!-- Refresh -->
+      <button id="refresh" class="icon-btn" aria-label="Refresh" title="Refresh">
+        <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
+      </button>
 
-  /* sort indicators */
-  thead th[data-sort-key]{position:relative}
-  thead th.sort-asc::after, thead th.sort-desc::after{
-    content:"";display:inline-block;margin-left:6px;border:5px solid transparent;opacity:.6
-  }
-  thead th.sort-asc::after{border-bottom-color:var(--muted)}
-  thead th.sort-desc::after{border-top-color:var(--muted)}
+      <!-- Clear all -->
+      <button id="clearAll" class="icon-btn" aria-label="Clear all players" title="Clear all players">
+        <svg class="icon" aria-hidden="true"><use href="#i-clear"/></svg>
+      </button>
 
-  /* Row actions / menu */
-  .actions{ text-align:right; position:relative; overflow:visible }
-  .menu{
-    position:absolute; right:8px; top:28px; background:var(--menu); border-radius:8px; box-shadow:var(--shadow);
-    padding:6px; min-width:120px; display:none; z-index:10000;
-  }
-  .menu.open{display:block}
-  .menu button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:8px 10px;border-radius:6px;cursor:pointer}
-  .menu button:hover{background:var(--row-hover)}
-  /* Pinned row styling */
-  tr.pinned { background: rgba(255,255,255,0.08); }
-  tr.pinned:hover { background: rgba(255,255,255,0.10); }
-  .pin-indicator { margin-left:4px; color: var(--accent); filter: drop-shadow(0 0 2px rgba(102,234,255,0.4)); }
-  thead th.sorted { color: var(--accent); }
+      <!-- Search -->
+      <div class="search">
+        <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20 15.5 14zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/>
+        </svg>
+        <input id="playerInput" placeholder="Search player(s), comma-separated" />
+      </div>
 
-  /* Resize grips */
-  .grip{position:fixed;z-index:1000;-webkit-app-region:no-drag}
-  .g-top{top:0;left:0;right:0;height:var(--grip);cursor:n-resize}
-  .g-bottom{bottom:0;left:0;right:0;height:var(--grip);cursor:s-resize}
-  .g-left{top:0;bottom:0;left:0;width:var(--grip);cursor:w-resize}
-  .g-right{top:0;bottom:0;right:0;width:var(--grip);cursor:e-resize}
-  .g-tl{top:0;left:0;width:var(--grip);height:var(--grip);cursor:nw-resize}
-  .g-tr{top:0;right:0;width:var(--grip);height:var(--grip);cursor:ne-resize}
-  .g-bl{bottom:0;left:0;width:var(--grip);height:var(--grip);cursor:sw-resize}
-  .g-br{bottom:0;right:0;width:var(--grip);height:var(--grip);cursor:se-resize}
+      <!-- Minimize -->
+      <button id="minBtn" class="icon-btn" aria-label="Minimize" title="Minimize">
+        <svg class="icon" aria-hidden="true"><use href="#i-min"/></svg>
+      </button>
 
-  /* Sidebar / Toolbar */
-  .sidebar{
-    position:fixed;left:0;top:0;bottom:0;width:260px;transform:translateX(-100%);
-    transition:transform .22s cubic-bezier(.2,.9,.2,1);
-    background:rgba(30,30,36,0.96);color:var(--text);box-shadow:var(--shadow);z-index:2000;
-    -webkit-app-region:no-drag;display:flex;flex-direction:column;overflow:hidden;
-  }
-  .sidebar.open{transform:translateX(0)}
-  .sidebar-inner{display:flex;flex-direction:column;height:100%;padding:14px}
-  .nav{display:flex;flex-direction:column;gap:6px;margin-top:6px}
-  .nav-item{
-    display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:transparent;color:var(--text);
-    border:0;text-align:left;cursor:pointer;-webkit-app-region:no-drag;font-weight:500;
-  }
-  .nav-item:hover{background:var(--row-hover)}
-  .nav-item.active{background:rgba(255,255,255,0.04);font-weight:700}
-  .nav-icon{width:22px;display:inline-block;text-align:center}
-  .nav-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .nav-sep{height:1px;background:rgba(255,255,255,0.03);margin:10px 0;border-radius:2px}
-  .sidebar-footer{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:0}
-  .user-row{display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--muted);padding-top:8px;border-top:1px solid rgba(255,255,255,0.02)}
-  .user-icon{width:20px;display:inline-block;text-align:center}
+      <!-- Close -->
+      <button id="closeBtn" class="icon-btn icon-btn--danger" aria-label="Close" title="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+      </button>
 
-  /* Buttons */
-  .btn{border:0;padding:9px 10px;border-radius:6px;background:transparent;color:var(--text);cursor:pointer;-webkit-app-region:no-drag}
-  .btn.primary{background:#ffb400;color:#111;font-weight:700}
-  .btn.community{border:1px solid rgba(255,255,255,0.06);color:var(--accent)}
 
-  /* Panels */
-  .panel{display:none;padding:14px;height:calc(100vh - 50px);overflow-y:auto}
-  .panel.active{display:block}
-
-  /* Settings section containers */
-  .settings-content{display:none}
-  .settings-content.active{display:block}
-
-  /* Nicks */
-  .nicks-list{background:var(--panel);border-radius:12px;overflow:hidden;margin-top:12px}
-  .nick-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04)}
-  .nick-row:last-child{border:0}
-  .nick-name{flex:1;margin-right:14px;font-weight:500}
-  .nick-real{color:var(--muted);margin-right:14px}
-  .delete-btn{opacity:.5;padding:6px;cursor:pointer;border:0;background:transparent;color:var(--text)}
-  .delete-btn:hover{opacity:1}
-  .add-btn{
-    position:fixed;right:20px;bottom:20px;width:48px;height:48px;border-radius:24px;background:var(--accent);color:#111;border:0;
-    font-size:24px;cursor:pointer;box-shadow:0 4px 12px var(--accent-soft);transition:transform .2s ease
-  }
-  .add-btn:hover{transform:scale(1.05);box-shadow:0 6px 16px rgba(102,234,255,0.5)}
-
-  .nick-indicator{display:inline-flex;align-items:center;margin-left:6px;opacity:.7;cursor:help}
-  .party-indicator{display:inline-flex;align-items:center;margin-left:4px;opacity:.8;cursor:help;color:var(--accent)}
-  .self-indicator{display:inline-flex;align-items:center;margin-left:4px;opacity:1;cursor:help}
-  .nick-indicator .icon{width:16px;height:16px}
-  .party-indicator .icon{width:16px;height:16px}
-  .self-indicator .icon{width:16px;height:16px}
-
-  /* Forms */
-  .add-nick-form{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px}
-  .add-nick-form h2{margin:0 0 16px;font-size:18px;font-weight:600}
-  .form-row{margin-bottom:12px}
-  .form-label{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,0.2);padding:8px 12px;border-radius:8px}
-  .form-label .icon{opacity:.7}
-  .form-label input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font-size:14px;padding:4px 0}
-  .form-submit{width:100%;background:var(--accent);color:#111;border:0;padding:10px;border-radius:8px;font-weight:600;cursor:pointer;margin-top:4px;transition:all .2s ease}
-  .form-submit:hover{transform:scale(1.02);box-shadow:0 4px 12px var(--accent-soft)}
-
-  /* Settings */
-  .settings-section{background:var(--panel);border-radius:8px;margin-top:16px;padding:20px}
-  .settings-section h2{margin:0 0 20px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
-  .settings-icon .icon{width:18px;height:18px}
-  .settings-row{margin-bottom:16px;display:flex;align-items:center}
-  .settings-label{flex:0 0 120px;color:var(--muted)}
-  .settings-select{background:rgba(0,0,0,0.2);color:var(--text);border:0;padding:8px 12px;border-radius:6px;min-width:200px}
-
-  /* Stats list */
-  .stats-list{display:flex;flex-direction:column;gap:4px}
-  .stat-row{display:flex;align-items:center;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:8px;gap:12px}
-  .stat-drag{cursor:move;color:var(--muted);font-size:16px}
-  .stat-toggle{flex:1;display:flex;align-items:center;gap:8px;cursor:pointer}
-  .stat-settings-btn{background:transparent;border:0;color:var(--text);opacity:.7;cursor:pointer;padding:4px 8px;border-radius:4px}
-  .stat-settings-btn:hover{opacity:1;background:rgba(255,255,255,0.05)}
-
-  /* Dynamic stat layout editor */
-  /* unify background: remove nested panel look */
-  .layout-editor{margin-top:16px;padding:14px;background:transparent;border:1px dashed rgba(255,255,255,0.12);border-radius:12px;display:flex;flex-direction:column;gap:14px}
-  .layout-editor h3{margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
-  .layout-palette{display:flex;flex-wrap:wrap;gap:8px}
-  .stat-pill{padding:6px 10px;background:rgba(255,255,255,0.07);border-radius:24px;font-size:12px;font-weight:500;cursor:grab;user-select:none;display:flex;align-items:center;gap:6px;position:relative}
-  .stat-pill[data-used="1"]{opacity:.35;filter:grayscale(60%);cursor:not-allowed}
-  .stat-pill.disabled{opacity:.35;filter:grayscale(80%);cursor:not-allowed}
-  .layout-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
-  .slot{background:rgba(255,255,255,0.05);border:1px dashed rgba(255,255,255,0.14);border-radius:10px;min-height:46px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);position:relative;padding:4px;transition:.15s}
-  .slot.filled{border-style:solid;color:var(--text);font-weight:500}
-  .slot.drag-over{outline:2px solid var(--accent);outline-offset:2px}
-  .slot .slot-remove{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.4);border:0;color:var(--muted);width:20px;height:20px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
-  .slot .slot-remove:hover{color:#fff;background:rgba(0,0,0,0.65)}
-  .layout-help{font-size:11px;color:var(--muted);line-height:1.4}
-
-  /* Modal / Color rules */
-  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9000}
-  .modal.open{display:flex;align-items:center;justify-content:center;animation:fadeIn .25s ease}
-  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-  .modal-content{background:linear-gradient(145deg,rgba(25,28,32,0.95),rgba(30,34,38,0.95));backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.08);box-shadow:0 8px 32px -8px rgba(0,0,0,0.6);border-radius:16px;width:92%;max-width:560px;max-height:88vh;overflow:auto;display:flex;flex-direction:column}
-  .modal-header{padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
-  .modal-header h3{margin:0;font-size:17px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
-  .modal-header h3 .stat-full-name{opacity:.6;font-weight:400;font-size:13px}
-  .modal-close{background:rgba(255,255,255,0.04);border:0;color:var(--muted);font-size:20px;cursor:pointer;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:.15s}
-  .modal-close:hover{background:rgba(255,255,255,0.08);color:#fff}
-  .modal-body{padding:22px 24px;display:flex;flex-direction:column;gap:20px}
-  
-  /* Simple notification modal (for alerts) */
-  .notification-modal .modal-content{max-width:400px;text-align:center}
-  .notification-modal .modal-body{padding:28px 24px;align-items:center}
-  .notification-modal .message{font-size:15px;line-height:1.6;color:var(--text)}
-  .notification-modal .ok-btn{margin-top:16px;padding:10px 24px;background:var(--accent);color:#0b1e24;border:0;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;transition:.15s}
-  .notification-modal .ok-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
-  .color-rules{display:flex;flex-direction:column;gap:10px;margin:0}
-  .color-rule{display:grid;grid-template-columns:70px 90px 90px 1fr 40px;align-items:center;gap:10px;background:rgba(255,255,255,0.03);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.05);position:relative;transition:.15s}
-  .color-rule:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.09)}
-  .rule-operator,.rule-value{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:8px;padding:6px 8px;font-size:13px}
-  .rule-operator:focus,.rule-value:focus{outline:2px solid var(--accent);outline-offset:2px}
-  .color-picker{display:flex;align-items:center;gap:8px}
-  .color-preview{width:34px;height:24px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);box-shadow:inset 0 0 0 2px rgba(0,0,0,0.3)}
-  .color-input{width:90px;height:32px;padding:0;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer}
-  .color-input::-webkit-color-swatch{border:0;border-radius:6px}
-  .color-input::-webkit-color-swatch-wrapper{padding:4px}
-  .rule-delete{background:rgba(255,255,255,0.05);border:0;color:var(--muted);cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;transition:.15s}
-  .rule-delete:hover{background:rgba(255,0,0,0.25);color:#fff}
-  .add-rule-btn{width:100%;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.15);color:var(--text);border-radius:12px;cursor:pointer;font-weight:500;letter-spacing:.5px}
-  .add-rule-btn:hover{background:rgba(255,255,255,0.07);border-style:solid}
-
-  /* Settings navigation */
-  .settings-nav{display:flex;flex-direction:column;gap:1px;background:var(--panel);border-radius:12px;overflow:hidden}
-  .settings-nav-item{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--panel);border:0;color:var(--text);font-size:14px;text-align:left;cursor:pointer}
-  .settings-nav-item:hover{background:rgba(255,255,255,0.03)}
-  .settings-nav-item.active{font-weight:700}
-  .settings-nav-item .nav-icon{width:20px;text-align:center;font-size:16px}
-  .settings-nav-item .nav-label{flex:1;font-weight:500}
-  .nav-arrow{font-size:12px;opacity:.5;margin-left:4px;transition:transform .2s}
-  .settings-nav-item.active .nav-arrow{transform:rotate(180deg)}
-  .nav-item.expanded .nav-arrow{transform:rotate(180deg)}
-  .nav-item.expanded .nav-icon .icon{transform:rotate(45deg);}
-  .nav-icon .icon{transition:transform .25s ease;}
-  .settings-submenu{display:none;margin-left:24px;margin-top:4px;border-left:1px solid rgba(255,255,255,0.1)}
-  .settings-submenu.expanded{display:block}
-  .nav-item.sub-item{padding:8px 12px;font-size:13px}
-  .nav-item.sub-item .nav-icon{font-size:14px}
-  /* Removed: green text for stats */
-
-  /* Keyboard grid */
-  .kb-grid{display:flex;flex-direction:column;gap:10px}
-  .kb-row{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,0.2);padding:12px;border-radius:8px}
-  .kb-action{flex:1}
-  .kb-input{min-width:160px; text-align:center; padding:10px 12px; border-radius:8px; background:rgba(255,255,255,0.06); cursor:pointer}
-  .kb-input.listening{outline:2px solid var(--accent)}
-  .kb-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5}
-  /* Nicks help box (like kb-help) */
-  .nicks-help{padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:13px;line-height:1.5;color:var(--muted);margin-bottom:16px}
-
-  /* Settings inputs & controls */
-  .settings-input{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:14px;outline:0}
-  .settings-input:focus{border-color:var(--accent)}
-  .settings-select{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;outline:0}
-  .settings-select:focus{border-color:var(--accent)}
-  .settings-textarea{width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:13px;outline:0;resize:vertical}
-  .settings-textarea:focus{border-color:var(--accent)}
-  /* Unified accent checkbox (used in Sources + Appearance) */
-  .accent-checkbox{
-    -webkit-appearance:none;appearance:none;width:20px;height:20px;margin:2px 0 0 0;cursor:pointer;flex-shrink:0;
-    border:2px solid var(--accent);border-radius:6px;background:rgba(255,255,255,0.05);position:relative;transition:.18s;
-    display:inline-block;
-  }
-  .accent-checkbox:hover{box-shadow:0 0 0 3px rgba(102,234,255,0.18)}
-  .accent-checkbox:focus{outline:2px solid var(--accent);outline-offset:2px}
-  .accent-checkbox:checked{background:var(--accent);border-color:var(--accent);}
-  .accent-checkbox:checked::after{content:"";display:none}
-  /* Apply same accent style automatically to all settings checkboxes without needing the class */
-  .settings-checkbox input[type="checkbox"]{
-    -webkit-appearance:none;appearance:none;width:20px;height:20px;margin:2px 0 0 0;cursor:pointer;flex-shrink:0;
-    border:2px solid var(--accent);border-radius:6px;background:rgba(255,255,255,0.05);position:relative;transition:.18s;display:inline-block;
-  }
-  .settings-checkbox input[type="checkbox"]:hover{box-shadow:0 0 0 3px rgba(102,234,255,0.18)}
-  .settings-checkbox input[type="checkbox"]:focus{outline:2px solid var(--accent);outline-offset:2px}
-  .settings-checkbox input[type="checkbox"]:checked{background:var(--accent);border-color:var(--accent)}
-  .settings-checkbox input[type="checkbox"]:checked::after{content:"";display:none}
-  /* Accent range sliders */
-  input[type="range"]{ -webkit-appearance:none; appearance:none; width:100%; height:6px; background:rgba(255,255,255,0.12); border-radius:4px; outline:none; cursor:pointer; }
-  input[type="range"]:focus{outline:2px solid var(--accent);outline-offset:2px}
-  input[type="range"]::-webkit-slider-runnable-track{height:6px;background:rgba(255,255,255,0.12);border-radius:4px}
-  input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); border:2px solid #04161c; margin-top:-5px; box-shadow:0 0 0 3px rgba(102,234,255,0.25); transition:.15s }
-  input[type="range"]:hover::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(102,234,255,0.35)}
-  input[type="range"]::-moz-range-track{height:6px;background:rgba(255,255,255,0.12);border-radius:4px}
-  input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #04161c;box-shadow:0 0 0 3px rgba(102,234,255,0.25)}
-  input[type="range"]::-ms-track{height:6px;background:transparent;border-color:transparent;color:transparent}
-  input[type="range"]::-ms-fill-lower,input[type="range"]::-ms-fill-upper{background:rgba(255,255,255,0.12);border-radius:4px}
-  input[type="range"]::-ms-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #04161c;box-shadow:0 0 0 3px rgba(102,234,255,0.25)}
-  /* Nick select (transparent + accent for value) */
-  .nick-select{background:transparent;border:1px solid rgba(255,255,255,0.12);color:var(--accent);padding:8px 10px;border-radius:8px;font-size:13px;backdrop-filter:blur(4px);cursor:pointer}
-  .nick-select:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,234,255,0.12)}
-  .nick-select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(102,234,255,0.2)}
-  .nick-select option{color:var(--text);background:#1f2230}
-  
-  /* Toggle switch */
-  .toggle-switch{position:relative;width:44px;height:24px;display:inline-block}
-  .toggle-switch input{opacity:0;width:0;height:0}
-  .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.1);border-radius:24px;transition:.3s}
-  .toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}
-  .toggle-switch input:checked + .toggle-slider{background:var(--accent)}
-  .toggle-switch input:checked + .toggle-slider:before{transform:translateX(20px)}
-  
-  /* Checkbox */
-  .settings-checkbox{display:flex;align-items:flex-start;gap:8px;padding:8px 0;cursor:pointer;user-select:none}
-  .settings-checkbox input[type="checkbox"]{width:18px;height:18px;margin:2px 0 0 0;cursor:pointer;flex-shrink:0}
-  .settings-checkbox span{flex:1}
-  .settings-checkbox small{display:block;margin-top:4px}
-  
-  /* Plus badge */
-  .plus-badge{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
-  
-  /* Settings subsections */
-  .settings-subsection{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.06)}
-  .settings-subsection:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}
-  .source-options{margin-left:0;display:flex;flex-direction:column;gap:4px}
-
-  /* Profile Panel Styles */
-  .profile-container{display:flex;flex-direction:column;gap:20px;padding:0}
-  .profile-card{background:var(--panel);border-radius:16px;padding:24px;border:1px solid rgba(255,255,255,0.06)}
-  .profile-header{display:flex;align-items:center;gap:16px}
-  .profile-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:var(--accent);position:relative;overflow:hidden}
-  .profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-  .profile-avatar.empty::before{content:"";position:absolute;width:48px;height:48px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2366eaff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:contain;opacity:0.6}
-  .profile-info{flex:1;display:flex;flex-direction:column;gap:6px}
-  .profile-username{font-size:24px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px}
-  .profile-status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
-  .profile-status .status-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
-  .profile-status.offline .status-dot{background:#666;box-shadow:none}
-  .profile-actions{display:flex;gap:10px;margin-top:8px}
-  .discord-btn{display:flex;align-items:center;gap:8px;padding:10px 20px;background:#5865F2;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer;transition:all .2s ease;font-size:14px}
-  .discord-btn:hover{background:#4752C4;transform:translateY(-1px);box-shadow:0 4px 12px rgba(88,101,242,0.4)}
-  .discord-btn:active{transform:translateY(0)}
-  .discord-btn .icon{width:20px;height:20px}
-  .profile-section{margin-top:8px}
-  .profile-section h3{margin:0 0 12px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
-  .profile-section h3 .icon{width:18px;height:18px}
-  .profile-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-  .profile-stat{background:rgba(0,0,0,0.2);padding:12px 16px;border-radius:10px;display:flex;flex-direction:column;gap:4px}
-  .profile-stat-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600}
-  .profile-stat-value{font-size:20px;font-weight:700;color:var(--accent)}
-  .plus-card{background:linear-gradient(145deg,rgba(102,114,234,0.1),rgba(118,75,162,0.1));border:1px solid rgba(102,114,234,0.3)}
-  .plus-card .plus-icon{font-size:48px;text-align:center;margin-bottom:12px;filter:drop-shadow(0 0 12px rgba(102,114,234,0.5))}
-  .plus-status{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
-  .plus-status.active{background:linear-gradient(135deg,rgba(102,234,255,0.15),rgba(102,234,255,0.05));border:1px solid var(--accent)}
-  
-  /* Payment button hover effects */
-  .payment-btn-monthly:hover{background:var(--accent)!important;color:white!important;transform:translateY(-2px);box-shadow:0 6px 16px rgba(102,114,234,0.3)!important}
-  .payment-btn-yearly:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(32,178,170,0.4)!important}
-  .sync-info{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(0,0,0,0.2);border-radius:10px;margin-top:12px}
-  .sync-time{font-size:12px;color:var(--muted)}
-  .logout-btn{padding:8px 16px;background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;transition:.2s}
-  .logout-btn:hover{background:rgba(224,90,90,0.15);color:#ff6b6b;border-color:#ff6b6b}
-
-  /* Session Panel Styles */
-  .session-container{display:flex;flex-direction:column;height:100%}
-  .session-header{margin-bottom:16px}
-  .session-player{display:flex;align-items:center;margin-top:12px}
-  .session-content{flex:1;overflow-y:auto}
-  #sessionStatsContainer{min-height:200px}
-  .session-stat-row{margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
-  .session-stat-label{font-weight:600;color:var(--text)}
-  .session-stat-value{font-family:monospace;font-size:13px}
-  .session-stat-start{color:var(--muted)}
-  .session-stat-arrow{color:var(--accent);margin:0 6px}
-  .session-stat-current{color:var(--text)}
-  .session-stat-diff{font-weight:600;margin-left:6px}
-  .session-stat-diff.positive{color:#22c55e}
-  .session-stat-diff.negative{color:#ef4444}
-  .session-stat-diff.neutral{color:var(--muted)}
-  .session-category{margin-top:20px;margin-bottom:12px}
-  .session-category:first-child{margin-top:0}
-  .session-category-title{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px}
-
-  /* --- Client Selection Redesign --- */
-  #clientSelectGrid{--btn-h:34px}
-  .client-btn{
-    position:relative;display:flex;align-items:center;justify-content:center;gap:6px;
-    background:linear-gradient(145deg,rgba(40,44,52,0.65),rgba(34,38,46,0.65));
-    border:1px solid rgba(255,255,255,0.08);color:var(--text);font-size:12px;font-weight:600;
-    padding:6px 10px;border-radius:8px;cursor:pointer;letter-spacing:.4px;min-height:var(--btn-h);
-    transition:.18s cubic-bezier(.25,.8,.25,1);backdrop-filter:blur(6px);
-  }
-  .client-btn:hover{border-color:var(--accent);color:#fff;box-shadow:0 0 0 3px rgba(102,234,255,0.15)}
-  .client-btn:active{transform:scale(.96)}
-  .client-btn.active{
-    background:linear-gradient(135deg,var(--accent) 0%,#41c4e6 100%);
-    color:#0b1e24;border-color:var(--accent);box-shadow:0 4px 14px -4px rgba(102,234,255,0.5);
-  }
-  .client-btn[data-detected="1"]:not(.active){
-    outline:2px solid var(--accent);outline-offset:2px;
-  }
-  .client-btn .badge{background:rgba(255,255,255,0.15);padding:2px 5px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.5px}
-  .client-btn.active .badge{background:rgba(0,0,0,0.25);color:#fff}
-  #clientStatus{margin-top:4px;font-size:12px;line-height:1.4;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06)}
-  #clientStatus.warn{background:rgba(224,193,77,0.15);border-color:rgba(224,193,77,0.4);color:#f3d98a}
-  #clientStatus.ok{background:rgba(67,209,127,0.18);border-color:rgba(67,209,127,0.45);color:#7bf3af}
-  #autoDetectBtn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:var(--text);font-weight:600}
-  #autoDetectBtn:hover{background:var(--accent);color:#04161c;border-color:var(--accent);box-shadow:0 4px 12px -2px rgba(102,234,255,0.5)}
-  #customPathRow input{font-size:12px}
-  #applyCustomPathBtn{background:linear-gradient(135deg,var(--accent) 0%,#41c4e6 100%);color:#06242b;font-weight:600}
-  #applyCustomPathBtn:hover{filter:brightness(1.07)}
-  </style>
-</head>
-
-<body>
-  <!-- Nebula icon sprite (stroke=2, round caps/joins, currentColor) -->
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
-    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 12a9 9 0 0 1-9 9 9 9 0 1 1 6.3-15.3"/><path d="M21 3v6h-6"/>
-    </symbol>
-    <symbol id="i-clear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 13h10l1-13"/><path d="M10 10v7M14 10v7"/>
-    </symbol>
-    <symbol id="i-min" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></symbol>
-    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
-
-    <!-- Sidebar -->
-    <symbol id="i-overlay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>
-    </symbol>
-    <symbol id="i-nicks" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="8" cy="8.5" r="3"/><path d="M2.5 19c1.6-3 4-4.5 6.5-4.5s4.9 1.5 6.5 4.5"/>
-      <path d="M16 5h4M16 9h6M16 13h5" />
-    </symbol>
-    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M4 12h2.5M17.5 12H20"/>
-      <path d="M12 4v2.5M12 17.5V20"/>
-      <path d="M6.6 6.6l1.8 1.8M15.6 15.6l1.8 1.8"/>
-      <path d="M6.6 17.4l1.8-1.8M15.6 8.4l1.8-1.8"/>
-    </symbol>
-    <symbol id="i-basic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M4 7h12"/><circle cx="16" cy="7" r="2.5"/>
-      <path d="M4 17h8"/><circle cx="10" cy="17" r="2.5"/>
-    </symbol>
-    <symbol id="i-client" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="5" width="18" height="14" rx="2"/>
-      <path d="M7 9h5M7 13h3M14 13h3"/>
-      <path d="M14 9h3"/>
-    </symbol>
-    <symbol id="i-appearance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="7"/><path d="M5 12h14M12 5v14"/>
-    </symbol>
-    <symbol id="i-sources" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 16l6-6 4 4 8-8"/><path d="M14 6h7v7"/>
-    </symbol>
-    <symbol id="i-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 5v14M15 5v14"/>
-    </symbol>
-    <symbol id="i-shortcuts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M9 14h6"/>
-    </symbol>
-    <symbol id="i-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="8" r="4"/><path d="M4 20c1.8-3.2 4.7-5 8-5s6.2 1.8 8 5"/>
-    </symbol>
-    <!-- Additional icons for settings subitems -->
-    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <path d="M14 2v6h6"/>
-    </symbol>
-    <symbol id="i-ghost" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2c-4.42 0-8 3.58-8 8v12l2-2 2 2 2-2 2 2 2-2 2 2 2-2V10c0-4.42-3.58-8-8-8zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 1a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
-    </symbol>
-    <symbol id="i-party" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-    </symbol>
-    <symbol id="i-discord" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M20.317 4.492c-1.53-.69-3.17-1.2-4.885-1.49a.075.075 0 0 0-.079.036c-.21.369-.444.85-.608 1.23a18.565 18.565 0 0 0-5.487 0 12.923 12.923 0 0 0-.617-1.23A.077.077 0 0 0 8.562 3c-1.714.29-3.354.8-4.885 1.491a.07.07 0 0 0-.032.027C.533 9.093-.32 13.555.099 17.961a.08.08 0 0 0 .031.055 20.03 20.03 0 0 0 5.993 2.98.078.078 0 0 0 .084-.026 13.83 13.83 0 0 0 1.226-1.963.074.074 0 0 0-.041-.104 13.201 13.201 0 0 1-1.872-.878.075.075 0 0 1-.008-.125c.126-.093.252-.19.372-.287a.075.075 0 0 1 .078-.01c3.927 1.764 8.18 1.764 12.061 0a.075.075 0 0 1 .079.009c.12.098.245.195.372.288a.075.075 0 0 1-.006.125c-.598.344-1.22.635-1.873.877a.075.075 0 0 0-.041.105c.36.687.772 1.341 1.225 1.962a.077.077 0 0 0 .084.028 19.963 19.963 0 0 0 6.002-2.981.076.076 0 0 0 .032-.054c.5-5.094-.838-9.52-3.549-13.442a.06.06 0 0 0-.031-.028zM8.02 15.278c-1.182 0-2.157-1.069-2.157-2.38 0-1.312.956-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.956 2.38-2.157 2.38zm7.975 0c-1.183 0-2.157-1.069-2.157-2.38 0-1.312.955-2.38 2.157-2.38 1.21 0 2.176 1.077 2.157 2.38 0 1.312-.946 2.38-2.157 2.38z"/>
-    </symbol>
-    <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
-    </symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-    </symbol>
-    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"/>
-      <circle cx="12" cy="12" r="6"/>
-      <circle cx="12" cy="12" r="2"/>
-    </symbol>
-    <!-- Self/Own user indicator -->
-    <symbol id="i-self" viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M4 20c1.8-3.2 4.7-5 8-5s6.2 1.8 8 5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="18" cy="6" r="3" fill="currentColor"/>
-    </symbol>
-    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="20,6 9,17 4,12"/>
-    </symbol>
-    <!-- Step icons for Discord login guide -->
-    <symbol id="i-step-1" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
-      <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">1</text>
-    </symbol>
-    <symbol id="i-step-2" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
-      <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">2</text>
-    </symbol>
-    <symbol id="i-step-3" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="11" fill="var(--accent)" stroke="none"/>
-      <text x="12" y="16" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="bold" fill="white">3</text>
-    </symbol>
-    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-      <circle cx="12" cy="7" r="4"/>
-    </symbol>
-    <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="7" cy="7" r="3"/>
-      <path d="m21 12-4.4-4.4a1.5 1.5 0 0 0-2.12 0L9.5 12.5a1.5 1.5 0 0 0 0 2.12L14 19l7-7z"/>
-      <path d="M16 8 2 22"/>
-      <path d="m8 16 6-6"/>
-    </symbol>
-    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="m9 12 2 2 4-4"/>
-    </symbol>
-    <symbol id="i-session" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M12 1v6"/>
-      <path d="M12 17v6"/>
-      <path d="m4.2 4.2 4.2 4.2"/>
-      <path d="m15.6 15.6 4.2 4.2"/>
-      <path d="M1 12h6"/>
-      <path d="M17 12h6"/>
-      <path d="m4.2 19.8 4.2-4.2"/>
-      <path d="m15.6 8.4 4.2-4.2"/>
-    </symbol>
-    <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M16 3l5 5-5 5-4-4-6 6-2-2 6-6-4-4 5-5z"/>
-    </symbol>
-  </svg>
-  <div class="topbar">
-    <button id="menuBtn" class="icon-btn" aria-label="Menu" title="Menu">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
-      </svg>
-    </button>
-  <div class="brand"><img src="../../assets/nebula-lettering.svg" alt="Nebula"></div>
-    <div class="spacer"></div>
-
-    <!-- Refresh -->
-    <button id="refresh" class="icon-btn" aria-label="Refresh" title="Refresh">
-      <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
-    </button>
-
-    <!-- Clear all -->
-    <button id="clearAll" class="icon-btn" aria-label="Clear all players" title="Clear all players">
-      <svg class="icon" aria-hidden="true"><use href="#i-clear"/></svg>
-    </button>
-
-    <!-- Search -->
-    <div class="search">
-      <svg class="svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20 15.5 14zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/>
-      </svg>
-      <input id="playerInput" placeholder="Search player(s), comma-separated" />
     </div>
 
-    <!-- Minimize -->
-    <button id="minBtn" class="icon-btn" aria-label="Minimize" title="Minimize">
-      <svg class="icon" aria-hidden="true"><use href="#i-min"/></svg>
-    </button>
+    <aside id="sidebar" class="sidebar" aria-hidden="true">
+      <div class="sidebar-inner">
+        <nav class="nav">
+          <button class="nav-item active" data-panel="overlay">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg></span>
+            <span class="nav-label">Overlay</span>
+          </button>
 
-    <!-- Close -->
-    <button id="closeBtn" class="icon-btn icon-btn--danger" aria-label="Close" title="Close">
-      <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
-    </button>
+          <button class="nav-item" data-panel="session">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-session"/></svg></span>
+            <span class="nav-label">Session</span>
+          </button>
 
+          <button class="nav-item" data-panel="nicks">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
+            <span class="nav-label">Nicks</span>
+          </button>
 
-  </div>
-
-  <aside id="sidebar" class="sidebar" aria-hidden="true">
-    <div class="sidebar-inner">
-      <nav class="nav">
-        <button class="nav-item active" data-panel="overlay">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg></span>
-          <span class="nav-label">Overlay</span>
-        </button>
-
-        <button class="nav-item" data-panel="session">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-session"/></svg></span>
-          <span class="nav-label">Session</span>
-        </button>
-
-        <button class="nav-item" data-panel="nicks">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
-          <span class="nav-label">Nicks</span>
-        </button>
-
-  <!-- Direct settings entries -->
-        <div class="nav-sep"></div>
-        <button class="nav-item" data-panel="columns">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
-          <span class="nav-label">Columns</span>
-        </button>
-        <button class="nav-item" data-panel="sources">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
-          <span class="nav-label">Sources</span>
-        </button>
-        <button class="nav-item" data-panel="keyboard">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
-          <span class="nav-label">Keyboard Shortcuts</span>
-        </button>
-        <button class="nav-item" data-panel="appearance">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
-          <span class="nav-label">Appearance</span>
-        </button>
-        <button class="nav-item" data-panel="client">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-client"/></svg></span>
-          <span class="nav-label">Client Selection</span>
-        </button>
-        <div class="nav-sep"></div>
-        <button class="nav-item" data-panel="profile">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
-          <span class="nav-label">Profile</span>
-        </button>
-      
-    </div>
-  </aside>
-
-  <div class="content">
-    <!-- Overlay Panel -->
-    <div class="panel" id="panel-overlay">
-      <div class="table-wrap">
-        <table id="table">
-          <colgroup>
-            <col class="c-lvl"><col class="c-name"><col class="c-ws">
-            <col class="c-fkdr"><col class="c-wlr"><col class="c-bblr">
-            <col class="c-fk"><col class="c-wins"><col class="c-actions">
-          </colgroup>
-          <thead>
-            <tr>
-              <th data-sort-key="level">Lvl</th>
-              <th>Name</th>
-              <th class="metric-h" data-sort-key="ws">WS</th>
-              <th class="metric-h" data-sort-key="fkdr">FKDR</th>
-              <th class="metric-h" data-sort-key="wlr">WLR</th>
-              <th class="metric-h" data-sort-key="bblr">BBLR</th>
-              <th class="metric-h" data-sort-key="fk">F. Kills</th>
-              <th class="metric-h" data-sort-key="wins">Wins</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Session Panel -->
-    <div class="panel" id="panel-session">
-      <div class="session-container">
-        <div class="session-header">
-          <div class="session-info">
-            <h2 style="margin:0 0 8px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
-              <span class="settings-icon">
-                <svg class="icon" aria-hidden="true"><use href="#i-session"/></svg>
-              </span>
-              <span id="sessionTitle">Session Stats</span>
-            </h2>
-            <div class="session-player">
-              <img id="sessionAvatar" src="https://crafatar.com/avatars/MHF_Steve?size=48&default=MHF_Steve&overlay" 
-                   style="width:48px;height:48px;border-radius:8px;margin-right:12px;" alt="Player Avatar">
-              <div>
-                <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
-                <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="session-content">
-          <div id="sessionStatsContainer" style="background:var(--panel);border-radius:12px;padding:20px;margin-top:16px;">
-            <div id="sessionStats" style="font-size:14px;line-height:1.6;">
-              <div style="text-align:center;color:var(--muted);padding:40px 20px;">
-                <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
-                <div style="font-size:16px;margin-bottom:8px;">No Session Active</div>
-                <div style="font-size:13px;">Enter your Minecraft IGN in Profile settings and start playing to track session stats!</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Nicks Panel -->
-    <div class="panel" id="panel-nicks">
-      <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span class="settings-icon">
-          <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
-        </span>
-        Nickname Handling
-      </h2>
-      <div
-        style="
-          padding:12px 14px;
-          border-radius:10px;
-          background:var(--panel);
-          display:flex;
-          flex-direction:column;
-          gap:12px;
-        "
-      >
-        <div style="font-size:13px;color:var(--text);line-height:1.5">
-          Manage how <b>nicked players</b> are displayed in the overlay. You can assign nicknames to their
-          real player names and decide how they should appear. When a registered nickname is detected, a
-          <svg class="icon icon-inline" style="width:16px;height:16px;vertical-align:-2px" aria-hidden="true" title="Nick recognised">
-            <use href="#i-ghost"/>
-          </svg>
-          icon appears next to the name so you recognize them instantly.
-        </div>
-        <label style="display:flex;flex-direction:column;gap:6px">
-          <select id="nickDisplayMode" class="nick-select">
-            <option value="nick">Show nickname (real stats)</option>
-            <option value="real">Show real name</option>
-          </select>
-        </label>
-        <div style="font-size:11.5px;color:var(--muted);line-height:1.5">
-          The displayed name can be either the nickname or the real one —
-          <b>stats always reflect the real player</b>. The
-          <svg class="icon icon-inline" style="width:14px;height:14px;vertical-align:-2px" aria-hidden="true">
-            <use href="#i-ghost"/>
-          </svg>
-          icon is always shown; the tooltip reveals the alternate name.
-        </div>
-      </div>
-      <!-- Add Nick Form -->
-      <div class="add-nick-form" id="addNickForm" style="display:none;margin:20px 0 16px;">
-        <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">Add new nick</h3>
-        <div class="form-row">
-          <label class="form-label">
-            <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
-            <input type="text" id="nickInput" placeholder="Nick" />
-          </label>
-        </div>
-        <div class="form-row">
-          <label class="form-label">
-            <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
-            <input type="text" id="realNameInput" placeholder="Real name" />
-          </label>
-        </div>
-        <button class="form-submit" id="saveNickBtn">ADD</button>
-      </div>
-
-      <!-- Nicks List -->
-      <div class="nicks-list" id="nicksList" style="margin:12px 0 12px;">
-        <!-- Nicks werden hier per JS eingefügt -->
-      </div>
-      <button class="add-btn" id="addNickBtn" title="Add nick" style="margin-top:4px;">+</button>
-    </div>
-
-  <!-- Client & Account Panel (was part of Basic Settings) -->
-  <div class="panel" id="panel-client">
-        <div class="settings-section">
-          <h2>
-            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
-            Client & API Management
-          </h2>
-
-          <div class="settings-subsection">
-            <h3 style="margin: 20px 0 12px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
-              <svg class="icon" aria-hidden="true"><use href="#i-client"/></svg>
-              Client Selection
-            </h3>
-            
-            <!-- Log File Dropdown -->
-            <div class="settings-subrow" style="display:flex;flex-direction:column;gap:12px;">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
-                <label class="settings-label" style="margin:0;">Minecraft Client</label>
-                <button id="autoDetectBtn" type="button" style="margin-left:auto;background:var(--row);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Auto-Detect</button>
-              </div>
-              <div id="clientSelectGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;width:100%;">
-                <button class="client-btn" data-client="badlion"><span class="badge">BL</span> Badlion</button>
-                <button class="client-btn" data-client="lunar"><span class="badge">LC</span> Lunar</button>
-                <button class="client-btn" data-client="vanilla"><span class="badge">VN</span> Vanilla</button>
-                <button class="client-btn" data-client="pvplounge"><span class="badge">PL</span> PvPLounge</button>
-                <button class="client-btn" data-client="labymod"><span class="badge">LM</span> LabyMod</button>
-                <button class="client-btn" data-client="feather"><span class="badge">FT</span> Feather</button>
-                <button class="client-btn" data-client="custom"><span class="badge">C</span> Custom...</button>
-              </div>
-              <div id="customPathRow" style="display:none;flex-direction:column;gap:4px;">
-                <input id="customLogPathInput" type="text" placeholder="Absolute path to latest.log" style="width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:12px;" />
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <button id="applyCustomPathBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Apply Path</button>
-                  <small style="color:var(--muted);font-size:11px;">Changing the path resets player/party lists.</small>
-                </div>
-              </div>
-              <div id="clientStatus" class="ok">No client selected yet.</div>
-            </div>
-          </div>
-          <!-- API Management subsection -->
-          <div class="settings-subsection">
-            <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
-              <svg class="icon" aria-hidden="true"><use href="#i-cloud"/></svg>
-              Hypixel API Management
-            </h3>
-            
-            <!-- API Status -->
-            <div class="settings-row" style="margin-bottom:12px;">
-              <span class="settings-icon" style="width:24px;text-align:center;"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg></span>
-              <div style="flex: 1;">
-                <div id="apiStatus" style="font-size:13px;color:var(--muted);">
-                  <div id="backendStatus">Checking backend...</div>
-                  <div id="userKeyStatus">No user key configured</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- User API Key Input -->
-            <div class="settings-row" style="margin-bottom:8px;">
-              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg></span>
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <input id="apiKeyInput" type="password" placeholder="Your Hypixel API Key (optional)" class="settings-input" style="flex:1; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
-                  <button id="pasteApiKeyBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:60px;">Paste</button>
-                  <button id="testApiKeyBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:60px;">Test</button>
-                </div>
-                <small style="color:var(--muted);font-size:11px;">
-                  Get your API key at <a href="#" id="hypixelApiLink" style="color:var(--accent);">hypixel.net</a> • Only needed if backend is unavailable
-                </small>
-              </div>
-            </div>
-
-            <!-- Fallback Setting -->
-            <div class="settings-row" style="margin-bottom:12px;">
-              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
-              <div style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; flex-direction: column;">
-                  <span>Use API Key Fallback</span>
-                  <small style="color:var(--muted);font-size:11px;">Fall back to your API key when backend is unavailable</small>
-                </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="fallbackKeyToggle" checked />
-                  <span class="slider"></span>
-                </label>
-              </div>
-            </div>
-
-            <!-- API Actions -->
-            <div class="settings-row" style="gap:8px;">
-              <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span>
-              <div style="display:flex;gap:8px;flex:1;">
-                <button id="clearCacheBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;flex:1;">Clear Cache</button>
-                <button id="refreshApiStatusBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;flex:1;">Refresh Status</button>
-              </div>
-            </div>
-          </div>
-    </div>
-  </div>
-
-  <!-- Sources Settings Panel -->
-  </div>
-
-  <div class="panel" id="panel-sources">
-        <div class="settings-section">
-          <h2>
-            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
-            Sources Settings
-          </h2>
-
-          <!-- Game Section -->
-          <div class="settings-subsection">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Game</h3>
-              <label class="toggle-switch">
-                <input type="checkbox" id="sourceGameToggle" checked />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-
-            <div class="source-options" id="gameSourceOptions">
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="gameAddFromWho" checked />
-                  <span>Add from /who (ONLINE list)</span>
-                </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="gameAddFromChat" checked />
-                <span>Add From Chat</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="gameRemoveOnDeath" checked />
-                <span>Remove on Final Death</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="gameRemoveOnDisconnect" checked />
-                <span>Remove/Add on Disconnect/Reconnect</span>
-                <small style="display: block; color: var(--muted); margin-left: 24px; font-size: 12px;">Players who disconnect while respawning will not be removed.</small>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="gameRemoveOnServerChange" checked />
-                <span>Remove All on Server Change</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Party Section -->
-          <div class="settings-subsection">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Party</h3>
-              <label class="toggle-switch">
-                <input type="checkbox" id="sourcePartyToggle" checked />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-
-            <div class="source-options" id="partySourceOptions">
-              <label class="settings-checkbox">
-                <input type="checkbox" id="partyRemoveOnMemberLeave" checked />
-                <span>Remove member on leave</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="partyRemoveAllOnLeaveOrDisband" checked />
-                <span>Clear all on party leave/disband</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="partyShowInviteTemp" checked />
-                <span>Show invited player (temp)</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="sourcePartyInvitesToggle" checked />
-                <span>Enable party invites display</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="partyRefreshServerChange" />
-                <span>Auto-refresh on server change</span>
-              </label>
-              <label class="settings-checkbox">
-                <input type="checkbox" id="partyRefreshGameEnd" />
-                <span>Auto-refresh after game end</span>
-              </label>
-              <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Party options control how players with the party source are retained or removed.</small>
-            </div>
-          </div>
-
-          <!-- Manual Section -->
-          <div class="settings-subsection">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
-              <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Manual</h3>
-              <label class="toggle-switch">
-                <input type="checkbox" id="sourceManualToggle" checked />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <div class="source-options" id="manualSourceOptions">
-              <label class="settings-checkbox">
-                <input type="checkbox" id="manualClearOnGameStart" />
-                <span>Remove all manually added players when a game starts</span>
-              </label>
-              <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Manual source refers to players added via the search bar.</small>
-            </div>
-          </div>
-
-          <!-- Chat Section -->
-          <div class="settings-subsection">
-            <div class="settings-group">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Chat</h3>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="sourceChatToggle" checked />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-
-              <div class="source-options" id="chatSourceOptions">
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="chatRemoveOnServerChange" checked />
-                  <span>Remove All on Server Change</span>
-                </label>
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="chatAddOnMention" checked />
-                  <span>Players who mention your name are auto-added</span>
-                </label>
-                <div style="margin-top:12px;">
-                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                    <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
-                    <label class="settings-label" style="margin:0;">Trigger Strings</label>
-                    <button id="addChatString" type="button" style="margin-left:auto;background:var(--row);border:0;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">+ Add</button>
-                  </div>
-                  <div id="chatStringList" style="display:flex;flex-direction:column;gap:6px;"></div>
-                  <small style="display:block;color:var(--muted);margin-top:6px;font-size:11px;">Players are added when their message contains any trigger (case-insensitive).</small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Guild Section -->
-          <div class="settings-subsection">
-            <div class="settings-group">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Guild</h3>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="sourceGuildToggle" checked />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-
-              <div class="source-options" id="guildSourceOptions">
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="guildRemoveOnServerChange" checked />
-                  <span>Remove All on Server Change</span>
-                </label>
-                <label class="settings-checkbox">
-                  <input type="checkbox" id="guildOnlineOnly" checked />
-                  <span>Show only online guild members</span>
-                </label>
-                <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Guild members are added when you use /guild list. Use this to quickly check guildmates' stats.</small>
-              </div>
-            </div>
-          </div>
-      </div>
-
-  <!-- Appearance Settings Panel -->
-  </div>
-
-  <div class="panel" id="panel-appearance">
-        <div class="settings-section">
-          <h2>
-            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
-            Appearance Settings
-          </h2>
-
-          <!-- Opacity -->
-          <div class="settings-row">
-            <label class="settings-label">Opacity</label>
-            <input id="opacityRange" type="range" min="0.2" max="1" step="0.01" style="flex:1" />
-            <span id="opacityValue" style="width:48px;text-align:right;margin-left:10px"></span>
-          </div>
-
-          <!-- Players Table Font Size -->
-          <div class="settings-row">
-            <label class="settings-label">Players Table Font Size</label>
-            <input id="fontSizeRange" type="range" min="10" max="18" step="1" style="flex:1" />
-            <span id="fontSizeValue" style="width:48px;text-align:right;margin-left:10px"></span>
-          </div>
-
-          <!-- Always on top -->
-          <div class="settings-row">
-            <label class="settings-label">Always On Top</label>
-            <label style="display:flex;align-items:center;gap:8px">
-              <input id="alwaysOnTopToggle" type="checkbox" class="accent-checkbox" />
-            </label>
-          </div>
-
-          <!-- Auto-resize overlay -->
-          <div class="settings-row">
-            <label class="settings-label">Auto-Resize Overlay</label>
-            <label style="display:flex;align-items:center;gap:8px">
-              <input id="autoResizeToggle" type="checkbox" class="accent-checkbox" />
-            </label>
-          </div>
-
-          <!-- Background Color -->
-          <div class="settings-row">
-            <label class="settings-label">Background Color</label>
-            <input id="bgColorInput" type="color" style="width:44px;height:32px;border:0;background:transparent;padding:0" />
-          </div>
-        </div>
-      </div>
-
-  <!-- Columns Settings Panel -->
-  </div>
-
-  <div class="panel" id="panel-columns">
-        <div class="settings-section">
-          <h2>
-            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
-            Columns Settings
-          </h2>
+    <!-- Direct settings entries -->
+          <div class="nav-sep"></div>
+          <button class="nav-item" data-panel="columns">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
+            <span class="nav-label">Columns</span>
+          </button>
+          <button class="nav-item" data-panel="sources">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
+            <span class="nav-label">Sources</span>
+          </button>
+          <button class="nav-item" data-panel="keyboard">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
+            <span class="nav-label">Keyboard Shortcuts</span>
+          </button>
+          <button class="nav-item" data-panel="appearance">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
+            <span class="nav-label">Appearance</span>
+          </button>
+          <button class="nav-item" data-panel="client">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-client"/></svg></span>
+            <span class="nav-label">Client Selection</span>
+          </button>
+          <div class="nav-sep"></div>
+          <button class="nav-item" data-panel="profile">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg></span>
+            <span class="nav-label">Profile</span>
+          </button>
         
-        <div class="layout-editor" id="statLayoutEditor">
-          <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning. Click on a filled slot to configure color rules.</div>
-          <div class="layout-palette" id="layoutPalette"></div>
-          <div class="layout-slots" id="layoutSlots"></div>
-          <button id="addSlotBtn" style="margin-top:12px;padding:8px 16px;background:var(--accent);border:0;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;">+ Add Slot (max 12)</button>
-        </div>
+      </div>
+    </aside>
+
+    <div class="content">
+      <!-- Overlay Panel -->
+      <div class="panel" id="panel-overlay">
+        <div class="table-wrap">
+          <table id="table">
+            <colgroup>
+              <col class="c-lvl"><col class="c-name"><col class="c-ws">
+              <col class="c-fkdr"><col class="c-wlr"><col class="c-bblr">
+              <col class="c-fk"><col class="c-wins"><col class="c-actions">
+            </colgroup>
+            <thead>
+              <tr>
+                <th data-sort-key="level">Lvl</th>
+                <th>Name</th>
+                <th class="metric-h" data-sort-key="ws">WS</th>
+                <th class="metric-h" data-sort-key="fkdr">FKDR</th>
+                <th class="metric-h" data-sort-key="wlr">WLR</th>
+                <th class="metric-h" data-sort-key="bblr">BBLR</th>
+                <th class="metric-h" data-sort-key="fk">F. Kills</th>
+                <th class="metric-h" data-sort-key="wins">Wins</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
         </div>
       </div>
 
-  <!-- Keyboard Shortcuts Settings Panel -->
-  </div>
-
-  <div class="panel" id="panel-keyboard">
-        <div class="settings-section">
-          <h2>
-            <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
-            Keyboard Shortcuts
-          </h2>
-          <div class="kb-help" style="color: var(--muted); margin-bottom: 12px;">
-            Click a field and press the desired key (F-keys or key with modifiers). Press <b>Escape</b> to clear (no shortcut).
-            Shortcuts are global while Nebula is running.
+      <!-- Session Panel -->
+      <div class="panel" id="panel-session">
+        <div class="session-container">
+          <div class="session-header">
+            <div class="session-info">
+              <h2 style="margin:0 0 8px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+                <span class="settings-icon">
+                  <svg class="icon" aria-hidden="true"><use href="#i-session"/></svg>
+                </span>
+                <span id="sessionTitle">Session Stats</span>
+              </h2>
+              <div class="session-player">
+                <img id="sessionAvatar" src="https://crafatar.com/avatars/MHF_Steve?size=48&default=MHF_Steve&overlay" 
+                    style="width:48px;height:48px;border-radius:8px;margin-right:12px;" alt="Player Avatar">
+                <div>
+                  <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
+                  <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="kb-grid" id="kbGrid"></div>
+
+          <div class="session-content">
+            <div id="sessionStatsContainer" style="background:var(--panel);border-radius:12px;padding:20px;margin-top:16px;">
+              <div id="sessionStats" style="font-size:14px;line-height:1.6;">
+                <div style="text-align:center;color:var(--muted);padding:40px 20px;">
+                  <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
+                  <div style="font-size:16px;margin-bottom:8px;">No Session Active</div>
+                  <div style="font-size:13px;">Enter your Minecraft IGN in Profile settings and start playing to track session stats!</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Profile Panel -->
-      <div class="panel" id="panel-profile">
-        <h2 style="margin:0 0 20px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+      <!-- Nicks Panel -->
+      <div class="panel" id="panel-nicks">
+        <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
           <span class="settings-icon">
-            <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
+            <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
           </span>
-          Profile & Account
+          Nickname Handling
         </h2>
-
-        <div class="profile-container">
-          <!-- Account Card -->
-          <div class="profile-card">
-            <div class="profile-header">
-              <div class="profile-avatar empty" id="profileAvatar">
-                <!-- Avatar image will be inserted here -->
-              </div>
-              <div class="profile-info">
-                <h3 class="profile-username" id="profileUsername">
-                  Not logged in
-                </h3>
-                <div class="profile-status offline" id="profileStatus">
-                  <span class="status-dot"></span>
-                  <span>Local account only</span>
-                </div>
-              </div>
-            </div>
-            <div class="profile-actions">
-              <button class="discord-btn" id="discordLoginBtn" style="display:flex">
-                <svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg>
-                <span>Login with Discord</span>
-              </button>
-              <button class="logout-btn" id="logoutBtn" style="display:none">
-                Logout
-              </button>
-            </div>
+        <div
+          style="
+            padding:12px 14px;
+            border-radius:10px;
+            background:var(--panel);
+            display:flex;
+            flex-direction:column;
+            gap:12px;
+          "
+        >
+          <div style="font-size:13px;color:var(--text);line-height:1.5">
+            Manage how <b>nicked players</b> are displayed in the overlay. You can assign nicknames to their
+            real player names and decide how they should appear. When a registered nickname is detected, a
+            <svg class="icon icon-inline" style="width:16px;height:16px;vertical-align:-2px" aria-hidden="true" title="Nick recognised">
+              <use href="#i-ghost"/>
+            </svg>
+            icon appears next to the name so you recognize them instantly.
           </div>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <select id="nickDisplayMode" class="nick-select">
+              <option value="nick">Show nickname (real stats)</option>
+              <option value="real">Show real name</option>
+            </select>
+          </label>
+          <div style="font-size:11.5px;color:var(--muted);line-height:1.5">
+            The displayed name can be either the nickname or the real one —
+            <b>stats always reflect the real player</b>. The
+            <svg class="icon icon-inline" style="width:14px;height:14px;vertical-align:-2px" aria-hidden="true">
+              <use href="#i-ghost"/>
+            </svg>
+            icon is always shown; the tooltip reveals the alternate name.
+          </div>
+        </div>
+        <!-- Add Nick Form -->
+        <div class="add-nick-form" id="addNickForm" style="display:none;margin:20px 0 16px;">
+          <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">Add new nick</h3>
+          <div class="form-row">
+            <label class="form-label">
+              <svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg>
+              <input type="text" id="nickInput" placeholder="Nick" />
+            </label>
+          </div>
+          <div class="form-row">
+            <label class="form-label">
+              <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
+              <input type="text" id="realNameInput" placeholder="Real name" />
+            </label>
+          </div>
+          <button class="form-submit" id="saveNickBtn">ADD</button>
+        </div>
 
-          <!-- Minecraft IGN Card -->
-          <div class="profile-card">
-            <div class="profile-section">
-              <h3 style="margin: 0 0 12px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
-                <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
-                Minecraft Ingame Name (IGN)
+        <!-- Nicks List -->
+        <div class="nicks-list" id="nicksList" style="margin:12px 0 12px;">
+          <!-- Nicks werden hier per JS eingefügt -->
+        </div>
+        <button class="add-btn" id="addNickBtn" title="Add nick" style="margin-top:4px;">+</button>
+      </div>
+
+    <!-- Client & Account Panel (was part of Basic Settings) -->
+    <div class="panel" id="panel-client">
+          <div class="settings-section">
+            <h2>
+              <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-basic"/></svg></span>
+              Client & API Management
+            </h2>
+
+            <div class="settings-subsection">
+              <h3 style="margin: 20px 0 12px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+                <svg class="icon" aria-hidden="true"><use href="#i-client"/></svg>
+                Client Selection
               </h3>
-              <div class="settings-row" style="margin: 0;">
-                <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-                  <div style="display:flex;gap:8px;align-items:center;width:100%">
-                    <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;"/>
-                    <!-- <button id="usernameLockBtn" type="button" style="padding:11px 14px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="IGN bearbeiten">
-                      <svg id="lockIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;transition:opacity 0.2s;"><path id="lockBody" d="M5 11h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path id="lockShackle" d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    </button> -->
+              
+              <!-- Log File Dropdown -->
+              <div class="settings-subrow" style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
+                  <label class="settings-label" style="margin:0;">Minecraft Client</label>
+                  <button id="autoDetectBtn" type="button" style="margin-left:auto;background:var(--row);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Auto-Detect</button>
+                </div>
+                <div id="clientSelectGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;width:100%;">
+                  <button class="client-btn" data-client="badlion"><span class="badge">BL</span> Badlion</button>
+                  <button class="client-btn" data-client="lunar"><span class="badge">LC</span> Lunar</button>
+                  <button class="client-btn" data-client="vanilla"><span class="badge">VN</span> Vanilla</button>
+                  <button class="client-btn" data-client="pvplounge"><span class="badge">PL</span> PvPLounge</button>
+                  <button class="client-btn" data-client="labymod"><span class="badge">LM</span> LabyMod</button>
+                  <button class="client-btn" data-client="feather"><span class="badge">FT</span> Feather</button>
+                  <button class="client-btn" data-client="custom"><span class="badge">C</span> Custom...</button>
+                </div>
+                <div id="customPathRow" style="display:none;flex-direction:column;gap:4px;">
+                  <input id="customLogPathInput" type="text" placeholder="Absolute path to latest.log" style="width:100%;padding:8px 12px;background:var(--row);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text);font-size:12px;" />
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <button id="applyCustomPathBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Apply Path</button>
+                    <small style="color:var(--muted);font-size:11px;">Changing the path resets player/party lists.</small>
                   </div>
-                  <small style="color:var(--muted);font-size:12px;line-height:1.4;">Used for chat mentions and automatic adding to the list. Changes sync with your Discord account when logged in.</small>
                 </div>
+                <div id="clientStatus" class="ok">No client selected yet.</div>
               </div>
             </div>
-          </div>
-
-          <!-- Plus Card -->
-          <div class="profile-card plus-card">
-            <div class="profile-section">
-              <h3>
-                <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                Plus Status
-              </h3>
-              <div class="plus-icon">✨</div>
-              <div class="plus-status" id="plusStatus">
-                <div id="plusStatusText" style="display:flex;flex-direction:column;gap:4px">
-                  <span style="font-weight:600;font-size:14px">Free Plan</span>
-                  <span style="font-size:12px;color:var(--muted)">Try Plus (Demo Mode)</span>
-                </div>
-                <button class="btn primary" id="upgradePlusBtn" style="padding:8px 16px;font-size:13px">
-                  <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                  <span>Try Demo</span>
-                </button>
-              </div>
-              <div style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px">
-                <div style="font-size:12px;color:var(--muted);line-height:1.6">
-                  <b style="color:var(--text)">Plus features:</b><br>
-                  • Unlimited nickname entries<br>
-                  • Advanced statistics & session history<br>
-                  • Priority support & early features<br>
-                  • Support Nebula development <3<br>
-                  <b style="color:var(--accent)">Only €1.99/month</b>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Cloud Sync Card -->
-          <div class="profile-card">
-            <div class="profile-section">
-              <h3>
+            <!-- API Management subsection -->
+            <div class="settings-subsection">
+              <h3 style="margin: 0 0 10px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
                 <svg class="icon" aria-hidden="true"><use href="#i-cloud"/></svg>
-                Cloud Sync
+                Hypixel API Management
               </h3>
-              <div class="sync-info" id="syncInfo">
-                <div style="display:flex;flex-direction:column;gap:4px">
-                  <span style="font-weight:600;font-size:14px" id="syncStatus">Not available</span>
-                  <span class="sync-time" id="syncTime">Login with Discord to enable cloud sync</span>
-                </div>
-                <button class="btn" id="syncNowBtn" style="padding:8px 16px;font-size:13px;background:rgba(102,234,255,0.1);border:1px solid var(--accent);color:var(--accent)" disabled>
-                  Sync Now
-                </button>
-              </div>
-              <div style="margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.5">
-                Cloud sync automatically backs up your settings, nicks, and color rules. Changes sync across all your devices when logged in.
-              </div>
-            </div>
-          </div>
-
-          <!-- Account Stats -->
-          <div class="profile-card" id="accountStatsCard" style="display:none">
-            <div class="profile-section">
-              <h3>Account Statistics</h3>
-              <div class="profile-stat-grid">
-                <div class="profile-stat">
-                  <span class="profile-stat-label">Member Since</span>
-                  <span class="profile-stat-value" id="memberSince">—</span>
-                </div>
-                <div class="profile-stat">
-                  <span class="profile-stat-label">Players Tracked</span>
-                  <span class="profile-stat-value" id="playersTracked">0</span>
-                </div>
-                <div class="profile-stat">
-                  <span class="profile-stat-label">Sessions</span>
-                  <span class="profile-stat-value" id="sessionsCount">0</span>
-                </div>
-                <div class="profile-stat">
-                  <span class="profile-stat-label">Total Lookups</span>
-                  <span class="profile-stat-value" id="totalLookups">0</span>
+              
+              <!-- API Status -->
+              <div class="settings-row" style="margin-bottom:12px;">
+                <span class="settings-icon" style="width:24px;text-align:center;"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg></span>
+                <div style="flex: 1;">
+                  <div id="apiStatus" style="font-size:13px;color:var(--muted);">
+                    <div id="backendStatus">Checking backend...</div>
+                    <div id="userKeyStatus">No user key configured</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Color Rules Modal -->
-      <div class="modal" id="colorRulesModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Color Rules: <span id="colorRuleTitle"></span></h3>
-            <button class="modal-close">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="color-rules" id="colorRulesList">
-              <!-- Regeln werden per JS eingefügt -->
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <button class="add-rule-btn" style="flex: 1;">+ Add Rule</button>
-              <button class="reset-rules-btn" id="resetRulesBtn" style="background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); color: var(--muted); padding: 12px 16px; border-radius: 12px; cursor: pointer; font-weight: 500; letter-spacing: 0.5px;">Reset to Default</button>
-            </div>
-          </div>
-        </div>
-      </div>
+              <!-- User API Key Input -->
+              <div class="settings-row" style="margin-bottom:8px;">
+                <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg></span>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display:flex;gap:8px;align-items:center;">
+                    <input id="apiKeyInput" type="password" placeholder="Your Hypixel API Key (optional)" class="settings-input" style="flex:1; padding: 8px 12px; background: var(--row); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px;" />
+                    <button id="pasteApiKeyBtn" type="button" style="background:var(--accent);border:0;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:60px;">Paste</button>
+                    <button id="testApiKeyBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;min-width:60px;">Test</button>
+                  </div>
+                  <small style="color:var(--muted);font-size:11px;">
+                    Get your API key at <a href="#" id="hypixelApiLink" style="color:var(--accent);">hypixel.net</a> • Only needed if backend is unavailable
+                  </small>
+                </div>
+              </div>
 
-      <!-- Notification Modal (for alerts) -->
-      <div class="modal notification-modal" id="notificationModal">
-        <div class="modal-content">
-          <div class="modal-body">
-            <p class="message" id="notificationMessage"></p>
-            <button class="ok-btn" id="notificationOkBtn">OK</button>
-          </div>
-        </div>
+              <!-- Fallback Setting -->
+              <div class="settings-row" style="margin-bottom:12px;">
+                <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></span>
+                <div style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
+                  <div style="display: flex; flex-direction: column;">
+                    <span>Use API Key Fallback</span>
+                    <small style="color:var(--muted);font-size:11px;">Fall back to your API key when backend is unavailable</small>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="fallbackKeyToggle" checked />
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- API Actions -->
+              <div class="settings-row" style="gap:8px;">
+                <span class="settings-icon" style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></span>
+                <div style="display:flex;gap:8px;flex:1;">
+                  <button id="clearCacheBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;flex:1;">Clear Cache</button>
+                  <button id="refreshApiStatusBtn" type="button" style="background:var(--row);border:1px solid rgba(255,255,255,0.2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;flex:1;">Refresh Status</button>
+                </div>
+              </div>
+            </div>
       </div>
     </div>
 
-  <!-- invisible grips -->
-  <div class="grip g-top" data-edge="top"></div>
-  <div class="grip g-bottom" data-edge="bottom"></div>
-  <div class="grip g-left" data-edge="left"></div>
-  <div class="grip g-right" data-edge="right"></div>
-  <div class="grip g-tl" data-edge="top-left"></div>
-  <div class="grip g-tr" data-edge="top-right"></div>
-  <div class="grip g-bl" data-edge="bottom-left"></div>
-  <div class="grip g-br" data-edge="bottom-right"></div>
-  
-    <script type="module" src="./index.js"></script>
-</body>
+    <!-- Sources Settings Panel -->
+    </div>
+
+    <div class="panel" id="panel-sources">
+          <div class="settings-section">
+            <h2>
+              <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-sources"/></svg></span>
+              Sources Settings
+            </h2>
+
+            <!-- Game Section -->
+            <div class="settings-subsection">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Game</h3>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sourceGameToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="source-options" id="gameSourceOptions">
+                  <label class="settings-checkbox">
+                    <input type="checkbox" id="gameAddFromWho" checked />
+                    <span>Add from /who (ONLINE list)</span>
+                  </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="gameAddFromChat" checked />
+                  <span>Add From Chat</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="gameRemoveOnDeath" checked />
+                  <span>Remove on Final Death</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="gameRemoveOnDisconnect" checked />
+                  <span>Remove/Add on Disconnect/Reconnect</span>
+                  <small style="display: block; color: var(--muted); margin-left: 24px; font-size: 12px;">Players who disconnect while respawning will not be removed.</small>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="gameRemoveOnServerChange" checked />
+                  <span>Remove All on Server Change</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Party Section -->
+            <div class="settings-subsection">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Party</h3>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sourcePartyToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <div class="source-options" id="partySourceOptions">
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyRemoveOnMemberLeave" checked />
+                  <span>Remove member on leave</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyRemoveAllOnLeaveOrDisband" checked />
+                  <span>Clear all on party leave/disband</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyShowInviteTemp" checked />
+                  <span>Show invited player (temp)</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="sourcePartyInvitesToggle" checked />
+                  <span>Enable party invites display</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyRefreshServerChange" />
+                  <span>Auto-refresh on server change</span>
+                </label>
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="partyRefreshGameEnd" />
+                  <span>Auto-refresh after game end</span>
+                </label>
+                <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Party options control how players with the party source are retained or removed.</small>
+              </div>
+            </div>
+
+            <!-- Manual Section -->
+            <div class="settings-subsection">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin: 20px 0 12px;">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Manual</h3>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="sourceManualToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="source-options" id="manualSourceOptions">
+                <label class="settings-checkbox">
+                  <input type="checkbox" id="manualClearOnGameStart" />
+                  <span>Remove all manually added players when a game starts</span>
+                </label>
+                <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Manual source refers to players added via the search bar.</small>
+              </div>
+            </div>
+
+            <!-- Chat Section -->
+            <div class="settings-subsection">
+              <div class="settings-group">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Chat</h3>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="sourceChatToggle" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="source-options" id="chatSourceOptions">
+                  <label class="settings-checkbox">
+                    <input type="checkbox" id="chatRemoveOnServerChange" checked />
+                    <span>Remove All on Server Change</span>
+                  </label>
+                  <label class="settings-checkbox">
+                    <input type="checkbox" id="chatAddOnMention" checked />
+                    <span>Players who mention your name are auto-added</span>
+                  </label>
+                  <div style="margin-top:12px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                      <span style="width:24px;text-align:center"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></span>
+                      <label class="settings-label" style="margin:0;">Trigger Strings</label>
+                      <button id="addChatString" type="button" style="margin-left:auto;background:var(--row);border:0;color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">+ Add</button>
+                    </div>
+                    <div id="chatStringList" style="display:flex;flex-direction:column;gap:6px;"></div>
+                    <small style="display:block;color:var(--muted);margin-top:6px;font-size:11px;">Players are added when their message contains any trigger (case-insensitive).</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Guild Section -->
+            <div class="settings-subsection">
+              <div class="settings-group">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Guild</h3>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="sourceGuildToggle" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="source-options" id="guildSourceOptions">
+                  <label class="settings-checkbox">
+                    <input type="checkbox" id="guildRemoveOnServerChange" checked />
+                    <span>Remove All on Server Change</span>
+                  </label>
+                  <label class="settings-checkbox">
+                    <input type="checkbox" id="guildOnlineOnly" checked />
+                    <span>Show only online guild members</span>
+                  </label>
+                  <small style="display:block;color:var(--muted);margin-top:8px;font-size:11px;">Guild members are added when you use /guild list. Use this to quickly check guildmates' stats.</small>
+                </div>
+              </div>
+            </div>
+        </div>
+
+    <!-- Appearance Settings Panel -->
+    </div>
+
+    <div class="panel" id="panel-appearance">
+          <div class="settings-section">
+            <h2>
+              <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-appearance"/></svg></span>
+              Appearance Settings
+            </h2>
+
+            <!-- Opacity -->
+            <div class="settings-row">
+              <label class="settings-label">Opacity</label>
+              <input id="opacityRange" type="range" min="0.2" max="1" step="0.01" style="flex:1" />
+              <span id="opacityValue" style="width:48px;text-align:right;margin-left:10px"></span>
+            </div>
+
+            <!-- Players Table Font Size -->
+            <div class="settings-row">
+              <label class="settings-label">Players Table Font Size</label>
+              <input id="fontSizeRange" type="range" min="10" max="18" step="1" style="flex:1" />
+              <span id="fontSizeValue" style="width:48px;text-align:right;margin-left:10px"></span>
+            </div>
+
+            <!-- Always on top -->
+            <div class="settings-row">
+              <label class="settings-label">Always On Top</label>
+              <label style="display:flex;align-items:center;gap:8px">
+                <input id="alwaysOnTopToggle" type="checkbox" class="accent-checkbox" />
+              </label>
+            </div>
+
+            <!-- Auto-resize overlay -->
+            <div class="settings-row">
+              <label class="settings-label">Auto-Resize Overlay</label>
+              <label style="display:flex;align-items:center;gap:8px">
+                <input id="autoResizeToggle" type="checkbox" class="accent-checkbox" />
+              </label>
+            </div>
+
+            <!-- Background Color -->
+            <div class="settings-row">
+              <label class="settings-label">Background Color</label>
+              <input id="bgColorInput" type="color" style="width:44px;height:32px;border:0;background:transparent;padding:0" />
+            </div>
+          </div>
+        </div>
+
+    <!-- Columns Settings Panel -->
+    </div>
+
+    <div class="panel" id="panel-columns">
+          <div class="settings-section">
+            <h2>
+              <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg></span>
+              Columns Settings
+            </h2>
+          
+          <div class="layout-editor" id="statLayoutEditor">
+            <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning. Click on a filled slot to configure color rules.</div>
+            <div class="layout-palette" id="layoutPalette"></div>
+            <div class="layout-slots" id="layoutSlots"></div>
+            <button id="addSlotBtn" style="margin-top:12px;padding:8px 16px;background:var(--accent);border:0;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;">+ Add Slot (max 12)</button>
+          </div>
+          </div>
+        </div>
+
+    <!-- Keyboard Shortcuts Settings Panel -->
+    </div>
+
+    <div class="panel" id="panel-keyboard">
+          <div class="settings-section">
+            <h2>
+              <span class="settings-icon"><svg class="icon" aria-hidden="true"><use href="#i-shortcuts"/></svg></span>
+              Keyboard Shortcuts
+            </h2>
+            <div class="kb-help" style="color: var(--muted); margin-bottom: 12px;">
+              Click a field and press the desired key (F-keys or key with modifiers). Press <b>Escape</b> to clear (no shortcut).
+              Shortcuts are global while Nebula is running.
+            </div>
+            <div class="kb-grid" id="kbGrid"></div>
+          </div>
+        </div>
+
+        <!-- Profile Panel -->
+        <div class="panel" id="panel-profile">
+          <h2 style="margin:0 0 20px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+            <span class="settings-icon">
+              <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
+            </span>
+            Profile & Account
+          </h2>
+
+          <div class="profile-container">
+            <!-- Account Card -->
+            <div class="profile-card">
+              <div class="profile-header">
+                <div class="profile-avatar empty" id="profileAvatar">
+                  <!-- Avatar image will be inserted here -->
+                </div>
+                <div class="profile-info">
+                  <h3 class="profile-username" id="profileUsername">
+                    Not logged in
+                  </h3>
+                  <div class="profile-status offline" id="profileStatus">
+                    <span class="status-dot"></span>
+                    <span>Local account only</span>
+                  </div>
+                </div>
+              </div>
+              <div class="profile-actions">
+                <button class="discord-btn" id="discordLoginBtn" style="display:flex">
+                  <svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg>
+                  <span>Login with Discord</span>
+                </button>
+                <button class="logout-btn" id="logoutBtn" style="display:none">
+                  Logout
+                </button>
+              </div>
+            </div>
+
+            <!-- Minecraft IGN Card -->
+            <div class="profile-card">
+              <div class="profile-section">
+                <h3 style="margin: 0 0 12px; font-size: 16px; font-weight: 600; display:flex; align-items:center; gap:8px;">
+                  <svg class="icon" aria-hidden="true"><use href="#i-profile"/></svg>
+                  Minecraft Ingame Name (IGN)
+                </h3>
+                <div class="settings-row" style="margin: 0;">
+                  <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display:flex;gap:8px;align-items:center;width:100%">
+                      <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;"/>
+                      <!-- <button id="usernameLockBtn" type="button" style="padding:11px 14px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="IGN bearbeiten">
+                        <svg id="lockIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;transition:opacity 0.2s;"><path id="lockBody" d="M5 11h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path id="lockShackle" d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      </button> -->
+                    </div>
+                    <small style="color:var(--muted);font-size:12px;line-height:1.4;">Used for chat mentions and automatic adding to the list. Changes sync with your Discord account when logged in.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Plus Card -->
+            <div class="profile-card plus-card">
+              <div class="profile-section">
+                <h3>
+                  <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                  Plus Status
+                </h3>
+                <div class="plus-icon">✨</div>
+                <div class="plus-status" id="plusStatus">
+                  <div id="plusStatusText" style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-weight:600;font-size:14px">Free Plan</span>
+                    <span style="font-size:12px;color:var(--muted)">Try Plus (Demo Mode)</span>
+                  </div>
+                  <button class="btn primary" id="upgradePlusBtn" style="padding:8px 16px;font-size:13px">
+                    <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                    <span>Try Demo</span>
+                  </button>
+                </div>
+                <div style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px">
+                  <div style="font-size:12px;color:var(--muted);line-height:1.6">
+                    <b style="color:var(--text)">Plus features:</b><br>
+                    • Unlimited nickname entries<br>
+                    • Advanced statistics & session history<br>
+                    • Priority support & early features<br>
+                    • Support Nebula development <3<br>
+                    <b style="color:var(--accent)">Only €1.99/month</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cloud Sync Card -->
+            <div class="profile-card">
+              <div class="profile-section">
+                <h3>
+                  <svg class="icon" aria-hidden="true"><use href="#i-cloud"/></svg>
+                  Cloud Sync
+                </h3>
+                <div class="sync-info" id="syncInfo">
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <span style="font-weight:600;font-size:14px" id="syncStatus">Not available</span>
+                    <span class="sync-time" id="syncTime">Login with Discord to enable cloud sync</span>
+                  </div>
+                  <button class="btn" id="syncNowBtn" style="padding:8px 16px;font-size:13px;background:rgba(102,234,255,0.1);border:1px solid var(--accent);color:var(--accent)" disabled>
+                    Sync Now
+                  </button>
+                </div>
+                <div style="margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.5">
+                  Cloud sync automatically backs up your settings, nicks, and color rules. Changes sync across all your devices when logged in.
+                </div>
+              </div>
+            </div>
+
+            <!-- Account Stats -->
+            <div class="profile-card" id="accountStatsCard" style="display:none">
+              <div class="profile-section">
+                <h3>Account Statistics</h3>
+                <div class="profile-stat-grid">
+                  <div class="profile-stat">
+                    <span class="profile-stat-label">Member Since</span>
+                    <span class="profile-stat-value" id="memberSince">—</span>
+                  </div>
+                  <div class="profile-stat">
+                    <span class="profile-stat-label">Players Tracked</span>
+                    <span class="profile-stat-value" id="playersTracked">0</span>
+                  </div>
+                  <div class="profile-stat">
+                    <span class="profile-stat-label">Sessions</span>
+                    <span class="profile-stat-value" id="sessionsCount">0</span>
+                  </div>
+                  <div class="profile-stat">
+                    <span class="profile-stat-label">Total Lookups</span>
+                    <span class="profile-stat-value" id="totalLookups">0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Color Rules Modal -->
+        <div class="modal" id="colorRulesModal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>Color Rules: <span id="colorRuleTitle"></span></h3>
+              <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="color-rules" id="colorRulesList">
+                <!-- Regeln werden per JS eingefügt -->
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="add-rule-btn" style="flex: 1;">+ Add Rule</button>
+                <button class="reset-rules-btn" id="resetRulesBtn" style="background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); color: var(--muted); padding: 12px 16px; border-radius: 12px; cursor: pointer; font-weight: 500; letter-spacing: 0.5px;">Reset to Default</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Modal (for alerts) -->
+        <div class="modal notification-modal" id="notificationModal">
+          <div class="modal-content">
+            <div class="modal-body">
+              <p class="message" id="notificationMessage"></p>
+              <button class="ok-btn" id="notificationOkBtn">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- invisible grips -->
+    <div class="grip g-top" data-edge="top"></div>
+    <div class="grip g-bottom" data-edge="bottom"></div>
+    <div class="grip g-left" data-edge="left"></div>
+    <div class="grip g-right" data-edge="right"></div>
+    <div class="grip g-tl" data-edge="top-left"></div>
+    <div class="grip g-tr" data-edge="top-right"></div>
+    <div class="grip g-bl" data-edge="bottom-left"></div>
+    <div class="grip g-br" data-edge="bottom-right"></div>
+    
+      <script type="module" src="./index.js"></script>
+      <script type="module" src="./renderer.js"></script>
+  </body>
+
 </html>

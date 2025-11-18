@@ -19,6 +19,7 @@ loginBtn.addEventListener("click", () => {
 // ------------------------------
 logoutBtn.addEventListener("click", async () => {
   await fetch("https://nebula-overlay.online/api/auth/logout", {
+    credentials: "include",
     method: "POST",
     credentials: "include"
   });
@@ -36,6 +37,7 @@ async function getUser() {
     });
 
     const data = await res.json();
+    console.log("User data:", data);
     return data.user || null;
   } catch {
     return null;
