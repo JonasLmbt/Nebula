@@ -65,6 +65,7 @@ function trackSessionStart() {
 const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
 const MIN_HEIGHT = 120; // minimum window height for empty overlay
 const DEFAULT_HEIGHT = 560; // default full height
+const errorMsg = "Could not start session";
 let resizeTimeout = null;
 
 function updateOverlaySize() {
@@ -262,150 +263,162 @@ try {
 } catch { return null; }
 }
 
+async function setAvatar(ign) {
+  const el = document.getElementById("sessionAvatar");
+  const uuid = await fetchMojangUuid(ign);
+  el.src = `https://mc-heads.net/avatar/${uuid}/48`;
+
+  el.onerror = () => {
+    el.src = "https://mc-heads.net/avatar/MHF_Steve/48";
+  };
+}
+setAvatar("Steve"); // Steve placeholder
+
+
 async function startSession(username) {
-if (!username || username.trim() === '') {
-  console.log('Cannot start session: no username provided');
-  return;
-}
+  if (!username || username.trim() === '') {
+    console.log('Cannot start session: no username provided');
+    return;
+  }
 
-// Wait for IPC to be available
-if (!window.window.ipcRenderer) {
-  console.log('IPC not ready yet, waiting...');
-  setTimeout(() => startSession(username), 500);
-  return;
-}
+  // Wait for IPC to be available
+  if (!window.window.ipcRenderer) {
+    console.log('IPC not ready yet, waiting...');
+    setTimeout(() => startSession(username), 500);
+    return;
+  }
 
-console.log('Starting session for:', username);
-sessionUsername = username;
-startTime = new Date();
+  console.log('Starting session for:', username);
+  sessionUsername = username;
+  startTime = new Date();
 
-// Show loading state
-const sessionStats = document.getElementById('sessionStats');
-if (sessionStats) {
-  sessionStats.innerHTML = `
-    <div style="text-align:center;color:var(--muted);padding:40px 20px;">
-      <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;animation:spin 2s linear infinite;"><use href="#i-session"/></svg>
-      <div style="font-size:16px;margin-bottom:8px;color:var(--text);">Loading Session Stats</div>
-      <div style="font-size:13px;">Fetching current stats for ${username}...</div>
-    </div>
-    <style>
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-  `;
-}
-
-try {
-  // First check API status
-  const apiStatus = await window.window.ipcRenderer.invoke('api:getStatus');
-  console.log('API Status:', apiStatus);
-  
-const rawResult = await window.window.ipcRenderer.invoke('bedwars:stats', username);
-  console.log('Session API raw result:', rawResult);
-  const normalized = normalizeBedwarsStats(rawResult);
-  console.log('Session API normalized result:', normalized);
-  
-  if (rawResult && !rawResult.error && (rawResult.name || normalized.name)) {
-    startStats = normalized; // store normalized for diff calculations
-    sessionUuid = normalized.uuid || rawResult.uuid || null;
-    if (usernameInput) {
-      // Initial value from settings (or from normalized stats if you prefer)
-      usernameInput.value = (basicSettings.username || '').trim();
-
-      const applyUsernameChange = () => {
-        const prev = (basicSettings.username || '').trim();
-        const next = (usernameInput.value || '').trim();
-
-        if (prev === next) return;
-
-        // Remove old player source if needed
-        if (prev) {
-          removePlayerSource(prev, 'username');
-        }
-
-        basicSettings.username = next;
-        localStorage.setItem('username', next);
-        updateSidebarUsername();
-
-        // Use the preload bridge instead of require('electron')
-        try {
-          if (window.window.ipcRenderer) {
-            window.window.ipcRenderer.send('set:username', basicSettings.username || '');
-          } else if (window.electronAPI && window.electronAPI.setUsername) {
-            window.electronAPI.setUsername(basicSettings.username || '');
-          }
-        } catch (e) {
-          console.error('Failed to send username IPC update:', e);
-        }
-
-        // Restart session if IGN changed
-        if (next && next !== sessionUsername) {
-          startSession(next);
-        }
-      };
-
-      // Trigger on blur (user leaves the field)
-      usernameInput.addEventListener('blur', applyUsernameChange);
-
-      // Optional: also trigger on Enter key
-      usernameInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-          applyUsernameChange();
-          usernameInput.blur();
-        }
-      });
-
-      // Start session on app load if username exists (delayed)
-      const savedUsername = basicSettings.username || '';
-      if (savedUsername) {
-        console.log('Found saved username on app load:', savedUsername);
-        localStorage.setItem('username', savedUsername);
-        setTimeout(() => {
-          if (!sessionUsername) {
-            console.log('Starting session on app load for:', savedUsername);
-            startSession(savedUsername);
-          }
-        }, 400);
-      }
-    }
-    // Create detailed error message with API status
-    let detailedError = `
-      <div style="text-align:center;color:#ef4444;padding:40px 20px;">
-        <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
-        <div style="font-size:16px;margin-bottom:8px;">Session Start Failed</div>
-        <div style="font-size:13px;line-height:1.5;margin-bottom:12px;">
-          ${errorMsg}
-        </div>
+  // Show loading state
+  const sessionStats = document.getElementById('sessionStats');
+  if (sessionStats) {
+    sessionStats.innerHTML = `
+      <div style="text-align:center;color:var(--muted);padding:40px 20px;">
+        <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;animation:spin 2s linear infinite;"><use href="#i-session"/></svg>
+        <div style="font-size:16px;margin-bottom:8px;color:var(--text);">Loading Session Stats</div>
+        <div style="font-size:13px;">Fetching current stats for ${username}...</div>
+      </div>
+      <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      </style>
     `;
+  }
+
+  try {
+    // First check API status
+    const apiStatus = await window.window.ipcRenderer.invoke('api:getStatus');
+    console.log('API Status:', apiStatus);
     
-    // Add API status information if available
-    if (apiStatus) {
+  const rawResult = await window.window.ipcRenderer.invoke('bedwars:stats', username);
+    console.log('Session API raw result:', rawResult);
+    const normalized = normalizeBedwarsStats(rawResult);
+    console.log('Session API normalized result:', normalized);
+    
+    if (rawResult && !rawResult.error && (rawResult.name || normalized.name)) {
+      startStats = normalized; // store normalized for diff calculations
+      sessionUuid = normalized.uuid || rawResult.uuid || null;
+      if (usernameInput) {
+        // Initial value from settings (or from normalized stats if you prefer)
+        usernameInput.value = (basicSettings.username || '').trim();
+
+        const applyUsernameChange = () => {
+          const prev = (basicSettings.username || '').trim();
+          const next = (usernameInput.value || '').trim();
+
+          if (prev === next) return;
+
+          // Remove old player source if needed
+          if (prev) {
+            removePlayerSource(prev, 'username');
+          }
+
+          basicSettings.username = next;
+          localStorage.setItem('username', next);
+          updateSidebarUsername();
+
+          // Use the preload bridge instead of require('electron')
+          try {
+            if (window.window.ipcRenderer) {
+              window.window.ipcRenderer.send('set:username', basicSettings.username || '');
+            } else if (window.electronAPI && window.electronAPI.setUsername) {
+              window.electronAPI.setUsername(basicSettings.username || '');
+            }
+          } catch (e) {
+            console.error('Failed to send username IPC update:', e);
+          }
+
+          // Restart session if IGN changed
+          if (next && next !== sessionUsername) {
+            startSession(next);
+          }
+        };
+
+        // Trigger on blur (user leaves the field)
+        usernameInput.addEventListener('blur', applyUsernameChange);
+
+        // Optional: also trigger on Enter key
+        usernameInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            applyUsernameChange();
+            usernameInput.blur();
+          }
+        });
+
+        // Start session on app load if username exists (delayed)
+        const savedUsername = basicSettings.username || '';
+        if (savedUsername) {
+          console.log('Found saved username on app load:', savedUsername);
+          localStorage.setItem('username', savedUsername);
+          setTimeout(() => {
+            if (!sessionUsername) {
+              console.log('Starting session on app load for:', savedUsername);
+              startSession(savedUsername);
+            }
+          }, 400);
+        }
+      }
+      // Create detailed error message with API status
+      let detailedError = `
+        <div style="text-align:center;color:#ef4444;padding:40px 20px;">
+          <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
+          <div style="font-size:16px;margin-bottom:8px;">Session Start Failed</div>
+          <div style="font-size:13px;line-height:1.5;margin-bottom:12px;">
+            ${errorMsg}
+          </div>
+      `;
+      
+      // Add API status information if available
+      if (apiStatus) {
+        detailedError += `
+          <div style="font-size:11px;color:var(--muted);text-align:left;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin:16px 0;">
+            <strong>API Status:</strong><br>
+            Backend: ${apiStatus.backendAvailable ? '🟢 Available' : '🔴 Down'}<br>
+            User Key: ${apiStatus.config.hasUserKey ? '🟢 Set' : '🔴 Not Set'}<br>
+            Enhanced System: ${apiStatus.config.useEnhanced ? 'Enabled' : 'Disabled'}
+          </div>
+        `;
+      }
+      
       detailedError += `
-        <div style="font-size:11px;color:var(--muted);text-align:left;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin:16px 0;">
-          <strong>API Status:</strong><br>
-          Backend: ${apiStatus.backendAvailable ? '🟢 Available' : '🔴 Down'}<br>
-          User Key: ${apiStatus.config.hasUserKey ? '🟢 Set' : '🔴 Not Set'}<br>
-          Enhanced System: ${apiStatus.config.useEnhanced ? 'Enabled' : 'Disabled'}
+          <div style="font-size:13px;line-height:1.5;">
+            <strong>What Session Stats Do:</strong><br>
+            • Track your progress since app start<br>
+            • Show stat changes (wins, kills, etc.)<br>
+            • Update automatically while playing
+          </div>
         </div>
       `;
+      
+      // Show specific error message
+      if (sessionStats) {
+        sessionStats.innerHTML = detailedError;
+      }
     }
-    
-    detailedError += `
-        <div style="font-size:13px;line-height:1.5;">
-          <strong>What Session Stats Do:</strong><br>
-          • Track your progress since app start<br>
-          • Show stat changes (wins, kills, etc.)<br>
-          • Update automatically while playing
-        </div>
-      </div>
-    `;
-    
-    // Show specific error message
-    if (sessionStats) {
-      sessionStats.innerHTML = detailedError;
-    }
-  }
-} catch (error) {
-console.error('Failed to start session (exception):', error);
+  } catch (error) {
+  console.error('Failed to start session (exception):', error);
   
   // Show network error with API diagnostics
   if (sessionStats) {
@@ -458,24 +471,6 @@ try {
   }
 } catch (error) {
   console.error('Failed to update session:', error);
-}
-}
-
-function updateSessionDisplay() {
-const sessionIgn = document.getElementById('sessionIgn');
-const sessionTime = document.getElementById('sessionTime');
-const sessionAvatar = document.getElementById('sessionAvatar');
-
-if (sessionUsername) {
-  sessionIgn.textContent = sessionUsername;
-  console.log(sessionUuid);
-  if (sessionUuid) {
-    sessionAvatar.src = `https://crafatar.com/avatars/${sessionUuid}?size=48&default=MHF_Steve&overlay`;
-  } else {
-// Username fallback: load Mojang UUID asynchronously; until then use Steve placeholder skin
-sessionAvatar.src = `https://crafatar.com/avatars/8667ba71b85a4004af54457a9734eed7?size=48&default=MHF_Steve&overlay`; // Steve placeholder
-  }
-  updateSessionTime();
 }
 }
 
@@ -1872,9 +1867,13 @@ function showPanel(id) {
     } else if (username !== sessionUsername) {
       console.log('Starting session because username changed:', username, '!==', sessionUsername);
       startSession(username);
+      sessionIgn.textContent = username;
+      setAvatar(username);
     } else if (sessionUsername && startStats) {
       console.log('Updating existing session');
       updateSession();
+      sessionIgn.textContent = username;
+      setAvatar(username);
     } else {
       console.log('Session state unclear - startStats:', !!startStats, 'sessionUsername:', sessionUsername);
     }
@@ -2261,17 +2260,21 @@ function showNotification(message) {
   const modal = document.getElementById('notificationModal');
   const messageEl = document.getElementById('notificationMessage');
   const okBtn = document.getElementById('notificationOkBtn');
-  
-  messageEl.textContent = message;
+
+  // IMPORTANT: Allow HTML for icons
+  messageEl.innerHTML = message;
+
   modal.classList.add('open');
-  
+
   const closeModal = () => {
     modal.classList.remove('open');
     okBtn.removeEventListener('click', closeModal);
   };
-  
+
+  // Prevent stacking multiple event listeners
   okBtn.addEventListener('click', closeModal);
 }
+
 
 // Add slot button
 const addSlotBtn = document.getElementById('addSlotBtn');
@@ -3573,7 +3576,7 @@ async function updatePlusStatus() {
         
         if (isPaidPlus) {
           plusStatusText.innerHTML = `
-            <span style="font-weight:600;font-size:14px;color:var(--accent)">✨ Plus Active</span>
+            <span style="font-weight:600;font-size:14px;color:var(--accent);display:inline-flex;align-items:center;gap:4px;"><svg class="icon" style="width:16px;height:16px;"><use href="#i-demo-plus"/></svg> Plus Active</span>
             <span style="font-size:12px;color:var(--muted)">Expires: ${expiresDate}</span>
           `;
           upgradePlusBtn.textContent = 'Manage';
@@ -3581,7 +3584,7 @@ async function updatePlusStatus() {
         } else if (isTestPlus) {
           const hoursLeft = Math.ceil((plusData.expiresAt - Date.now()) / (60 * 60 * 1000));
           plusStatusText.innerHTML = `
-            <span style="font-weight:600;font-size:14px;color:var(--warning)">🧪 Test Plus Active</span>
+            <span style="font-weight:600;font-size:14px;color:var(--warning)"><svg class="icon"><use href="#i-test-tube"/></svg> Test Plus Active</span>
             <span style="font-size:12px;color:var(--muted)">${hoursLeft} hours left of monthly test</span>
           `;
           upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Upgrade to Full</span>';
@@ -3602,7 +3605,7 @@ async function updatePlusStatus() {
     // Demo plus mode (with time limit)
     const minutesLeft = Math.ceil(demoTimeLeft / (60 * 1000));
     plusStatusText.innerHTML = `
-      <span style="font-weight:600;font-size:14px;color:var(--accent)">✨ Demo Plus</span>
+      <span style="font-weight:600;font-size:14px;color:var(--accent);display:inline-flex;align-items:center;gap:4px;"><svg class="icon" style="width:16px;height:16px;"><use href="#i-demo-plus"/></svg> Demo Plus</span>
       <span style="font-size:12px;color:var(--muted)">${minutesLeft} minutes left - Get unlimited access</span>
     `;
     upgradePlusBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>Upgrade Now</span>';
@@ -3763,7 +3766,7 @@ if (upgradePlusBtn) {
 
     if (!window.userProfile) {
       // Demo mode without login
-      showNotification('🎉 Demo Plus activated! Try all Plus features this session.');
+      showNotification('<svg class="icon"><use href="#i-celebrate"/></svg> Demo Plus activated! Try all Plus features this session.');
       localStorage.setItem('demoPlus', 'true');
       updatePlusStatus();
       return;
@@ -3776,7 +3779,7 @@ if (upgradePlusBtn) {
       showNotification('Opening your Nebula Plus management page...');
       const result = await window.ipcRenderer.invoke('plus:manageSubscription', window.userProfile.id);
       if (result.error) {
-        showNotification('❌ ' + result.error);
+        showNotification('<svg class="icon"><use href="#i-error"/></svg> ' + result.error);
         return;
       }
       return;
@@ -3854,18 +3857,18 @@ function showPlusVerificationDialog() {
         const result = await window.ipcRenderer.invoke('plus:createCheckout', window.userProfile.id, { plan: 'monthly' });
         
         if (result.error) {
-          showNotification('❌ ' + result.error);
+          showNotification('<svg class="icon"><use href="#i-error"/></svg> ' + result.error);
           return;
         }
         
-        showNotification('💳 Opening monthly payment (€1.99/month)...');
+        showNotification('<svg class="icon"><use href="#i-card"/></svg> Opening monthly payment (€1.99/month)...');
         
         // After a delay, show payment verification dialog
         setTimeout(() => {
           showPaymentVerificationDialog();
         }, 3000);
       } catch (err) {
-        showNotification('❌ Error: ' + (err.message || err));
+        showNotification('<svg class="icon"><use href="#i-error"/></svg> Error: ' + (err.message || err));
       }
     };
   }
@@ -3880,18 +3883,18 @@ function showPlusVerificationDialog() {
         const result = await window.ipcRenderer.invoke('plus:createCheckout', window.userProfile.id, { plan: 'yearly' });
         
         if (result.error) {
-          showNotification('❌ ' + result.error);
+          showNotification('<svg class="icon"><use href="#i-error"/></svg> ' + result.error);
           return;
         }
         
-        showNotification('💎 Opening yearly payment (€19.99/year - save 16%)...');
+        showNotification('<svg class="icon"><use href="#i-diamond"/></svg> Opening yearly payment (€19.99/year - save 16%)...');
         
         // After a delay, show payment verification dialog
         setTimeout(() => {
           showPaymentVerificationDialog();
         }, 3000);
       } catch (err) {
-        showNotification('❌ Error: ' + (err.message || err));
+        showNotification('<svg class="icon"><use href="#i-error"/></svg> Error: ' + (err.message || err));
       }
     };
   }
@@ -3921,10 +3924,10 @@ function showPlusVerificationDialog() {
       if (!existingDemo || timeSinceDemo > 24 * 60 * 60 * 1000) {
         localStorage.setItem('demoPlus', 'true');
         localStorage.setItem('demoPlusStartTime', String(now));
-        showNotification('⚡ 10-minute Quick Demo activated! Try Nebula Plus features now.');
+        showNotification('<svg class="icon"><use href="#i-bolt"/></svg> 10-minute Quick Demo activated! Try Nebula Plus features now.');
         updatePlusStatus();
       } else {
-        showNotification('⏰ Demo already used today. Login for 7-day trial or wait 24h!');
+        showNotification('<svg class="icon"><use href="#i-clock"/></svg> Demo already used today. Login for 7-day trial or wait 24h!');
       }
     };
   }
@@ -3967,7 +3970,7 @@ function showPaymentVerificationDialog() {
     closeModal();
     
     if (!window.userProfile) {
-      showNotification('⚠️ Please login with Discord first');
+      showNotification('<svg class="icon"><use href="#i-warning"/></svg> Please login with Discord first');
       return;
     }
     
@@ -3981,11 +3984,11 @@ function showPaymentVerificationDialog() {
         const result = await window.ipcRenderer.invoke('plus:verify', window.userProfile.id, sessionId);
         
         if (result.error) {
-          showNotification('❌ Payment verification failed: ' + result.error);
+          showNotification('<svg class="icon"><use href="#i-error"/></svg> Payment verification failed: ' + result.error);
           return;
         }
         
-        showNotification('🎉 Plus activated successfully! Welcome to Nebula Plus!');
+        showNotification('<svg class="icon"><use href="#i-celebrate"/></svg> Plus activated successfully! Welcome to Nebula Plus!');
         updatePlusStatus();
       } else {
         // Fallback: Manual check or demo activation
@@ -3994,11 +3997,11 @@ function showPaymentVerificationDialog() {
         // For demo purposes, you could activate demo plus here
         // Or implement a webhook-based verification system
         setTimeout(() => {
-          showNotification('⚠️ Payment verification in progress. Plus will activate automatically once confirmed.');
+          showNotification('<svg class="icon"><use href="#i-warning"/></svg> Payment verification in progress. Plus will activate automatically once confirmed.');
         }, 2000);
       }
     } catch (err) {
-      showNotification('❌ Verification error: ' + (err.message || err));
+      showNotification('<svg class="icon"><use href="#i-error"/></svg> Verification error: ' + (err.message || err));
     }
   };
 
@@ -4015,7 +4018,7 @@ async function verifyPlusPurchase(purchaseToken) {
       throw new Error(result.error);
     }
     
-    showNotification('🎉 Plus activated successfully! Welcome to Nebula Plus!');
+    showNotification('<svg class="icon"><use href="#i-celebrate"/></svg> Plus activated successfully! Welcome to Nebula Plus!');
     updateProfileUI(); // Refresh plus status
     
   } catch (err) {
