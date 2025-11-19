@@ -51,6 +51,8 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
     console.error("[Nebula:unhandledRejection]", reason);
 });
+const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
+const appVersion = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version;
 let win = null;
 const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 function initAutoUpdate() {
@@ -664,8 +666,8 @@ electron_1.ipcMain.handle('firebase:upload', async (_e, userId, settings) => {
         await setDoc(userDocRef, {
             settings,
             updatedAt: serverTimestamp(),
-            version: '1.0.0'
-        });
+            version: appVersion
+        }, { merge: true });
         console.log('[Firebase Main] Settings uploaded for user:', userId);
         return { success: true };
     }

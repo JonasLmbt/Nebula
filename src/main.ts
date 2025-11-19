@@ -628,11 +628,13 @@ ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
   if (!await initFirebaseMain()) {
     return { error: 'Firebase not initialized' };
   }
-  
+
   try {
-    const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
-    
+    const { doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
+
     const userDocRef = doc(firestore, 'users', userId);
+    const snap = await getDoc(userDocRef);
+    
     await setDoc(
       userDocRef,
       {
@@ -642,14 +644,30 @@ ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
       },
       { merge: true }
     );
-        
-    console.log('[Firebase Main] Settings uploaded for user:', userId);
+
+    if (!snap.exists() || !snap.data().plus) {
+      const defaultPlus = {
+        plan: "none",
+        status: "inactive",
+        expiresAt: Timestamp.now(), 
+        stripeCustomerId: null
+      };
+
+      await setDoc(
+        userDocRef,
+        { plus: defaultPlus },
+        { merge: true }
+      );
+      console.log(`[Firebase] Added missing plus field with timestamp for user ${userId}`);
+    }
+
     return { success: true };
   } catch (error) {
     console.error('[Firebase Main] Upload failed:', error);
     return { error: String(error) };
   }
 });
+
 
 ipcMain.handle('firebase:download', async (_e, userId: string) => {
   if (!await initFirebaseMain()) {
