@@ -815,38 +815,34 @@ electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
     }
 });
 // Create Stripe checkout session via backend API
-electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { plan: 'monthly' }) => {
-    console.log('[Plus] Creating checkout session for user:', userId, 'Options:', options);
-    try {
-        const plan = options?.plan ?? 'monthly';
-        // Base URL of your backend (you can also move this to a config file)
-        const backendBaseUrl = process.env.NEBULA_BACKEND_URL || 'https://nebula-overlay.online';
-        const response = await (0, node_fetch_1.default)(`${backendBaseUrl}/api/plus/create-checkout-session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, plan })
-        });
-        console.log('[Plus] Backend response status:', response.status);
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.url) {
-            const errMsg = data?.error || `Failed to create checkout session (status ${response.status})`;
-            console.error('[Plus] Backend checkout session error:', errMsg);
-            return { error: errMsg };
-        }
-        const checkoutUrl = data.url;
-        console.log('[Plus] Opening Stripe checkout from backend:', checkoutUrl, 'Plan:', plan);
-        await electron_1.shell.openExternal(checkoutUrl);
-        return {
-            success: true,
-            message: plan === 'yearly'
-                ? 'Yearly plan selected! €19.99/year (save 16%)'
-                : 'Monthly plan selected! €1.99/month'
-        };
-    }
-    catch (error) {
-        console.error('[Plus] Checkout failed:', error);
-        return { error: String(error) };
-    }
+electron_1.ipcMain.handle("plus:createCheckout", async (_e, options) => {
+    if (!win)
+        return { error: "Main window missing" };
+    const plan = options?.plan ?? "monthly";
+    const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
+    const postUrl = `${backendBaseUrl}/api/plus/create-checkout-session`;
+    const checkoutWindow = new electron_1.BrowserWindow({
+        width: 900,
+        height: 1000,
+        title: "Nebula Plus Checkout",
+        autoHideMenuBar: true,
+        webPreferences: {
+            session: win.webContents.session,
+        },
+    });
+    const html = `
+    <html>
+      <body>
+        <form id="f" method="POST" action="${postUrl}?plan=${plan}">
+        </form>
+        <script>
+          document.getElementById("f").submit();
+        </script>
+      </body>
+    </html>
+  `;
+    checkoutWindow.loadURL(`data:text/html;base64,${Buffer.from(html).toString("base64")}`);
+    return { success: true };
 });
 // Open Stripe Customer Portal for subscription management
 electron_1.ipcMain.handle('premium:manageSubscription', async (_e, userId) => {
