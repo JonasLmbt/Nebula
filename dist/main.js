@@ -661,14 +661,24 @@ electron_1.ipcMain.handle('firebase:upload', async (_e, userId, settings) => {
         return { error: 'Firebase not initialized' };
     }
     try {
-        const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
+        const { doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
         const userDocRef = doc(firestore, 'users', userId);
+        const snap = await getDoc(userDocRef);
         await setDoc(userDocRef, {
             settings,
             updatedAt: serverTimestamp(),
             version: appVersion
         }, { merge: true });
-        console.log('[Firebase Main] Settings uploaded for user:', userId);
+        if (!snap.exists() || !snap.data().plus) {
+            const defaultPlus = {
+                plan: "none",
+                status: "inactive",
+                expiresAt: Timestamp.now(),
+                stripeCustomerId: null
+            };
+            await setDoc(userDocRef, { plus: defaultPlus }, { merge: true });
+            console.log(`[Firebase] Added missing plus field with timestamp for user ${userId}`);
+        }
         return { success: true };
     }
     catch (error) {

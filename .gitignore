@@ -28,7 +28,7 @@ Thumbs.db
 *.asar
 .cache/
 node_modules/
-dist/
+dist/*
 build/
 release/
 **/win-unpacked/
