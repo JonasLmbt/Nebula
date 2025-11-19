@@ -67,6 +67,7 @@ const MIN_HEIGHT = 120; // minimum window height for empty overlay
 const DEFAULT_HEIGHT = 560; // default full height
 const errorMsg = "Could not start session";
 let resizeTimeout = null;
+let sessionUuid = null;
 
 function updateOverlaySize() {
   if (resizeTimeout) clearTimeout(resizeTimeout);

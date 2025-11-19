@@ -14,23 +14,32 @@ const BASE_CLIENT_PATHS: Record<string, string> = {
 
 // Lunar has multiple possible folders depending on version
 function detectLunarPath(): string | undefined {
+  const homeDir = process.env.USERPROFILE || process.env.HOMEPATH || '';
+  const appdata = process.env.APPDATA || '';
+
   const candidates = [
-    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8', 'logs', 'latest.log'),
-    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', '1.8.9', 'logs', 'latest.log'),
-    path.join(process.env.APPDATA || '', '.lunarclient', 'offline', 'multiver', 'logs', 'latest.log'),
+    path.join(homeDir, '.lunarclient', 'profiles', 'lunar', '1.8', 'logs', 'latest.log'),
+    path.join(homeDir, '.lunarclient', 'profiles', 'lunar', '1.21', 'logs', 'latest.log'),
   ];
-  let newest: { p?: string; m: number } = { p: undefined, m: 0 };
+
+  let newest: { p?: string; m: number } = { m: 0 };
+
   for (const p of candidates) {
     try {
       if (fs.existsSync(p)) {
-        const s = fs.statSync(p);
-        const m = s.mtimeMs || s.mtime.getTime();
-        if (m > newest.m) newest = { p, m };
+        const stat = fs.statSync(p);
+        const m = stat.mtimeMs || stat.mtime.getTime();
+        if (m > newest.m) {
+          newest = { p, m };
+        }
       }
-    } catch {/* ignore */}
+    } catch {}
   }
+
   return newest.p;
 }
+
+
 
 function buildClientPaths(): Record<string, string> {
   const lunar = detectLunarPath();
@@ -171,18 +180,27 @@ export class MinecraftChatLogger extends EventEmitter {
     const chatIndex = line.indexOf('[CHAT]');
     // If line lacks [CHAT], we still might want to capture continuation of multi-line party invites
     if (chatIndex === -1) {
-      if (this.awaitingInviteContinuation) {
-        const trimmed = this.stripColorCodes(line.trim());
-        if (trimmed) {
-          if (/^You have 60 seconds to accept\.?/i.test(trimmed) || /Click here to join!?/i.test(trimmed)) {
-            console.log('[DBG:PARTY_INVITE_IN_CONTINUATION]', trimmed);
-            // Stop waiting after capturing continuation
-            this.awaitingInviteContinuation = false;
-          }
+        const cleaned = this.stripColorCodes(line.trim());
+        // Recognize non-[CHAT] party invites (Lunar, old clients, mod clients, etc.)
+        if (/has invited you to join their party!?/i.test(cleaned)) {
+            const m = cleaned.match(/([A-Za-z0-9_]{3,16}) has invited you/);
+            if (m) {
+                const inviter = m[1];
+                this.emit('partyInvite', inviter);
+                this.awaitingInviteContinuation = true;
+            }
+            return;
         }
-      }
-      return;
+        // Continuation lines (e.g., "You have 60 seconds...")
+        if (this.awaitingInviteContinuation) {
+            if (/You have \d+ seconds/i.test(cleaned) || /Click here to join/i.test(cleaned)) {
+                this.awaitingInviteContinuation = false;
+            }
+            return;
+        }
+        return;
     }
+
 
     const raw = line.substring(chatIndex + 6).trim();
     const msg = this.stripColorCodes(raw);
