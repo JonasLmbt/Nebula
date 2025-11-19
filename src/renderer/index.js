@@ -4,7 +4,6 @@
 
 console.log('NEBULA LOADED - Version:', new Date().toISOString());
 
-var userProfile = null;
 var authTokens = null;
 
 try { window.window.ipcRenderer = window.ipcRenderer; } catch (_) { /* noop */ }
@@ -16,8 +15,6 @@ let queue = [];
 let startStats = null;        // Stats when session started
 let startTime = new Date();   // Session start time
 let sessionUsername = null;   // Current session username
-let sessionUpdateInterval = null; // Interval for updating session
-let sessionUuid = null;       // UUID für Avatar
 
 // Account Metrics Tracking
 let accountMetrics = JSON.parse(localStorage.getItem('accountMetrics') || JSON.stringify({
@@ -60,6 +57,7 @@ function trackSessionStart() {
   saveAccountMetrics();
   console.log('[Metrics] Session started - Total:', accountMetrics.sessionsCount);
 }
+trackSessionStart();
 
 // Auto-resize overlay logic (defined early so it can be called anywhere)
 const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
