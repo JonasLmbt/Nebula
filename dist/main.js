@@ -51,7 +51,6 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
     console.error("[Nebula:unhandledRejection]", reason);
 });
-let nicksWin = null;
 let win = null;
 const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 function initAutoUpdate() {

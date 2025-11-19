@@ -2,11 +2,11 @@ import { app, BrowserWindow, ipcMain, globalShortcut, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path'; 
 import * as fs from 'fs';
-import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './logs/chat-logger';
 import { normalizeHypixelBedwarsStats } from "./logs/hypixelNormalizer"; 
+
 console.log("[Nebula:boot] main.ts top reached");
 process.on("uncaughtException", (err) => {
   console.error("[Nebula:uncaughtException]", err);
@@ -16,8 +16,9 @@ process.on("unhandledRejection", (reason) => {
   console.error("[Nebula:unhandledRejection]", reason);
 });
 
+const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
+const appVersion = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version;
 
-let nicksWin: BrowserWindow | null = null;
 let win: BrowserWindow | null = null;
 const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 
@@ -632,12 +633,16 @@ ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
     const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
     
     const userDocRef = doc(firestore, 'users', userId);
-    await setDoc(userDocRef, {
-      settings,
-      updatedAt: serverTimestamp(),
-      version: '1.0.0'
-    });
-    
+    await setDoc(
+      userDocRef,
+      {
+        settings,
+        updatedAt: serverTimestamp(),
+        version: appVersion
+      },
+      { merge: true }
+    );
+        
     console.log('[Firebase Main] Settings uploaded for user:', userId);
     return { success: true };
   } catch (error) {
