@@ -4,6 +4,9 @@
 
 console.log('NEBULA LOADED - Version:', new Date().toISOString());
 
+var userProfile = null;
+var authTokens = null;
+
 try { window.window.ipcRenderer = window.ipcRenderer; } catch (_) { /* noop */ }
 const rows = document.getElementById("rows");
 const input = document.getElementById("playerInput");
@@ -1396,8 +1399,8 @@ saveNickBtn?.addEventListener('click', () => {
 
   // Limit für nicht-Plus-Nutzer
   const isPlus = (localStorage.getItem('demoPlus') === 'true') || (window.userProfile && window.userProfile.isPlus);
-  if (!isPlus && nicks.length >= 5) {
-    showNotification('Maximum of 5 nicknames without Plus allowed. Upgrade to Plus for unlimited entries!');
+  if (!isPlus && nicks.length >= 10) {
+    showNotification('Maximum of 10 nicknames without Plus allowed. Upgrade to Plus for unlimited entries!');
     return;
   }
 
@@ -3335,34 +3338,6 @@ if (chatStringList) {
 // Initial render for chat strings
 renderChatStrings();
 
-// Settings submenu toggle logic (LEGACY CODE - NO LONGER USED)
-// This code is for the old collapsible submenu that was removed.
-// Keeping it to avoid breaking anything, but it should not run.
-const settingsBtn = document.querySelector('.nav-item[data-panel="settings"]');
-const settingsSubmenu = document.querySelector('.settings-submenu');
-
-function openSettingsSubmenu(initialSection) {
-  // Legacy - no longer used
-  return;
-}
-
-function closeSettingsSubmenu() {
-  // Legacy - no longer used
-  return;
-}
-
-function showSettingsSection(section) {
-  // Legacy - no longer used
-  return;
-}
-
-// Remove legacy settings persistence keys
-localStorage.removeItem('settingsExpanded');
-localStorage.removeItem('activeSettingsSection');
-
-// ==========================================
-// Profile & Discord Authentication
-// ==========================================
 
 // ==========================================
 // Firebase Cloud Sync (via Main Process)
@@ -3452,6 +3427,7 @@ async function downloadUserSettings(userId) {
 }
 
 async function syncUserSettings(userId, direction = 'auto') {
+  console.log('[Firebase] Starting sync:', userId);
   if (!userId) {
     throw new Error('User not logged in');
   }
@@ -3503,11 +3479,8 @@ async function syncUserSettings(userId, direction = 'auto') {
   }
 }
 
-let userProfile = JSON.parse(localStorage.getItem('userProfile') || 'null');
-let authTokens = JSON.parse(localStorage.getItem('authTokens') || 'null');
-
 // Update profile UI
-function updateProfileUI() {
+export function updateProfileUI() {
   const avatar = document.getElementById('profileAvatar');
   const username = document.getElementById('profileUsername');
   const status = document.getElementById('profileStatus');
@@ -3518,18 +3491,18 @@ function updateProfileUI() {
   const syncNowBtn = document.getElementById('syncNowBtn');
   const accountStatsCard = document.getElementById('accountStatsCard');
 
-  if (userProfile && authTokens) {
+  if (window.userProfile) {
     // Logged in state
     if (avatar) {
       avatar.classList.remove('empty');
-      if (userProfile.avatar) {
-        avatar.innerHTML = `<img src="${userProfile.avatar}" alt="${userProfile.username}" />`;
+      if (window.userProfile.avatar) {
+        avatar.innerHTML = `<img src="${window.userProfile.avatar}" alt="${window.userProfile.username}" />`;
       } else {
         // Show first letter of username if no avatar
-        avatar.innerHTML = `<div style="font-size:36px;font-weight:700">${userProfile.username[0].toUpperCase()}</div>`;
+        avatar.innerHTML = `<div style="font-size:36px;font-weight:700">${window.userProfile.username[0].toUpperCase()}</div>`;
       }
     }
-    if (username) username.textContent = userProfile.tag || userProfile.username;
+    if (username) username.textContent = window.userProfile.tag || window.userProfile.username;
     if (status) {
       status.classList.remove('offline');
       status.innerHTML = '<span class="status-dot"></span><span>Connected via Discord</span>';
@@ -3588,9 +3561,10 @@ async function updatePlusStatus() {
   const demoTimeLeft = 10 * 60 * 1000 - (now - demoStartTime); // 10 minutes
   const isDemoExpired = demoPlus && demoTimeLeft <= 0;
 
-  if (userProfile && authTokens) {
+  if (window.userProfile) {
+
     try {
-      const plusData = await window.ipcRenderer.invoke('plus:checkStatus', userProfile.id);
+      const plusData = await window.ipcRenderer.invoke('plus:checkStatus', window.userProfile.id);
       
       if (plusData.isPlus) {
         const expiresDate = new Date(plusData.expiresAt).toLocaleDateString();
@@ -3671,9 +3645,9 @@ async function updateAccountStats() {
     let isCloudData = false;
 
     // If logged in, try to sync with cloud
-    if (userProfile?.id) {
+    if (window.userProfile?.id) {
       try {
-        const cloudResult = await window.ipcRenderer.invoke('metrics:get', userProfile.id);
+        const cloudResult = await window.ipcRenderer.invoke('metrics:get', window.userProfile.id);
         if (cloudResult.success && cloudResult.data) {
           isCloudData = cloudResult.source === 'cloud';
           finalMetrics = {
@@ -3693,7 +3667,7 @@ async function updateAccountStats() {
               totalLookups: Math.max(accountMetrics.totalLookups, cloudResult.data.totalLookups || 0)
             };
             
-            window.ipcRenderer.invoke('metrics:update', userProfile.id, updateData).then(result => {
+            window.ipcRenderer.invoke('metrics:update', window.userProfile.id, updateData).then(result => {
               if (result.success) {
                 console.log('[Metrics] Local data synced to cloud');
               }
@@ -3720,12 +3694,6 @@ async function updateAccountStats() {
       el.style.opacity = isCloudData ? '1' : '0.8';
     });
 
-    console.log('[Metrics] Display updated:', {
-      source: isCloudData ? 'cloud' : 'local',
-      ...finalMetrics,
-      players: finalMetrics.players.size
-    });
-
   } catch (error) {
     console.error('[Metrics] Failed to update display:', error);
     // Fallback to local data
@@ -3744,197 +3712,12 @@ function scheduleAccountStatsUpdate() {
   }
 }
 
-// Discord Login Handler
-const discordLoginBtn = document.getElementById('discordLoginBtn');
-if (discordLoginBtn) {
-  discordLoginBtn.addEventListener('click', async () => {
-    try {
-      discordLoginBtn.disabled = true;
-      discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Opening Discord...</span>';
-      
-      const result = await window.ipcRenderer.invoke('auth:discord:login');
-      
-      if (result.error) {
-        showNotification(result.error);
-        discordLoginBtn.disabled = false;
-        discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-        return;
-      }
-
-      // Show auth code input card instead of prompt
-      const authCodeCard = document.getElementById('authCodeCard');
-      if (authCodeCard) {
-        authCodeCard.style.display = 'block';
-        authCodeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Focus the input field
-        setTimeout(() => {
-          const input = document.getElementById('authCodeInput');
-          if (input) input.focus();
-        }, 500);
-      }
-      
-      // Reset button state
-      discordLoginBtn.disabled = false;
-      discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Waiting for authorization...</span>';
-      
-    } catch (err) {
-      console.error('Discord login error:', err);
-      showNotification('Failed to initiate Discord login');
-      discordLoginBtn.disabled = false;
-      discordLoginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-    }
-  });
-}
-
-// Handle Discord auth code
-async function handleDiscordCallback(code) {
-  const loginBtn = document.getElementById('discordLoginBtn');
-  const submitBtn = document.getElementById('submitAuthCode');
-  const authCard = document.getElementById('authCodeCard');
-  
-  try {
-    if (loginBtn) {
-      loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Authenticating...</span>';
-    }
-
-    const result = await window.ipcRenderer.invoke('auth:discord:exchange', code);
-    
-    if (result.error) {
-      showNotification('Authentication failed: ' + result.error);
-      
-      // Reset all buttons and show auth card again
-      if (loginBtn) {
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-      }
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Complete Login';
-      }
-      if (authCard) authCard.style.display = 'block';
-      
-      return;
-    }
-
-    // Save user data and tokens
-    userProfile = result.user;
-    authTokens = result.tokens;
-    localStorage.setItem('userProfile', JSON.stringify(userProfile));
-    localStorage.setItem('authTokens', JSON.stringify(authTokens));
-    localStorage.setItem('authTimestamp', Date.now().toString());
-    
-    // Update UI
-    updateProfileUI();
-    
-    showNotification(`Successfully logged in as ${userProfile.tag}!`);
-    
-    // Reset buttons
-    if (loginBtn) {
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-    }
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Complete Login';
-    }
-  } catch (err) {
-    console.error('Discord callback handling error:', err);
-    showNotification('Failed to complete Discord login');
-    
-    // Reset all buttons and show auth card again
-    if (loginBtn) {
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-    }
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Complete Login';
-    }
-    if (authCard) authCard.style.display = 'block';
-  }
-}
-
-// Logout Handler
-const logoutBtn = document.getElementById('logoutBtn');
-if (logoutBtn) {
-  logoutBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to logout? Your local settings will remain, but cloud sync will be disabled.')) {
-      userProfile = null;
-      authTokens = null;
-      localStorage.removeItem('userProfile');
-      localStorage.removeItem('authTokens');
-      localStorage.removeItem('authTimestamp');
-      localStorage.removeItem('lastSyncTime');
-      updateProfileUI();
-      showNotification('Logged out successfully');
-    }
-  });
-}
-
-// Auth Code Submit Handler
-const submitAuthCodeBtn = document.getElementById('submitAuthCode');
-const authCodeInput = document.getElementById('authCodeInput');
-const cancelAuthCodeBtn = document.getElementById('cancelAuthCode');
-const authCodeCard = document.getElementById('authCodeCard');
-
-if (submitAuthCodeBtn && authCodeInput) {
-  submitAuthCodeBtn.addEventListener('click', () => {
-    const input = authCodeInput.value.trim();
-    if (!input) {
-      showNotification('Please paste the redirect URL');
-      return;
-    }
-
-    // Extract code from URL
-    let code = input;
-    
-    if (code.includes('?code=')) {
-      const urlParams = new URLSearchParams(code.split('?')[1]);
-      code = urlParams.get('code') || code;
-    } else if (code.includes('&code=')) {
-      const urlParams = new URLSearchParams(code.split('?')[1] || code);
-      code = urlParams.get('code') || code;
-    }
-    
-    if (code && code.length > 10) {
-      submitAuthCodeBtn.disabled = true;
-      submitAuthCodeBtn.textContent = 'Authenticating...';
-      handleDiscordCallback(code);
-      
-      // Hide auth card after submitting
-      if (authCodeCard) authCodeCard.style.display = 'none';
-      authCodeInput.value = '';
-    } else {
-      showNotification('Invalid code or URL. Please check and try again.');
-    }
-  });
-
-  // Allow Enter key to submit
-  authCodeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      submitAuthCodeBtn.click();
-    }
-  });
-}
-
-if (cancelAuthCodeBtn && authCodeCard) {
-  cancelAuthCodeBtn.addEventListener('click', () => {
-    authCodeCard.style.display = 'none';
-    if (authCodeInput) authCodeInput.value = '';
-    const loginBtn = document.getElementById('discordLoginBtn');
-    if (loginBtn) {
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-discord"/></svg><span>Login with Discord</span>';
-    }
-  });
-}
 
 // Sync Now Handler (Firebase Cloud Sync)
 const syncNowBtn = document.getElementById('syncNowBtn');
 if (syncNowBtn) {
   syncNowBtn.addEventListener('click', async () => {
-    if (!userProfile) {
+    if (!window.userProfile) {
       showNotification('Please login with Discord first');
       return;
     }
@@ -3949,7 +3732,7 @@ if (syncNowBtn) {
       syncNowBtn.textContent = 'Syncing...';
       
       // Sync user settings with Firebase
-      await syncUserSettings(userProfile.id, 'auto');
+      await syncUserSettings(window.userProfile.id, 'auto');
       
       // Update UI timestamp
       updateProfileUI();
@@ -3978,7 +3761,7 @@ if (upgradePlusBtn) {
       return;
     }
 
-    if (!userProfile) {
+    if (!window.userProfile) {
       // Demo mode without login
       showNotification('🎉 Demo Plus activated! Try all Plus features this session.');
       localStorage.setItem('demoPlus', 'true');
@@ -3998,7 +3781,8 @@ function showPlusVerificationDialog() {
   const messageEl = document.getElementById('notificationMessage');
   const okBtn = document.getElementById('notificationOkBtn');
   
-  if (userProfile && authTokens) {
+  if (window.userProfile) {
+
     // LOGGED IN USER: Direct purchase options 
     messageEl.innerHTML = `
       <div style="text-align:left;padding:12px 0">
@@ -4054,7 +3838,7 @@ function showPlusVerificationDialog() {
       closeModal();
       
       try {
-        const result = await window.ipcRenderer.invoke('plus:createCheckout', userProfile.id, { plan: 'monthly' });
+        const result = await window.ipcRenderer.invoke('plus:createCheckout', window.userProfile.id, { plan: 'monthly' });
         
         if (result.error) {
           showNotification('❌ ' + result.error);
@@ -4080,7 +3864,7 @@ function showPlusVerificationDialog() {
       closeModal();
       
       try {
-        const result = await window.ipcRenderer.invoke('plus:createCheckout', userProfile.id, { plan: 'yearly' });
+        const result = await window.ipcRenderer.invoke('plus:createCheckout', window.userProfile.id, { plan: 'yearly' });
         
         if (result.error) {
           showNotification('❌ ' + result.error);
@@ -4169,7 +3953,7 @@ function showPaymentVerificationDialog() {
   document.getElementById('verifyPaymentBtn').onclick = async () => {
     closeModal();
     
-    if (!userProfile) {
+    if (!window.userProfile) {
       showNotification('⚠️ Please login with Discord first');
       return;
     }
@@ -4181,7 +3965,7 @@ function showPaymentVerificationDialog() {
       
       if (sessionId) {
         // Verify with actual session ID
-        const result = await window.ipcRenderer.invoke('plus:verify', userProfile.id, sessionId);
+        const result = await window.ipcRenderer.invoke('plus:verify', window.userProfile.id, sessionId);
         
         if (result.error) {
           showNotification('❌ Payment verification failed: ' + result.error);
@@ -4212,7 +3996,7 @@ function showPaymentVerificationDialog() {
 // Verify plus purchase
 async function verifyPlusPurchase(purchaseToken) {
   try {
-    const result = await window.ipcRenderer.invoke('plus:verify', userProfile.id, purchaseToken);
+    const result = await window.ipcRenderer.invoke('plus:verify', window.userProfile.id, purchaseToken);
     
     if (result.error) {
       throw new Error(result.error);
@@ -4262,10 +4046,10 @@ async function initialize() {
   // Only start auto-sync if Firebase is ready
   if (firebaseReady) {
     setInterval(async () => {
-      if (userProfile && firebaseInitialized) {
+      if (window.userProfile && firebaseInitialized) {
         try {
           console.log('[Firebase] Auto-sync check...');
-          await syncUserSettings(userProfile.id, 'auto');
+          await syncUserSettings(window.userProfile.id, 'auto');
         } catch (error) {
           console.warn('[Firebase] Auto-sync failed:', error);
           // Don't show notification for background sync failures

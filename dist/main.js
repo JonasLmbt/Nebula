@@ -547,11 +547,44 @@ electron_1.ipcMain.handle('window:setBounds', (_e, bounds) => {
     }
 });
 // --- Discord OAuth2 Authentication ---
-const DISCORD_LOGIN_URL = "https://nebula-overlay.online/api/auth/discord/login";
 // Open Discord OAuth2 URL in browser
 electron_1.ipcMain.handle("auth:discord:login", async () => {
-    await electron_1.shell.openExternal("https://nebula-overlay.online/api/auth/discord/login");
-    return { success: true };
+    return new Promise((resolve) => {
+        if (!win)
+            return resolve({ error: "Main window missing" });
+        const authWindow = new electron_1.BrowserWindow({
+            width: 550,
+            height: 750,
+            resizable: false,
+            minimizable: false,
+            maximizable: false,
+            title: "Login with Discord",
+            modal: true,
+            parent: win,
+            backgroundColor: "#1a1a1a", // dark mode
+            show: true,
+            autoHideMenuBar: true, // removes File/Edit/View menu
+            webPreferences: {
+                session: win.webContents.session,
+                nodeIntegration: false,
+                contextIsolation: true,
+            },
+        });
+        const loginUrl = "https://nebula-overlay.online/api/auth/discord/login";
+        authWindow.loadURL(loginUrl);
+        // Redirect handler
+        const finish = () => {
+            if (!authWindow.isDestroyed())
+                authWindow.close();
+            resolve({ success: true });
+        };
+        const checkUrl = (url) => {
+            if (url.includes("login=success"))
+                finish();
+        };
+        authWindow.webContents.on("will-redirect", (_e, url) => checkUrl(url));
+        authWindow.webContents.on("did-navigate", (_e, url) => checkUrl(url));
+    });
 });
 electron_1.ipcMain.handle("auth:discord:getUser", async () => {
     try {
@@ -654,7 +687,15 @@ electron_1.ipcMain.handle('firebase:download', async (_e, userId) => {
             return { success: true, data: null };
         }
         const data = docSnap.data();
-        const timestamp = data.updatedAt ? data.updatedAt.toMillis() : 0;
+        let timestamp = 0;
+        if (data.updatedAt) {
+            if (typeof data.updatedAt.toMillis === "function") {
+                timestamp = data.updatedAt.toMillis();
+            }
+            else if (typeof data.updatedAt === "number") {
+                timestamp = data.updatedAt;
+            }
+        }
         console.log('[Firebase Main] Settings downloaded for user:', userId);
         return {
             success: true,
@@ -775,6 +816,7 @@ electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
 });
 // Create Stripe checkout session via backend API
 electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { plan: 'monthly' }) => {
+    console.log('[Plus] Creating checkout session for user:', userId, 'Options:', options);
     try {
         const plan = options?.plan ?? 'monthly';
         // Base URL of your backend (you can also move this to a config file)
@@ -784,6 +826,7 @@ electron_1.ipcMain.handle('plus:createCheckout', async (_e, userId, options = { 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, plan })
         });
+        console.log('[Plus] Backend response status:', response.status);
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.url) {
             const errMsg = data?.error || `Failed to create checkout session (status ${response.status})`;

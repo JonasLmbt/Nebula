@@ -499,13 +499,49 @@ ipcMain.handle('window:setBounds', (_e, bounds: { width?: number; height?: numbe
 });
 
 // --- Discord OAuth2 Authentication ---
-const DISCORD_LOGIN_URL = "https://nebula-overlay.online/api/auth/discord/login";
-
 // Open Discord OAuth2 URL in browser
+
 ipcMain.handle("auth:discord:login", async () => {
-  await shell.openExternal("https://nebula-overlay.online/api/auth/discord/login");
-  return { success: true };
+  return new Promise((resolve) => {
+    if (!win) return resolve({ error: "Main window missing" });
+
+    const authWindow = new BrowserWindow({
+      width: 550,
+      height: 750,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      title: "Login with Discord",
+      modal: true,
+      parent: win,
+      backgroundColor: "#1a1a1a",  // dark mode
+      show: true,
+      autoHideMenuBar: true,        // removes File/Edit/View menu
+      webPreferences: {
+        session: win.webContents.session,
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    const loginUrl = "https://nebula-overlay.online/api/auth/discord/login";
+    authWindow.loadURL(loginUrl);
+
+    // Redirect handler
+    const finish = () => {
+      if (!authWindow.isDestroyed()) authWindow.close();
+      resolve({ success: true });
+    };
+
+    const checkUrl = (url: string) => {
+      if (url.includes("login=success")) finish();
+    };
+
+    authWindow.webContents.on("will-redirect", (_e, url) => checkUrl(url));
+    authWindow.webContents.on("did-navigate", (_e, url) => checkUrl(url));
+  });
 });
+
 
 ipcMain.handle("auth:discord:getUser", async () => {
   try {
@@ -626,7 +662,14 @@ ipcMain.handle('firebase:download', async (_e, userId: string) => {
     }
     
     const data = docSnap.data();
-    const timestamp = data.updatedAt ? data.updatedAt.toMillis() : 0;
+    let timestamp = 0;
+    if (data.updatedAt) {
+      if (typeof data.updatedAt.toMillis === "function") {
+        timestamp = data.updatedAt.toMillis();
+      } else if (typeof data.updatedAt === "number") {
+        timestamp = data.updatedAt;
+      }
+    }
     
     console.log('[Firebase Main] Settings downloaded for user:', userId);
     return { 
@@ -772,6 +815,7 @@ ipcMain.handle('plus:checkStatus', async (_e, userId: string) => {
 ipcMain.handle(
   'plus:createCheckout',
   async (_e, userId: string, options: { plan: 'monthly' | 'yearly' } = { plan: 'monthly' }) => {
+    console.log('[Plus] Creating checkout session for user:', userId, 'Options:', options);
     try {
       const plan = options?.plan ?? 'monthly';
 
@@ -783,6 +827,7 @@ ipcMain.handle(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, plan })
       });
+      console.log('[Plus] Backend response status:', response.status);
 
       const data = await response.json().catch(() => ({}));
 

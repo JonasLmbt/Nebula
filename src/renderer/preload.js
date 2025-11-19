@@ -1,25 +1,38 @@
-// preload.js
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
 
-// Minimale, aber kompatible API
-contextBridge.exposeInMainWorld('ipc', {
-  send: (channel, ...args) => {
-    ipcRenderer.send(channel, ...args);
-  },
-  invoke: (channel, ...args) => {
-    return ipcRenderer.invoke(channel, ...args);
-  },
-  on: (channel, listener) => {
-    const subscription = (_event, ...args) => listener(...args);
-    ipcRenderer.on(channel, subscription);
-    return () => {
-      ipcRenderer.removeListener(channel, subscription);
-    };
-  },
-  once: (channel, listener) => {
-    ipcRenderer.once(channel, (_event, ...args) => listener(...args));
-  },
-  loginWithDiscord: () => ipcRenderer.invoke("auth:discord:login")
+// EXPOSE SAFE APIS TO RENDERER
+contextBridge.exposeInMainWorld("electronAPI", {
+
+    // --- AUTH ---
+    loginWithDiscord: () => ipcRenderer.invoke("auth:discord:login"),
+    getUser: () => ipcRenderer.invoke("auth:discord:getUser"),
+    logout: () => ipcRenderer.invoke("auth:logout"),
+
+    // --- WINDOW CONTROLS ---
+    minimize: () => ipcRenderer.send("window:minimize"),
+    close: () => ipcRenderer.send("window:close"),
+
+    // --- SHORTCUTS ---
+    registerShortcuts: (map) => ipcRenderer.invoke("shortcuts:register", map),
+
+    // --- CHAT LOGGER ---
+    autoDetectChat: () => ipcRenderer.invoke("chat:autoDetect"),
+
+    // --- METRICS ---
+    getMetrics: (userId) => ipcRenderer.invoke("metrics:get", userId),
+    updateMetrics: (userId, metrics) => ipcRenderer.invoke("metrics:update", userId),
+    getMetricsUserId: () => ipcRenderer.invoke("metrics:getUserId"),
+
+    // --- PLUS SYSTEM ---
+    createCheckout: (userId, options) =>
+        ipcRenderer.invoke("plus:createCheckout", userId, options),
+    openPortal: (userId) =>
+        ipcRenderer.invoke("premium:manageSubscription", userId),
+
+    // --- EVENT LISTENERS FROM MAIN ---
+    onChatPlayers: (callback) => ipcRenderer.on("chat:players", (_e, p) => callback(p)),
+    onChatParty: (callback) => ipcRenderer.on("chat:party", (_e, p) => callback(p)),
+    onChatMessage: (callback) => ipcRenderer.on("chat:message", (_e, p) => callback(p)),
 });
 
 // Optional: alte globale Variable nachbilden, falls du sie viel benutzt
