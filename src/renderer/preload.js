@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     createCheckout: (userId, options) =>
         ipcRenderer.invoke("plus:createCheckout", userId, options),
     openPortal: (userId) =>
-        ipcRenderer.invoke("premium:manageSubscription", userId),
+        ipcRenderer.invoke("plus:manageSubscription", userId),
 
     // --- EVENT LISTENERS FROM MAIN ---
     onChatPlayers: (callback) => ipcRenderer.on("chat:players", (_e, p) => callback(p)),

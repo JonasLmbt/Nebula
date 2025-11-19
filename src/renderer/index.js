@@ -3769,6 +3769,19 @@ if (upgradePlusBtn) {
       return;
     }
 
+    // Check existing Plus status
+    const plusData = await window.ipcRenderer.invoke('plus:checkStatus', window.userProfile.id);
+    const isPaidPlus = plusData.type === 'paid';
+    if (isPaidPlus) {
+      showNotification('Opening your Nebula Plus management page...');
+      const result = await window.ipcRenderer.invoke('plus:manageSubscription', window.userProfile.id);
+      if (result.error) {
+        showNotification('❌ ' + result.error);
+        return;
+      }
+      return;
+    }
+
     // Open our new plan selection dialog instead of direct checkout
     showPlusVerificationDialog();
   });

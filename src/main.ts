@@ -809,16 +809,13 @@ ipcMain.handle('plus:checkStatus', async (_e, userId: string) => {
   }
 });
 
-
+const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
 
 // Create Stripe checkout session via backend API
 ipcMain.handle("plus:createCheckout", async (_e, options) => {
   if (!win) return { error: "Main window missing" };
 
   const plan = options?.plan ?? "monthly";
-
-  const backendBaseUrl =
-    process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
 
   const postUrl = `${backendBaseUrl}/api/plus/create-checkout-session`;
 
@@ -849,45 +846,46 @@ ipcMain.handle("plus:createCheckout", async (_e, options) => {
   return { success: true };
 });
 
-
-
 // Open Stripe Customer Portal for subscription management
-ipcMain.handle('premium:manageSubscription', async (_e, userId: string) => {
-  try {
-    if (!userId) {
-      return { error: 'No userId provided' };
-    }
+ipcMain.handle("plus:manageSubscription", async (_e, userId: string) => {
+  if (!win) return { error: "Main window missing" };
+  if (!userId) return { error: "UserId missing" };
 
-    const backendBaseUrl = process.env.NEBULA_BACKEND_URL || 'https://nebula-overlay.online';
+  const postUrl = `${backendBaseUrl}/api/plus/create-portal-session"`;
 
-    const response = await fetch(`${backendBaseUrl}/api/plus/create-customer-portal-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId })
-    });
+  // Create popup window for the portal
+  const portalWindow = new BrowserWindow({
+    width: 900,
+    height: 1000,
+    title: "Manage Subscription",
+    autoHideMenuBar: true,
+    webPreferences: {
+      session: win.webContents.session, 
+    },
+  });
 
-    const data = await response.json().catch(() => ({}));
+  // Auto-submit POST form to backend (identical to createCheckout)
+  const html = `
+    <html>
+      <body>
+        <form id="f" method="POST" action="${postUrl}">
+          <input type="hidden" name="userId" value="${userId}" />
+        </form>
+        <script>
+          document.getElementById("f").submit();
+        </script>
+      </body>
+    </html>
+  `;
 
-    if (!response.ok || !data?.url) {
-      const errMsg = data?.error || `Failed to create customer portal session (status ${response.status})`;
-      console.error('[Plus] Customer portal backend error:', errMsg);
-      return { error: errMsg };
-    }
+  portalWindow.loadURL(
+    `data:text/html;base64,${Buffer.from(html).toString("base64")}`
+  );
 
-    const customerPortalUrl = data.url as string;
-
-    console.log('[Plus] Opening customer portal for user:', userId);
-    await shell.openExternal(customerPortalUrl);
-
-    return {
-      success: true,
-      message: 'Customer portal opened - manage your subscription there'
-    };
-  } catch (error) {
-    console.error('[Plus] Customer portal failed:', error);
-    return { error: String(error) };
-  }
+  return { success: true };
 });
+
+
 
 // --- Enhanced API System with 3-tier Backend Support ---
 interface ApiResponse {

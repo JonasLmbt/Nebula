@@ -814,12 +814,12 @@ electron_1.ipcMain.handle('plus:checkStatus', async (_e, userId) => {
         return { isPlus: false, error: String(error) };
     }
 });
+const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
 // Create Stripe checkout session via backend API
 electron_1.ipcMain.handle("plus:createCheckout", async (_e, options) => {
     if (!win)
         return { error: "Main window missing" };
     const plan = options?.plan ?? "monthly";
-    const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
     const postUrl = `${backendBaseUrl}/api/plus/create-checkout-session`;
     const checkoutWindow = new electron_1.BrowserWindow({
         width: 900,
@@ -845,35 +845,37 @@ electron_1.ipcMain.handle("plus:createCheckout", async (_e, options) => {
     return { success: true };
 });
 // Open Stripe Customer Portal for subscription management
-electron_1.ipcMain.handle('premium:manageSubscription', async (_e, userId) => {
-    try {
-        if (!userId) {
-            return { error: 'No userId provided' };
-        }
-        const backendBaseUrl = process.env.NEBULA_BACKEND_URL || 'https://nebula-overlay.online';
-        const response = await (0, node_fetch_1.default)(`${backendBaseUrl}/api/plus/create-customer-portal-session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.url) {
-            const errMsg = data?.error || `Failed to create customer portal session (status ${response.status})`;
-            console.error('[Plus] Customer portal backend error:', errMsg);
-            return { error: errMsg };
-        }
-        const customerPortalUrl = data.url;
-        console.log('[Plus] Opening customer portal for user:', userId);
-        await electron_1.shell.openExternal(customerPortalUrl);
-        return {
-            success: true,
-            message: 'Customer portal opened - manage your subscription there'
-        };
-    }
-    catch (error) {
-        console.error('[Plus] Customer portal failed:', error);
-        return { error: String(error) };
-    }
+electron_1.ipcMain.handle("plus:manageSubscription", async (_e, userId) => {
+    if (!win)
+        return { error: "Main window missing" };
+    if (!userId)
+        return { error: "UserId missing" };
+    const postUrl = `${backendBaseUrl}/api/plus/create-portal-session"`;
+    // Create popup window for the portal
+    const portalWindow = new electron_1.BrowserWindow({
+        width: 900,
+        height: 1000,
+        title: "Manage Subscription",
+        autoHideMenuBar: true,
+        webPreferences: {
+            session: win.webContents.session,
+        },
+    });
+    // Auto-submit POST form to backend (identical to createCheckout)
+    const html = `
+    <html>
+      <body>
+        <form id="f" method="POST" action="${postUrl}">
+          <input type="hidden" name="userId" value="${userId}" />
+        </form>
+        <script>
+          document.getElementById("f").submit();
+        </script>
+      </body>
+    </html>
+  `;
+    portalWindow.loadURL(`data:text/html;base64,${Buffer.from(html).toString("base64")}`);
+    return { success: true };
 });
 class HypixelApiRouter {
     constructor(config) {
