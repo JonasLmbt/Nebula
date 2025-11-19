@@ -7,7 +7,7 @@ const serverPath = "root@188.245.182.162:/var/www/nebula-site/downloads/";
 
 // 1. Find newest .exe file in release/
 const files = fs.readdirSync(releaseDir)
-  .filter(f => f.toLowerCase().endsWith(".exe"))
+  .filter(f => /^Nebula Setup .*\.exe$/i.test(f)) // << nur echte Installer
   .map(f => ({
     name: f,
     time: fs.statSync(path.join(releaseDir, f)).mtime.getTime()
