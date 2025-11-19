@@ -635,6 +635,7 @@ ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
     const userDocRef = doc(firestore, 'users', userId);
     const snap = await getDoc(userDocRef);
     
+    console.log(appVersion);
     await setDoc(
       userDocRef,
       {

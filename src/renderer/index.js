@@ -3914,24 +3914,6 @@ function showPaymentVerificationDialog() {
   document.getElementById('paymentCancelBtn').onclick = closeModal;
 }
 
-// Verify plus purchase
-async function verifyPlusPurchase(purchaseToken) {
-  try {
-    const result = await window.ipcRenderer.invoke('plus:verify', window.userProfile.id, purchaseToken);
-    
-    if (result.error) {
-      throw new Error(result.error);
-    }
-    
-    showNotification('<svg class="icon"><use href="#i-celebrate"/></svg> Plus activated successfully! Welcome to Nebula Plus!');
-    updateProfileUI(); // Refresh plus status
-    
-  } catch (err) {
-    console.error('Plus verification error:', err);
-    showNotification('Plus verification failed: ' + (err.message || err));
-  }
-}
-
 // Token refresh logic (check if token needs refresh on app start)
 async function checkAndRefreshToken() {
   if (!authTokens || !authTokens.refreshToken) return;
@@ -3970,7 +3952,7 @@ async function initialize() {
       if (window.userProfile && firebaseInitialized) {
         try {
           console.log('[Firebase] Auto-sync check...');
-          await syncUserSettings(window.userProfile.id, 'auto');
+          await syncUserSettings(window.userProfile.id, 'upload');
         } catch (error) {
           console.warn('[Firebase] Auto-sync failed:', error);
           // Don't show notification for background sync failures
