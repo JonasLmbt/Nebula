@@ -1,26 +1,35 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path'; 
 import * as fs from 'fs';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './logs/chat-logger';
-import { normalizeHypixelBedwarsStats } from "./logs/hypixelNormalizer"; 
+import { HypixelApiRouter } from './logs/hypixelApiRouter';
 
+// Bootstrap logging and error handling
 console.log("[Nebula:boot] main.ts top reached");
-process.on("uncaughtException", (err) => {
-  console.error("[Nebula:uncaughtException]", err);
-});
+process.on("uncaughtException", (err) => { console.error("[Nebula:uncaughtException]", err); });
+process.on("unhandledRejection", (reason) => { console.error("[Nebula:unhandledRejection]", reason); });
 
-process.on("unhandledRejection", (reason) => {
-  console.error("[Nebula:unhandledRejection]", reason);
-});
+// Backend URL configuration
+const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
 
+// Hypixel API Key
+const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
+
+
+// App version
 const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
 const appVersion = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version;
 
+// Main window reference
 let win: BrowserWindow | null = null;
-const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
+
+
+// ==========================================
+// Auto Update Setup
+// ==========================================
 
 function initAutoUpdate() {
   if (!app.isPackaged) {
@@ -48,6 +57,16 @@ function initAutoUpdate() {
     autoUpdater.on('update-downloaded', (info) => {
       if (win) win.webContents.send('update:ready', info);
     });
+    autoUpdater.on("update-downloaded", async () => {
+    if (win) {
+      // Cache löschen
+      win.webContents.session.clearCache().then(() => {
+        autoUpdater.quitAndInstall();
+      });
+    } else {
+      autoUpdater.quitAndInstall();
+    }
+  });
 
     // Initial check
     autoUpdater.checkForUpdates().catch(e => console.warn('AutoUpdate check failed:', e));
@@ -55,6 +74,11 @@ function initAutoUpdate() {
     console.warn('AutoUpdate init failed:', e);
   }
 }
+
+
+// ==========================================
+// Create Main Window
+// ==========================================
 
 async function createWindow() {
   app.setName('Nebula');
@@ -322,146 +346,21 @@ ipcMain.handle('window:resize', (_e, payload: { edge: ResizeEdge; dx: number; dy
   win.setBounds({ x: nx, y: ny, width: nw, height: nh }, false);
 });
 
-// Hypixel Cache & Rate Limiter
-class HypixelCache {
-  private cache = new Map<string, {
-    data: any;
-    timestamp: number;
-  }>();
-  private uuidCache = new Map<string, string>();
-  private guildCache = new Map<string, { data: any; timestamp: number }>();
-  private queue = new Set<string>();
-  private readonly TTL = 10 * 60 * 1000; // 10 minutes cache TTL
-  private readonly MAX_CONCURRENT = 3; // Max. parallele Requests
 
-  constructor(private apiKey: string) {}
+// ==========================================
+// Initialize enhanced API Router
+// ==========================================
 
-  private async getUUID(name: string): Promise<string | null> { 
-    if (!name) return null;
-    try {
-      const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return (data && data.id) ? data.id : null; 
-    } catch { return null; }
-    }
-
-  private async fetchHypixelStats(uuid: string) {
-    const res = await fetch(`https://api.hypixel.net/v2/player?uuid=${uuid}`, {
-      headers: { 'API-Key': this.apiKey },
-    });
-    
-    if (!res.ok) {
-      if (res.status === 429) {
-  throw new Error('Hypixel rate limit reached - please wait');
-      }
-      throw new Error(`Hypixel API: ${res.status}`);
-    }
-
-    const data = await res.json() as { player?: any };
-    return data.player;
-  }
-
-  private async fetchGuild(uuid: string) {
-    const cached = this.guildCache.get(uuid);
-    if (cached && Date.now() - cached.timestamp < this.TTL) return cached.data;
-    try {
-      const res = await fetch(`https://api.hypixel.net/v2/guild?player=${uuid}`, {
-        headers: { 'API-Key': this.apiKey },
-      });
-      if (!res.ok) {
-  if (res.status === 429) throw new Error('Hypixel rate limit (guild)');
-  return null; // no guild found or other error
-      }
-      const data = await res.json() as { guild?: any };
-      const guild = data.guild || null;
-      this.guildCache.set(uuid, { data: guild, timestamp: Date.now() });
-      return guild;
-    } catch {
-      return null;
-    }
-  }
-
-  private async processBedwarsStats(player: any, requestedName: string, guild: any | null) {
-    return normalizeHypixelBedwarsStats(player, requestedName, guild);
-  }
-
-  async getStats(name: string) {
-    const normalizedName = name.toLowerCase();
-    
-  // 1. Check cache first
-    const cached = this.cache.get(normalizedName);
-    if (cached && Date.now() - cached.timestamp < this.TTL) {
-      return cached.data;
-    }
-
-  // 2. Queue management (max. 3 concurrent requests)
-    while (this.queue.size >= this.MAX_CONCURRENT) {
-      await new Promise(r => setTimeout(r, 100));
-    }
-    
-  // 3. Perform request
-    try {
-      this.queue.add(normalizedName);
-
-  // Small delay between requests to avoid burst hitting the API
-      if (this.queue.size > 1) {
-        await new Promise(r => setTimeout(r, 150));
-      }
-
-  let uuid: string | null = await this.getUUID(name);
-  if (uuid === null) {
-    return { name, level: 0, ws: null, fkdr: null, wlr: null, bblr: null, fk: null, wins: null, rankTag: '[NICK]', rankColor: '#fff', unresolved: true };
-  }
-
-  const player = await this.fetchHypixelStats(uuid);
-  if (!player) throw new Error('Player not found on Hypixel');
-  const guild = await this.fetchGuild(uuid);
-  const stats = await this.processBedwarsStats(player, name, guild);
-  // Add UUID for renderer / avatar (Crafatar requires plain UUID without dashes)
-  if (uuid) {
-    try { (stats as any).uuid = uuid.replace(/-/g, ''); } catch { /* ignore */ }
-  }
-  
-  // Cache successful request
-  this.cache.set(normalizedName, {
-    data: stats,
-    timestamp: Date.now()
-  });
-
-  return stats;
-
-    } catch (err: any) {
-  // Rate limit or other API errors
-      return { error: String(err.message || err) };
-    } finally {
-      this.queue.delete(normalizedName);
-    }
-  }
-
-  clearCache() {
-    this.cache.clear();
-    this.uuidCache.clear();
-  }
-}
-
-// Zentraler Cache-Manager
-const hypixel = new HypixelCache(HYPIXEL_KEY);
+const apiRouter = new HypixelApiRouter({
+  backendUrl: backendBaseUrl,
+  userApiKey: HYPIXEL_KEY,
+  useFallbackKey: true,
+  cacheTimeout: 5 * 60 * 1000
+});
 
 // --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
 ipcMain.handle('bedwars:stats', async (_e, name: string) => {
-  // Try enhanced API system first
-  try {
-    return await apiRouter.getStats(name);
-  } catch (error) {
-    console.log('[API] Enhanced system failed, using original:', error);
-    
-    // Fallback to original system
-    if (!HYPIXEL_KEY) {
-      return { error: 'HYPIXEL_KEY missing in environment. Please check .env.' };
-    }
-    return hypixel.getStats(name);
-  }
+  return await apiRouter.getStats(name);
 });
 
 // --- IPC: Always-on-top toggle from renderer appearance settings
@@ -492,8 +391,46 @@ ipcMain.handle('window:setBounds', (_e, bounds: { width?: number; height?: numbe
   }
 });
 
-// --- Discord OAuth2 Authentication ---
-// Open Discord OAuth2 URL in browser
+// --- IPC: Enhanced API Management ---
+ipcMain.handle('api:getStatus', async () => {
+  return apiRouter.getStatus();
+});
+
+ipcMain.handle('api:setUserKey', async (_e, apiKey: string) => {
+  const result = await apiRouter.verifyUserApiKey(apiKey);
+  if (result.valid) {
+    apiRouter.updateConfig({ userApiKey: apiKey });
+    return { success: true };
+  }
+  return { success: false, error: result.error || 'Invalid API key' };
+});
+
+ipcMain.handle('api:clearCache', async () => {
+  apiRouter.clearCache();
+  return { success: true };
+});
+
+ipcMain.handle('api:toggleFallback', async (_e, enabled: boolean) => {
+  apiRouter.updateConfig({ useFallbackKey: enabled });
+  return { success: true, enabled };
+});
+
+// --- IPC: External URL opener
+ipcMain.handle('external:open', async (_e, url: string) => {
+  try {
+    const { shell } = await import('electron');
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error('[External] Failed to open URL:', error);
+    return { error: String(error) };
+  }
+});
+
+
+// ==========================================
+// Discord OAuth2 Authentication
+// ==========================================
 
 ipcMain.handle("auth:discord:login", async () => {
   return new Promise((resolve) => {
@@ -536,7 +473,6 @@ ipcMain.handle("auth:discord:login", async () => {
   });
 });
 
-
 ipcMain.handle("auth:discord:getUser", async () => {
   try {
     const res = await fetch("https://nebula-overlay.online/api/auth/me", {
@@ -567,20 +503,10 @@ ipcMain.handle("auth:logout", async () => {
 });
 
 
-
-// Get Firebase configuration for renderer process
-ipcMain.handle('firebase:getConfig', async () => {
-  return {
-    apiKey: 'AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I',
-    authDomain: 'nebula-502f4.firebaseapp.com',
-    projectId: 'nebula-502f4',
-    storageBucket: 'nebula-502f4.firebasestorage.app',
-    messagingSenderId: '228435926597',
-    appId: '1:228435926597:web:6a36ab3dc7040494ec0d2c'
-  };
-});
-
+// ==========================================
 // Initialize Firebase in main process
+// ==========================================
+
 let firebaseApp: any = null;
 let firestore: any = null;
 
@@ -615,6 +541,18 @@ async function initFirebaseMain() {
     return false;
   }
 }
+
+// Get Firebase configuration for renderer process
+ipcMain.handle('firebase:getConfig', async () => {
+  return {
+    apiKey: 'AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I',
+    authDomain: 'nebula-502f4.firebaseapp.com',
+    projectId: 'nebula-502f4',
+    storageBucket: 'nebula-502f4.firebasestorage.app',
+    messagingSenderId: '228435926597',
+    appId: '1:228435926597:web:6a36ab3dc7040494ec0d2c'
+  };
+});
 
 // Firebase Cloud Sync Handlers
 ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
@@ -662,7 +600,7 @@ ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
   }
 });
 
-
+// Download user settings from Firebase
 ipcMain.handle('firebase:download', async (_e, userId: string) => {
   if (!await initFirebaseMain()) {
     return { error: 'Firebase not initialized' };
@@ -699,6 +637,7 @@ ipcMain.handle('firebase:download', async (_e, userId: string) => {
     return { error: String(error) };
   }
 });
+
 
 // ==========================================
 // Account Metrics System
@@ -775,6 +714,7 @@ ipcMain.handle('metrics:getUserId', async () => {
   return null;
 });
 
+
 // ==========================================
 // Plus System
 // ==========================================
@@ -825,8 +765,6 @@ ipcMain.handle('plus:checkStatus', async (_e, userId: string) => {
     return { isPlus: false, error: String(error) };
   }
 });
-
-const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
 
 // Create Stripe checkout session via backend API
 ipcMain.handle("plus:createCheckout", async (_e, options) => {
@@ -900,347 +838,4 @@ ipcMain.handle("plus:manageSubscription", async (_e, userId: string) => {
   );
 
   return { success: true };
-});
-
-
-
-// --- Enhanced API System with 3-tier Backend Support ---
-interface ApiRouterConfig {
-  backendUrl?: string
-  userApiKey?: string;
-  useFallbackKey: boolean;
-  cacheTimeout: number;
-}
-
-class HypixelApiRouter {
-  private config: ApiRouterConfig;
-
-  // Caches
-  private playerCache = new Map<string, { data: any; timestamp: number }>();
-  private uuidCache = new Map<string, { uuid: string | null; timestamp: number }>();
-  private guildCache = new Map<string, { data: any | null; timestamp: number }>();
-
-  // Rate limiting
-  private readonly MAX_CONCURRENT = 3;
-  private readonly TTL = 10 * 60 * 1000; // 10 min cache TTL
-
-  // Backend status
-  private backendDown = false;
-  private userKeyValid = true;
-
-
-  constructor(config: ApiRouterConfig) {
-    this.config = {
-      backendUrl: 'https://nebula-overlay.online',
-      userApiKey: HYPIXEL_KEY,
-      useFallbackKey: true,
-      cacheTimeout: this.TTL,
-    };
-    Object.assign(this.config, config);
-
-    if (this.config.backendUrl) {
-      this.pingBackend();
-    }
-  }
-
-  /* ------------------------------------------------------------
-   * UUID LOOKUP (Mojang)
-   * ------------------------------------------------------------ */
-  private async getUUID(name: string): Promise<string | null> {
-    const key = name.toLowerCase();
-    const cached = this.uuidCache.get(key);
-
-    if (cached && Date.now() - cached.timestamp < this.TTL) {
-      return cached.uuid;
-    }
-
-    try {
-      const res = await fetch(
-        `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(
-          name
-        )}`
-      );
-
-      if (!res.ok) return null;
-
-      const data = await res.json();
-      const uuid = data?.id ?? null;
-
-      this.uuidCache.set(key, { uuid, timestamp: Date.now() });
-      return uuid;
-    } catch {
-      return null;
-    }
-  }
-
-  /* ------------------------------------------------------------
-   * HYPIXEL PLAYER REQUEST
-   * ------------------------------------------------------------ */
-  private async fetchHypixelPlayerDirect(uuid: string, apiKey: string) {
-      const res = await fetch(`https://api.hypixel.net/v2/player?uuid=${uuid}`, {
-          headers: { "API-Key": apiKey }
-      });
-
-      if (!res.ok) return null;
-      const json = await res.json();
-      return json.player ?? null;
-  }
-
-  private async fetchPlayerData(name: string, uuid: string): Promise<any | null> {
-    const cached = this.playerCache.get(name);
-    if (cached && Date.now() - cached.timestamp < this.TTL) {
-        console.log(`[API Router] Using cached player data for ${name} (${uuid})`);
-        return cached.data;
-    }
-
-    let player = null;
-
-    // 2. ENV key
-    if (HYPIXEL_KEY) {
-        try {
-            player = await this.fetchHypixelPlayerDirect(uuid, HYPIXEL_KEY);
-            console.log(`[API Router] Fetched player data for ${name} (${uuid}) using ENV key`);
-        } catch {}
-    }
-
-    // 3. USER key
-    if (!player && this.config.userApiKey && this.config.userApiKey !== HYPIXEL_KEY) {
-        try {
-            player = await this.fetchHypixelPlayerDirect(uuid, this.config.userApiKey);
-            console.log(`[API Router] Fetched player data for ${name} (${uuid}) using USER key`);
-        } catch {
-            this.userKeyValid = false;
-        }
-    }
-
-    // 4. BACKEND
-    if (!player && this.config.backendUrl) {
-        try {
-            const res = await fetch(`${this.config.backendUrl}/api/player?name=${name}`);
-            if (res.ok) {
-                const data = await res.json();
-                player = data.player ?? data;
-                console.log(`[API Router] Fetched player data for ${name} (${uuid}) using BACKEND`);
-            }
-        } catch {
-            this.backendDown = true;
-        }
-    }
-
-    if (player) {
-        this.playerCache.set(name, { data: player, timestamp: Date.now() });
-    }
-
-    return player;
-  }
-
-
-  /* ------------------------------------------------------------
-   * HYPIXEL GUILD REQUEST
-   * ------------------------------------------------------------ */
-  private async fetchHypixelGuildDirect(uuid: string, apiKey: string) {
-      const res = await fetch(`https://api.hypixel.net/v2/guild?player=${uuid}`, {
-          headers: { "API-Key": apiKey }
-      });
-
-      if (!res.ok) return null;
-      const json = await res.json();
-      return json.guild ?? null;
-  }
-
-  private async fetchGuildData(name: string, uuid: string): Promise<any | null> {
-    const cached = this.guildCache.get(name);
-
-    if (cached && Date.now() - cached.timestamp < this.TTL) {
-        console.log(`[API Router] Using cached guild data for ${name} (${uuid})`);
-        return cached.data;
-    }
-
-    let guild = null;
-
-    // 2. ENV key
-    if (HYPIXEL_KEY) {
-        try {
-            guild = await this.fetchHypixelGuildDirect(uuid, HYPIXEL_KEY);
-            console.log(`[API Router] Fetched guild data for ${name} (${uuid}) using ENV key`);
-        } catch {}
-    }
-
-    // 3. USER key
-    if (!guild && this.config.userApiKey && this.config.userApiKey !== HYPIXEL_KEY) {
-        try {
-            guild = await this.fetchHypixelGuildDirect(uuid, this.config.userApiKey);
-            console.log(`[API Router] Fetched guild data for ${name} (${uuid}) using USER key`);
-        } catch {}
-    }
-
-    // 4. BACKEND
-    if (!guild) {
-        try {
-            const res = await fetch(
-                `https://nebula-overlay.online/api/guild?name=${encodeURIComponent(name)}`
-            );
-            if (res.ok) {
-                console.log(`[API Router] Fetched guild data for ${name} (${uuid}) using BACKEND`);
-                const data = await res.json();
-                guild = data.guild ?? data;
-            }
-        } catch {
-            this.backendDown = true;
-        }
-    }
-
-    this.guildCache.set(name, { data: guild, timestamp: Date.now() });
-    return guild;
-  }
-
-
-  /* ------------------------------------------------------------
-   * MAIN: getStats()
-   * ------------------------------------------------------------ */
-
-  async getStats(name: string) {
-      const uuid = await this.getUUID(name);
-      if (!uuid || uuid.length === 0 || uuid === null) {
-          // nick
-          return { name, level: 0, experience: 0, ws: null, fkdr: null, wlr: null, bblr: null, fk: null, fd: null, wins: null, losses: null, bedsBroken: null, bedsLost: null, kills: null, deaths: null, mode: null, winsPerLevel: null, fkPerLevel: null, bedwarsScore: null, networkLevel: null, guildName: null, guildTag: null, mfkdr: null, mwlr: null, mbblr: null, rankTag: '[NICK]', rankColor: '#fff'};
-      }
-
-      // Step 1: player data
-      const player = await this.fetchPlayerData(name, uuid);
-
-      if (!player) {
-          return { error: "Player not found" };
-      }
-
-      // Step 2: guild data
-      const guild = await this.fetchGuildData(name, uuid);
-
-      // Step 3: normalize
-      const result = normalizeHypixelBedwarsStats(player, name, guild);
-
-      return result;
-  }
-
-  /* ------------------------------------------------------------
-   * Backend Health Check
-   * ------------------------------------------------------------ */
-  private async pingBackend() {
-    if (!this.config.backendUrl) return;
-
-    try {
-      const res = await fetch(`${this.config.backendUrl}/ping`);
-      this.backendDown = !res.ok;
-    } catch {
-      this.backendDown = true;
-    }
-  }
-
-  /* ------------------------------------------------------------
-   * UTIL
-   * ------------------------------------------------------------ */
-  clearCache() {
-    this.playerCache.clear();
-    this.uuidCache.clear();
-    this.guildCache.clear();
-  }
-
-    // Public methods for status and configuration
-  getStatus() {
-    return {
-      backendAvailable: !this.backendDown,
-      userKeyValid: this.userKeyValid,
-      uuidCacheSize: this.uuidCache.size,
-      config: {
-        hasBackend: !!this.config.backendUrl,
-        hasUserKey: !!this.config.userApiKey,
-        useFallback: this.config.useFallbackKey
-      }
-    };
-  }
-
-  updateConfig(newConfig: Partial<ApiRouterConfig>) {
-    this.config = { ...this.config, ...newConfig };
-  }
-
-  async verifyUserApiKey(apiKey: string): Promise<{ valid: boolean, error?: string }> {
-    if (!apiKey) return { valid: false, error: 'No API key provided' };
-    
-    try {
-      const response = await fetch('https://api.hypixel.net/punishmentStats', {
-        headers: { 'API-Key': apiKey },
-        signal: AbortSignal.timeout(5000)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const isValid = data.success === true;
-        this.userKeyValid = isValid;
-        return { valid: isValid, error: isValid ? undefined : 'API returned invalid response' };
-      } else if (response.status === 403) {
-        this.userKeyValid = false;
-        return { valid: false, error: 'Invalid API key (403 Forbidden)' };
-      } else if (response.status === 429) {
-        this.userKeyValid = false;
-        return { valid: false, error: 'Rate limited (too many requests)' };
-      } else {
-        this.userKeyValid = false;
-        return { valid: false, error: `HTTP ${response.status}: ${response.statusText}` };
-      }
-    } catch (error: any) {
-      this.userKeyValid = false;
-      if (error.name === 'TimeoutError') {
-        return { valid: false, error: 'Request timed out (check your internet connection)' };
-      } else if (error.message?.includes('fetch')) {
-        return { valid: false, error: 'Network error (check your internet connection)' };
-      }
-      return { valid: false, error: error.message || 'Unknown error occurred' };
-    }
-  }
-}
-
-export default HypixelApiRouter;
-
-
-// Initialize enhanced API Router
-const apiRouter = new HypixelApiRouter({
-  userApiKey: HYPIXEL_KEY,
-  useFallbackKey: true,
-  cacheTimeout: 5 * 60 * 1000
-});
-
-// --- IPC: Enhanced API Management ---
-ipcMain.handle('api:getStatus', async () => {
-  return apiRouter.getStatus();
-});
-
-ipcMain.handle('api:setUserKey', async (_e, apiKey: string) => {
-  const result = await apiRouter.verifyUserApiKey(apiKey);
-  if (result.valid) {
-    apiRouter.updateConfig({ userApiKey: apiKey });
-    return { success: true };
-  }
-  return { success: false, error: result.error || 'Invalid API key' };
-});
-
-ipcMain.handle('api:clearCache', async () => {
-  apiRouter.clearCache();
-  return { success: true };
-});
-
-ipcMain.handle('api:toggleFallback', async (_e, enabled: boolean) => {
-  apiRouter.updateConfig({ useFallbackKey: enabled });
-  return { success: true, enabled };
-});
-
-// --- IPC: External URL opener
-ipcMain.handle('external:open', async (_e, url: string) => {
-  try {
-    const { shell } = await import('electron');
-    await shell.openExternal(url);
-    return { success: true };
-  } catch (error) {
-    console.error('[External] Failed to open URL:', error);
-    return { error: String(error) };
-  }
 });
