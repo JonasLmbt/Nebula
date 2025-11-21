@@ -260,7 +260,7 @@ try {
   const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
   if (!res.ok) return null;
   const data = await res.json();
-  return (data && data.id) ? data.id : null; // already ohne Bindestriche
+  return (data && data.id) ? data.id : null; 
 } catch { return null; }
 }
 
@@ -1971,6 +1971,28 @@ function saveStatSettings() {
   renderStatLayoutPalette();
 }
 
+async function updateNickSuggestions() {
+  const datalist = document.getElementById('nickSuggestions');
+  if (!datalist) return;
+
+  datalist.innerHTML = '';
+
+  const added = new Set(); 
+
+  for (const nick of new Set(displayedPlayers)) {
+    if (added.has(nick)) continue;
+
+    const uuid = await fetchMojangUuid(nick);
+    if (!uuid) {
+      const option = document.createElement('option');
+      option.value = nick;
+      datalist.appendChild(option);
+
+      added.add(nick); 
+    }
+  }
+}
+
 // Rebuild the entire table from cache (used when stat settings change)
 function renderTable() {
   const table = document.getElementById('table');
@@ -2025,6 +2047,7 @@ function renderTable() {
   bindMenus();
   bindSortHeaders(); // Bind click handlers for sorting
   updateOverlaySize();
+  updateNickSuggestions();
 }
 
 // Bind sort handlers to table headers

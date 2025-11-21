@@ -29,6 +29,7 @@ export interface NormalizedBedwarsStats {
   uuid?: string;
 }
 
+
 export function normalizeHypixelBedwarsStats(
   player: any,
   requestedName: string,
