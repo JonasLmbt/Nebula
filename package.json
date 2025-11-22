@@ -1,17 +1,19 @@
 {
   "name": "nebula",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Nebula — a lightweight Bedwars stats overlay.",
   "main": "dist/main.js",
   "author": "Jonas Lambrecht",
   "license": "MIT",
+
   "scripts": {
-    "build": "rimraf dist && tsc && xcopy src\\renderer dist\\renderer /E /I /Y",
+    "build": "rimraf dist && tsc && cpy \"src/renderer/**/*\" \"dist/renderer\"",
     "dist": "npm run build && electron-builder --publish always",
-    "start": "npm run build && \"node_modules/.bin/electron.cmd\" .",
-    "dev": "npm run build && \"node_modules/.bin/electron.cmd\" . --enable-logging",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --enable-logging",
     "publish-release": "node deploy-installer.js"
   },
+
   "devDependencies": {
     "@types/node": "^24.10.0",
     "@types/node-fetch": "^2.6.13",
@@ -19,9 +21,11 @@
     "electron": "^39.1.0",
     "electron-builder": "^26.0.12",
     "rimraf": "^6.1.0",
+    "cpy": "^10.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
+
   "dependencies": {
     "dotenv": "^16.6.1",
     "electron-updater": "^6.6.2",
@@ -29,17 +33,21 @@
     "node-fetch": "^2.6.7",
     "tail": "^2.2.6"
   },
+
   "repository": {
     "type": "git",
     "url": "https://github.com/JonasLmbt/Nebula.git"
   },
+
   "build": {
     "appId": "com.jonaslmbt.nebula",
     "productName": "Nebula",
+
     "directories": {
       "output": "release",
       "buildResources": "build"
     },
+
     "files": [
       "dist/**/*",
       "assets/**/*",
@@ -48,19 +56,31 @@
       "!src/**/*",
       "!node_modules/.cache/**/*"
     ],
+
     "asar": true,
+
     "win": {
       "target": [
         "nsis",
         "portable"
       ]
     },
+
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities"
+    },
+
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": false
     },
+
     "publish": [
       {
         "provider": "github",
