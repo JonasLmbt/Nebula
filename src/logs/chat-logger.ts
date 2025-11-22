@@ -3,42 +3,73 @@ import path from 'path';
 import EventEmitter from 'events';
 import { Tail } from 'tail';
 
-// Base client log path templates (Windows; macOS variants would be added similarly if needed)
+const isWindows = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+
+// Helpful shortcuts
+const HOME = process.env.HOME || process.env.USERPROFILE || '';
+const APPDATA = process.env.APPDATA || '';  // Windows only
+const MC_MAC = path.join(HOME, 'Library', 'Application Support', 'minecraft');
+const LC_MAC = path.join(HOME, 'Library', 'Application Support', 'lunarclient');
+const BL_MAC = MC_MAC; // Badlion uses normal mc folder
+
+
+// Base paths for Windows + macOS
 const BASE_CLIENT_PATHS: Record<string, string> = {
-  badlion: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'blclient', 'minecraft', 'latest.log'),
-  vanilla: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
-  pvplounge: path.join(process.env.APPDATA || '', '.pvplounge', 'logs', 'latest.log'),
-  labymod: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'fml-client-latest.log'),
-  feather: path.join(process.env.APPDATA || '', '.minecraft', 'logs', 'latest.log'),
+  badlion: isWindows
+    ? path.join(APPDATA, '.minecraft', 'logs', 'blclient', 'minecraft', 'latest.log')
+    : path.join(BL_MAC, 'logs', 'blclient', 'minecraft', 'latest.log'),
+
+  vanilla: isWindows
+    ? path.join(APPDATA, '.minecraft', 'logs', 'latest.log')
+    : path.join(MC_MAC, 'logs', 'latest.log'),
+
+  pvplounge: isWindows
+    ? path.join(APPDATA, '.pvplounge', 'logs', 'latest.log')
+    : path.join(HOME, 'Library', 'Application Support', 'pvplounge', 'logs', 'latest.log'),
+
+  labymod: isWindows
+    ? path.join(APPDATA, '.minecraft', 'logs', 'fml-client-latest.log')
+    : path.join(MC_MAC, 'logs', 'latest.log'),
+
+  feather: isWindows
+    ? path.join(APPDATA, '.minecraft', 'logs', 'latest.log')
+    : path.join(HOME, 'Library', 'Application Support', 'feather', 'logs', 'latest.log'),
 };
+
 
 // Lunar has multiple possible folders depending on version
 function detectLunarPath(): string | undefined {
-  const homeDir = process.env.USERPROFILE || process.env.HOMEPATH || '';
-  const appdata = process.env.APPDATA || '';
+  const paths: string[] = [];
 
-  const candidates = [
-    path.join(homeDir, '.lunarclient', 'profiles', 'lunar', '1.8', 'logs', 'latest.log'),
-    path.join(homeDir, '.lunarclient', 'profiles', 'lunar', '1.21', 'logs', 'latest.log'),
-  ];
+  if (isWindows) {
+    const homeDir = process.env.USERPROFILE || '';
+    paths.push(
+      path.join(homeDir, '.lunarclient', 'profiles', 'lunar', '1.8', 'logs', 'latest.log'),
+      path.join(homeDir, '.lunarclient', 'profiles', 'lunar', '1.21', 'logs', 'latest.log')
+    );
+  }
 
-  let newest: { p?: string; m: number } = { m: 0 };
+  if (isMac) {
+    paths.push(
+      path.join(LC_MAC, 'offline', '1.8', 'logs', 'latest.log'),
+      path.join(LC_MAC, 'offline', '1.21', 'logs', 'latest.log')
+    );
+  }
 
-  for (const p of candidates) {
+  // choose newest
+  let newest: { path?: string; m: number } = { m: 0 };
+
+  for (const p of paths) {
     try {
-      if (fs.existsSync(p)) {
-        const stat = fs.statSync(p);
-        const m = stat.mtimeMs || stat.mtime.getTime();
-        if (m > newest.m) {
-          newest = { p, m };
-        }
-      }
+      if (!fs.existsSync(p)) continue;
+      const m = fs.statSync(p).mtimeMs;
+      if (m > newest.m) newest = { path: p, m };
     } catch {}
   }
 
-  return newest.p;
+  return newest.path;
 }
-
 
 
 function buildClientPaths(): Record<string, string> {
@@ -205,10 +236,6 @@ export class MinecraftChatLogger extends EventEmitter {
     const raw = line.substring(chatIndex + 6).trim();
     const msg = this.stripColorCodes(raw);
     if (!msg) return;
-
-    try {
-      console.log('[DBG:CLEAN]', msg);
-    } catch {}
 
     // Clean rank tags from names like [VIP] Player -> Player
     const cleanName = (name: string) => {
