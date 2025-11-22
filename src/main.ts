@@ -33,43 +33,52 @@ let win: BrowserWindow | null = null;
 
 function initAutoUpdate() {
   if (!app.isPackaged) {
+    console.log('[AutoUpdate] Skipping – app is not packaged.');
     return;
   }
+
   try {
     autoUpdater.logger = console as any;
     autoUpdater.autoDownload = true;
 
     autoUpdater.on('checking-for-update', () => {
-      if (win) win.webContents.send('update:status', 'checking');
+      console.log('[AutoUpdate] Checking for update...');
+      win?.webContents.send('update:status', 'checking');
     });
-    autoUpdater.on('update-available', (info) => {
-      if (win) win.webContents.send('update:available', info);
-    });
-    autoUpdater.on('update-not-available', (info) => {
-      if (win) win.webContents.send('update:none', info);
-    });
-    autoUpdater.on('error', (err) => {
-      if (win) win.webContents.send('update:error', err ? (err.message || String(err)) : 'unknown');
-    });
-    autoUpdater.on('download-progress', (prog) => {
-      if (win) win.webContents.send('update:progress', prog);
-    });
-    autoUpdater.on('update-downloaded', (info) => {
-      if (win) win.webContents.send('update:ready', info);
-    });
-    autoUpdater.on("update-downloaded", async () => {
-    if (win) {
-      // Cache löschen
-      win.webContents.session.clearCache().then(() => {
-        autoUpdater.quitAndInstall();
-      });
-    } else {
-      autoUpdater.quitAndInstall();
-    }
-  });
 
-    // Initial check
+    autoUpdater.on('update-available', (info) => {
+      console.log('[AutoUpdate] Update available:', info);
+      win?.webContents.send('update:available', info);
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('[AutoUpdate] No update available:', info);
+      win?.webContents.send('update:none', info);
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('[AutoUpdate] Error:', err);
+      win?.webContents.send('update:error', err ? (err.message || String(err)) : 'unknown');
+    });
+
+    autoUpdater.on('download-progress', (prog) => {
+      console.log('[AutoUpdate] Download progress:', prog);
+      win?.webContents.send('update:progress', prog);
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('[AutoUpdate] Update downloaded:', info);
+      win?.webContents.send('update:ready', info);
+    });
+
+    console.log('[AutoUpdate] Calling checkForUpdates()...');
     autoUpdater.checkForUpdates().catch(e => console.warn('AutoUpdate check failed:', e));
+
+    autoUpdater.on("update-downloaded", async () => {
+    if (win) { win.webContents.session.clearCache().then(() => { autoUpdater.quitAndInstall(); });
+    } else { autoUpdater.quitAndInstall(); }
+    });
+
   } catch (e) {
     console.warn('AutoUpdate init failed:', e);
   }

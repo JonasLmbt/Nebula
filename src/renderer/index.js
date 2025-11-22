@@ -67,7 +67,6 @@ const MIN_HEIGHT = 120; // minimum window height for empty overlay
 const DEFAULT_HEIGHT = 560; // default full height
 const errorMsg = "Could not start session";
 let resizeTimeout = null;
-let sessionUuid = null;
 
 function updateOverlaySize() {
   if (resizeTimeout) clearTimeout(resizeTimeout);
@@ -155,23 +154,30 @@ const finalHeight = Math.min(neededHeight, maxHeight);
 
 const displayedPlayers = new Set();
 const nickedPlayers = new Set(); // tracks players originally added via nick
+
 // playerSources: map normalized name -> set of sources ('username'|'manual'|'party'|'who'|'chat'|'invite'|'guild')
 const playerSources = new Map();
+
 // Track invite timeouts: map normalized name -> timeout ID
 const inviteTimeouts = new Map();
+
 // Cache for all loaded player objects (keyed by normalized name)
 let playerCache = {};
+
 // Tracks whether a registered nick is CURRENTLY active (i.e. we saw the nick-form in /who or chat)
 // key: realName(lower) -> boolean
 const activeNickState = {};
 console.log('displayedPlayers initialized:', displayedPlayers);
-const originalNicks = {}; // realName(lower) -> originally eingegebener Nick
+const originalNicks = {}; // realName(lower) -> originally entered nick
 let nickDisplayMode = localStorage.getItem('nickDisplayMode') || 'nick';
+
 // Pinned players cannot be removed by any automatic source removal
 let pinnedPlayers = new Set(JSON.parse(localStorage.getItem('pinnedPlayers') || '[]').map(s => String(s).toLowerCase()));
 function savePinned() { localStorage.setItem('pinnedPlayers', JSON.stringify(Array.from(pinnedPlayers))); }
+
 // Track whether we are in the pre-game lobby phase (after "Sending you to..." and before game start)
 let preGameLobby = false;
+
 // Track whether we are currently in an active game (after gameStart until next server change / lobby join)
 let gameInProgress = false;
 let guildListMode = false; // Tracks if we're currently parsing guild list output
@@ -179,7 +185,11 @@ let guildBatchAccepted = false; // Only add members if guild was enabled when th
 
 // Nick management (moved earlier to ensure availability before initial renders)
 let nicks = JSON.parse(localStorage.getItem('nicks') || '[]');
-function saveNicks() { localStorage.setItem('nicks', JSON.stringify(nicks)); }
+
+function saveNicks() { 
+  localStorage.setItem('nicks', JSON.stringify(nicks)); 
+}
+
 function getRealName(name) {
 const nick = nicks.find(n => n.nick.toLowerCase() === String(name).toLowerCase());
 return nick ? nick.real : name;
@@ -190,7 +200,9 @@ const entry = nicks.find(n => n.real.toLowerCase() === String(realName).toLowerC
 return entry ? entry.nick : undefined;
 }
 
-function isNick(name) { return nicks.some(n => n.nick.toLowerCase() === String(name).toLowerCase()); }
+function isNick(name) { 
+  return nicks.some(n => n.nick.toLowerCase() === String(name).toLowerCase()); 
+}
 
 
 // Session Stats Functions
@@ -254,6 +266,7 @@ const uuid = (player.uuid || player.id || null);
 return { name: player.name || player.username || player.displayName || '', level, ws, fk, fd, fkdr, wins, losses, wlr, bb, bl, bblr, uuid };
 }
 
+// Fetch Mojang UUID from username
 async function fetchMojangUuid(name) {
 if (!name) return null;
 try {
@@ -264,6 +277,7 @@ try {
 } catch { return null; }
 }
 
+// Set session avatar
 async function setAvatar(ign) {
   const el = document.getElementById("sessionAvatar");
   const uuid = await fetchMojangUuid(ign);
@@ -273,9 +287,16 @@ async function setAvatar(ign) {
     el.src = "https://mc-heads.net/avatar/MHF_Steve/48";
   };
 }
-setAvatar("Steve"); // Steve placeholder
+
+// Set session avatar to Steve placeholder initially
+setAvatar("Steve"); 
 
 
+// ==========================================
+// Session Stats Functions
+// ==========================================
+
+// Start a new session for the given username
 async function startSession(username) {
   if (!username || username.trim() === '') {
     console.log('Cannot start session: no username provided');
@@ -448,6 +469,7 @@ async function startSession(username) {
 }
 }
 
+// Update session stats by fetching current data
 async function updateSession() {
 if (!startStats || !sessionUsername) return;
 
@@ -475,6 +497,7 @@ try {
 }
 }
 
+// Update session time display
 function updateSessionTime() {
 const sessionTime = document.getElementById('sessionTime');
 if (!sessionTime || !startTime) return;
@@ -493,6 +516,7 @@ if (hoursElapsed > 0) {
 sessionTime.textContent = timeText;
 }
 
+// Generate HTML for a session stat row
 function sessionStatHTML(startVal, currentVal, isNegativeStat = false) {
 if (startVal === undefined || currentVal === undefined) {
   return '<span style="color: #ef4444;">?</span>';
@@ -518,6 +542,7 @@ return `
 `;
 }
 
+// Generate HTML for a session stat row
 function generateSessionHTML(startPlayer, currentPlayer) {
 const sessionStats = document.getElementById('sessionStats');
 const sessionTitle = document.getElementById('sessionTitle');
@@ -682,138 +707,147 @@ guildTag: { name: 'Guild Tag', short: 'Tag', type: 'text' },
 // Sorting state
 let sortKey = null; // keys from STATS, e.g. 'level' | 'ws' | 'fkdr' | 'wlr' | 'bblr' | 'fk' | 'wins' | 'bedwarsScore' | ...
 let sortDir = 'asc'; // 'asc' | 'desc'
+
 // Restore persisted sort if exists
 try {
-const sk = localStorage.getItem('sortKey');
-const sd = localStorage.getItem('sortDir');
-if (sk) sortKey = (sk === 'score' ? 'bedwarsScore' : sk);
-if (sd === 'asc' || sd === 'desc') sortDir = sd;
+  const sk = localStorage.getItem('sortKey');
+  const sd = localStorage.getItem('sortDir');
+  if (sk) sortKey = (sk === 'score' ? 'bedwarsScore' : sk);
+  if (sd === 'asc' || sd === 'desc') sortDir = sd;
 } catch {}
 
+// Safely convert value to number, return NaN if not finite
 function getNumeric(value) {
-const n = Number(value);
-return Number.isFinite(n) ? n : NaN;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : NaN;
 }
 
 // Apply color rules to stat values
 function getColorForValue(column, value) {
-const rules = statSettings.colorRules[column];
-if (!rules || !Array.isArray(rules)) return '';
+  const rules = statSettings.colorRules[column];
+  if (!rules || !Array.isArray(rules)) return '';
 
-// Ensure value is numeric
-const numValue = typeof value === 'number' ? value : Number(value);
-if (!Number.isFinite(numValue)) return '';
+  // Ensure value is numeric
+  const numValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numValue)) return '';
 
-for (const rule of rules) {
-  if (rule.op === '>=' && numValue >= rule.value) {
-    return `style="color:${rule.color}"`;
+  for (const rule of rules) {
+    if (rule.op === '>=' && numValue >= rule.value) {
+      return `style="color:${rule.color}"`;
+    }
+    if (rule.op === '<' && numValue < rule.value) {
+      return `style="color:${rule.color}"`;
+    }
   }
-  if (rule.op === '<' && numValue < rule.value) {
-    return `style="color:${rule.color}"`;
-  }
-}
 return '';
 }
 
+// Get sort value for a player based on the sort key
 function getSortValue(player, key) {
-switch (key) {
-  case 'level': {
-    if (player?.level != null) return getNumeric(player.level);
-    const exp = player?.stats?.Bedwars?.Experience ?? player?.experience;
-    return exp != null ? Math.floor(getBedWarsLevel(Number(exp))) : 0;
+  switch (key) {
+    case 'level': {
+      if (player?.level != null) return getNumeric(player.level);
+      const exp = player?.stats?.Bedwars?.Experience ?? player?.experience;
+      return exp != null ? Math.floor(getBedWarsLevel(Number(exp))) : 0;
+    }
+    case 'networkLevel': return getNumeric(player?.networkLevel ?? 0);
+    case 'ws': return getNumeric(player?.ws ?? 0);
+    case 'fkdr': return getNumeric(player?.fkdr ?? 0);
+    case 'wlr': return getNumeric(player?.wlr ?? 0);
+    case 'bblr': return getNumeric(player?.bblr ?? 0);
+    case 'fk': return getNumeric(player?.fk ?? 0);
+    case 'fd': return getNumeric(player?.fd ?? 0);
+    case 'wins': return getNumeric(player?.wins ?? 0);
+    case 'losses': return getNumeric(player?.losses ?? 0);
+    case 'bedsBroken': return getNumeric(player?.bedsBroken ?? 0);
+    case 'bedsLost': return getNumeric(player?.bedsLost ?? 0);
+    case 'kills': return getNumeric(player?.kills ?? 0);
+    case 'deaths': return getNumeric(player?.deaths ?? 0);
+    case 'winsPerLevel': return getNumeric(STATS.winsPerLevel.calc(player));
+    case 'fkPerLevel': return getNumeric(STATS.fkPerLevel.calc(player));
+    case 'score': // legacy alias
+    case 'bedwarsScore': {
+        const v = (player && typeof player.bedwarsScore === 'number') ? player.bedwarsScore : STATS.bedwarsScore.calc(player);
+        return getNumeric(v);
+      }
+    case 'mfkdr': return getNumeric(player?.mfkdr ?? NaN);
+    case 'mwlr': return getNumeric(player?.mwlr ?? NaN);
+    case 'mbblr': return getNumeric(player?.mbblr ?? NaN);
+    default: return 0;
   }
-  case 'networkLevel': return getNumeric(player?.networkLevel ?? 0);
-  case 'ws': return getNumeric(player?.ws ?? 0);
-  case 'fkdr': return getNumeric(player?.fkdr ?? 0);
-  case 'wlr': return getNumeric(player?.wlr ?? 0);
-  case 'bblr': return getNumeric(player?.bblr ?? 0);
-  case 'fk': return getNumeric(player?.fk ?? 0);
-  case 'fd': return getNumeric(player?.fd ?? 0);
-  case 'wins': return getNumeric(player?.wins ?? 0);
-  case 'losses': return getNumeric(player?.losses ?? 0);
-  case 'bedsBroken': return getNumeric(player?.bedsBroken ?? 0);
-  case 'bedsLost': return getNumeric(player?.bedsLost ?? 0);
-  case 'kills': return getNumeric(player?.kills ?? 0);
-  case 'deaths': return getNumeric(player?.deaths ?? 0);
-  case 'winsPerLevel': return getNumeric(STATS.winsPerLevel.calc(player));
-  case 'fkPerLevel': return getNumeric(STATS.fkPerLevel.calc(player));
-case 'score': // legacy alias
-case 'bedwarsScore': {
-    const v = (player && typeof player.bedwarsScore === 'number') ? player.bedwarsScore : STATS.bedwarsScore.calc(player);
-    return getNumeric(v);
-  }
-  case 'mfkdr': return getNumeric(player?.mfkdr ?? NaN);
-  case 'mwlr': return getNumeric(player?.mwlr ?? NaN);
-  case 'mbblr': return getNumeric(player?.mbblr ?? NaN);
-  default: return 0;
-}
 }
 
 // Insert row for this player (used by both fetchPlayerStats and renderTable)
-function renderPlayerRow(player, wasNick, dynamicStats) {
-console.log('[DEBUG] renderPlayerRow', player?.name, player);
-const levelHTML = updatePlayerLevel(player);
-const realName = player.name;
-// Player might not have loaded (error placeholder) -> mark as nick
-const isUnresolved = player.error || player.unresolved;
-const key = realName.toLowerCase();
-const sources = playerSources.get(key);
-const isPartyMember = sources && sources.has('party');
-const lowerReal = realName.toLowerCase();
-const originalNick = originalNicks[lowerReal] || getNickFromReal(realName);
-const hasNick = !!originalNick;
-// Only show nickname if (a) mode is nick AND (b) we determined the player is actually nicked right now
-const isActiveNick = !!activeNickState[lowerReal];
-const showNick = hasNick && nickDisplayMode === 'nick' && isActiveNick;
-const displayName = showNick ? originalNick : realName;
-const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
-const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
-const dynamicCells = selectedStats.map(key => {
-  if (key === 'level' || key === 'name') return '';
-  let val = player[key];
-  // Support calc functions for derived stats if backend didn't send field
-  const statDef = STATS[key];
-  if ((val == null || (typeof val === 'number' && isNaN(val))) && statDef && typeof statDef.calc === 'function') {
-    try { val = statDef.calc(player); } catch { val = null; }
-  }
-  const colorStyle = getColorForValue(key, typeof val === 'number' ? val : Number(val));
-  return `<td class="metric" ${colorStyle}>${fmt(val)}</td>`;
-}).join('');
-const orderedCells = [
-  `<td class="lvl">${levelHTML}</td>`,
-  `<td class="name">
-    ${(() => {
-      if (showNick || isUnresolved) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
-      return player.rankTag ? `<span class="rank-tag" style="color:${player.rankColor || '#ffffff'}">${player.rankTag}</span>` : '';
-    })()}
-    ${(() => {
-      if (showNick || isUnresolved) return `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>`;
-      if (player.rankTag) return `<span class="player-name" style="color:${player.rankColor || '#ffffff'}">${esc(displayName)}</span>`;
-      // Unranked -> grau wie Stone Prestige
-      return `<span class="player-name" style="color:#AAAAAA">${esc(displayName)}</span>`;
-    })()}
-    ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
-${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
-${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Gepinnt"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
-    ${sessionUsername && String(player.name).trim().toLowerCase() === String(sessionUsername).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
-  </td>`,
-  dynamicCells
-].join('');
-const pinned = pinnedPlayers.has(key);
-rows.insertAdjacentHTML("beforeend", `
-  <tr data-name="${escAttr(player.name)}" ${pinned ? 'class="pinned"' : ''}>
-    ${orderedCells}
-    <td class="actions">
-      <button class="icon-btn row-menu-btn">⋮</button>
-      <div class="menu">
-        <button class="pin-btn">${pinned ? 'Unpin' : 'Pin'}</button>
-        <button class="remove-btn">Remove</button>
-      </div>
-    </td>
-  </tr>
-`);
+function renderPlayerRow(player, dynamicStats) {
+  // Debug log
+  console.log('[DEBUG] renderPlayerRow', player?.name, player);
+
+  // Create level HTML
+  const levelHTML = updatePlayerLevel(player);
+  const realName = player.name;
+
+  // Player might not have loaded (error placeholder) -> mark as nick
+  const isUnresolved = player.error || player.unresolved;
+  const key = realName.toLowerCase();
+  const sources = playerSources.get(key);
+  const isPartyMember = sources && sources.has('party');
+  const lowerReal = realName.toLowerCase();
+  const originalNick = originalNicks[lowerReal] || getNickFromReal(realName);
+  const hasNick = !!originalNick;
+
+  // Only show nickname if (a) mode is nick AND (b) we determined the player is actually nicked right now
+  const isActiveNick = !!activeNickState[lowerReal];
+  const showNick = hasNick && nickDisplayMode === 'nick' && isActiveNick;
+  const displayName = showNick ? originalNick : realName;
+  const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
+  const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
+  const dynamicCells = selectedStats.map(key => {
+    if (key === 'level' || key === 'name') return '';
+    let val = player[key];
+    // Support calc functions for derived stats if backend didn't send field
+    const statDef = STATS[key];
+    if ((val == null || (typeof val === 'number' && isNaN(val))) && statDef && typeof statDef.calc === 'function') {
+      try { val = statDef.calc(player); } catch { val = null; }
+    }
+    const colorStyle = getColorForValue(key, typeof val === 'number' ? val : Number(val));
+    return `<td class="metric" ${colorStyle}>${fmt(val)}</td>`;
+  }).join('');
+  const orderedCells = [
+    `<td class="lvl">${levelHTML}</td>`,
+    `<td class="name">
+      ${(() => {
+        if (showNick || isUnresolved) return `<span class="rank-tag" style="color:#ffffff">[NICK]</span>`;
+        return player.rankTag ? `<span class="rank-tag" style="color:${player.rankColor || '#ffffff'}">${player.rankTag}</span>` : '';
+      })()}
+      ${(() => {
+        if (showNick || isUnresolved) return `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>`;
+        if (player.rankTag) return `<span class="player-name" style="color:${player.rankColor || '#ffffff'}">${esc(displayName)}</span>`;
+        // Unranked -> grau wie Stone Prestige
+        return `<span class="player-name" style="color:#AAAAAA">${esc(displayName)}</span>`;
+      })()}
+      ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
+  ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
+  ${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Gepinnt"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
+      ${sessionUsername && String(player.name).trim().toLowerCase() === String(sessionUsername).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
+    </td>`,
+    dynamicCells
+  ].join('');
+  const pinned = pinnedPlayers.has(key);
+  rows.insertAdjacentHTML("beforeend", `
+    <tr data-name="${escAttr(player.name)}" ${pinned ? 'class="pinned"' : ''}>
+      ${orderedCells}
+      <td class="actions">
+        <button class="icon-btn row-menu-btn">⋮</button>
+        <div class="menu">
+          <button class="pin-btn">${pinned ? 'Unpin' : 'Pin'}</button>
+          <button class="remove-btn">Remove</button>
+        </div>
+      </td>
+    </tr>
+  `);
 }
 
+// Calculate BedWars level from experience
 function getBedWarsLevel(exp) {
   let level = 100 * (Math.floor(exp / 487000));
   exp = exp % 487000;
@@ -896,6 +930,7 @@ nickedPlayers.delete(key);
   delete originalNicks[key];
   try { delete activeNickState[key]; } catch {}
   updateOverlaySize();
+  updateNickSuggestions();
 }
 
 // Add/track a source for a player
@@ -905,7 +940,7 @@ function addPlayerSource(name, source) {
   if (source === 'chat' && !sourcesSettings?.chat?.enabled) return;
   if (source === 'party' && !sourcesSettings?.party?.enabled) return;
   if (source === 'who' && !sourcesSettings?.game?.addFromWho) return;
-if (source === 'guild' && (!sourcesSettings?.guild?.enabled)) return;
+  if (source === 'guild' && (!sourcesSettings?.guild?.enabled)) return;
   if (source === 'invite' && (!sourcesSettings?.party?.enabled || !sourcesSettings?.party?.showInviteTemp || !sourcesSettings?.partyInvites?.enabled)) return;
   
   const key = String(getRealName(name) || name).toLowerCase();
@@ -914,6 +949,7 @@ if (source === 'guild' && (!sourcesSettings?.guild?.enabled)) return;
   playerSources.set(key, set);
 }
 
+// Remove a source for a player
 function removePlayerSource(name, source) {
   const key = String(getRealName(name) || name).toLowerCase();
   
@@ -969,6 +1005,7 @@ function clearInviteTimeout(name) {
   }
 }
 
+// Clear all players except those with username source
 function clearAllButUsername() {
   // Remove all non-username-backed players; keep username-only
   const selfKey = sessionUsername ? String(sessionUsername).trim().toLowerCase() : null;
@@ -1001,8 +1038,10 @@ nickedPlayers.delete(key);
     if (dn && !playerSources.has(dn)) tr.remove();
   });
   updateOverlaySize(); // Update window size after clearing
+  updateNickSuggestions();
 }
 
+// Add a player by name and source
 function addPlayer(name, source) {
   name = String(name || '').trim();
   if (!name) return;
@@ -1025,6 +1064,7 @@ function addPlayer(name, source) {
     fetchPlayerStats(name).then(() => {
       updateOverlaySize();
       renderTable();
+      updateNickSuggestions();
     });
   }
 }
@@ -1034,8 +1074,8 @@ window.ipcRenderer.on('chat:players', (_e, newPlayers) => {
   try {
     if (!Array.isArray(newPlayers)) return;
     if (!sourcesSettings?.game?.addFromWho) return; // feature disabled
-// Remove diffed old /who entries (only if not held by other sources)
-const incomingSet = new Set(newPlayers.map(p => String(p).trim().toLowerCase()));
+    // Remove diffed old /who entries (only if not held by other sources)
+    const incomingSet = new Set(newPlayers.map(p => String(p).trim().toLowerCase()));
     for (const [key, sources] of Array.from(playerSources.entries())) {
       if (sources.has('who') && !incomingSet.has(key)) {
         // Don't remove the session username - keep it in the overlay
@@ -1063,7 +1103,7 @@ const incomingSet = new Set(newPlayers.map(p => String(p).trim().toLowerCase()))
         }
       }
     }
-// Now add new players / set 'who' source
+    // Now add new players / set 'who' source
     newPlayers.forEach(player => {
       if (!player || typeof player !== 'string') return;
       addPlayer(player, 'who');
@@ -1236,14 +1276,12 @@ function esc(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">
 
 function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
 
-function fmt(n) {
-  if (n == null) return "—";
-  if (typeof n === 'string') return n || "—";
-  if (typeof n === 'number') return isNaN(n) ? "—" : n;
-  return String(n);
-}
+function fmt(n) { if (n == null) return "—"; if (typeof n === 'string') return n || "—"; if (typeof n === 'number') return isNaN(n) ? "—" : n; return String(n); }
 
+
+// ==========================================
 // Nick management (definition moved earlier)
+// ==========================================
 
 // Nicks Panel UI
 function renderNicks() {
@@ -1561,6 +1599,7 @@ window.ipcRenderer.on('chat:gameStart', () => {
   }
 });
 
+// Fetch all queued players
 async function fetchAll() {
   // Add all queued players as manual entries (does not clear current list)
   for (const inputName of queue) {
@@ -1569,6 +1608,7 @@ async function fetchAll() {
   queue = [];
 }
 
+// Row menu bindings
 function bindMenus() {
   const btns = Array.from(document.querySelectorAll(".row-menu-btn"));
   const removes = Array.from(document.querySelectorAll(".remove-btn"));
@@ -1621,10 +1661,12 @@ function bindMenus() {
   document.addEventListener("click", closeAllMenus);
 }
 
+// Close all open menus
 function closeAllMenus() {
   document.querySelectorAll(".menu.open").forEach(m => m.classList.remove("open"));
 }
 
+// Input handling
 input.addEventListener("keydown", e => {
   if (e.key === "Enter") {
     const names = input.value.split(",").map(s => s.trim()).filter(Boolean);
@@ -1634,24 +1676,17 @@ input.addEventListener("keydown", e => {
   }
 });
 
-document.getElementById("clearAll").addEventListener("click", () => {
-  queue = [];
-  clearAllButUsername();
-  updateOverlaySize();
-});
-
+// Top bar buttons
+document.getElementById("clearAll").addEventListener("click", () => { queue = []; clearAllButUsername(); updateOverlaySize(); });
 document.getElementById("refresh").addEventListener("click", fetchAll);
 document.getElementById("minBtn").addEventListener("click", () => window.ipcRenderer.send("window:minimize"));
 document.getElementById("closeBtn").addEventListener("click", () => window.ipcRenderer.send("window:close"));
 
 // Shortcut-triggered actions from main
 window.ipcRenderer.on('shortcut:refresh', () => fetchAll());
-window.ipcRenderer.on('shortcut:clear', () => {
-  queue = [];
-  clearAllButUsername();
-});
+window.ipcRenderer.on('shortcut:clear', () => { queue = []; clearAllButUsername(); });
 
-// --- resize grips
+// Window resizing grips
 let resizing = null;
 function onDown(e) {
   const edge = e.target.getAttribute("data-edge");
@@ -1677,6 +1712,7 @@ function onUp() {
 const menuBtn = document.getElementById('menuBtn');
 const sidebar = document.getElementById('sidebar');
 
+// Sidebar toggle + interactions
 if (menuBtn && sidebar) {
   menuBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1706,9 +1742,10 @@ if (menuBtn && sidebar) {
 // Removed: generic activation of all nav items (caused conflicts with sub-items)
 }
 
+// Window resizing grips
 document.querySelectorAll(".grip").forEach(g => g.addEventListener("mousedown", onDown));
 
-// --- Panel switching (flat list)
+// Panel switching (flat list)
 function showPanel(id) {
   // Get current panel before switching
   const currentPanel = document.querySelector('.panel.active')?.id?.replace('panel-', '');
@@ -1812,6 +1849,7 @@ document.querySelectorAll('.nav > .nav-item').forEach(btn => {
 // Remove old settings submenu persistence (no longer needed)
 localStorage.removeItem('settingsExpanded');
 localStorage.removeItem('activeSettingsSection');
+
 // Always start in Overlay panel on launch
 showPanel('overlay');
 
@@ -1932,30 +1970,28 @@ if (statSettings.layout.length > 12) {
 }
 
 // Migration: convert legacy color names to hex once on load
-(function migrateColorRules() {
-  const map = { good: '#00ff00', warn: '#ffff00', bad: '#ff0000' };
-  try {
-    if (statSettings && statSettings.colorRules) {
-      let changed = false;
-      for (const key of Object.keys(statSettings.colorRules)) {
-        const arr = statSettings.colorRules[key];
-        if (!Array.isArray(arr)) continue;
-        for (const rule of arr) {
-          if (rule && typeof rule.color === 'string' && map[rule.color]) {
-            rule.color = map[rule.color];
-            changed = true;
-          }
+const map = { good: '#00ff00', warn: '#ffff00', bad: '#ff0000' };
+try {
+  if (statSettings && statSettings.colorRules) {
+    let changed = false;
+    for (const key of Object.keys(statSettings.colorRules)) {
+      const arr = statSettings.colorRules[key];
+      if (!Array.isArray(arr)) continue;
+      for (const rule of arr) {
+        if (rule && typeof rule.color === 'string' && map[rule.color]) {
+          rule.color = map[rule.color];
+          changed = true;
         }
       }
-      if (changed) {
-        localStorage.setItem('statSettings', JSON.stringify(statSettings));
-      }
     }
-  } catch {}
-})();
+    if (changed) {
+      localStorage.setItem('statSettings', JSON.stringify(statSettings));
+    }
+  }
+} catch {}
 
+// Save stat settings to localStorage
 function saveStatSettings() {
-  // Purge disabled stats from layout and visible/order if present (migration)
   try {
     const disabledKeys = Object.keys(STATS).filter(k => STATS[k]?.disabled);
     if (disabledKeys.length) {
@@ -1971,6 +2007,7 @@ function saveStatSettings() {
   renderStatLayoutPalette();
 }
 
+// Update nickname suggestions datalist
 async function updateNickSuggestions() {
   const datalist = document.getElementById('nickSuggestions');
   if (!datalist) return;
@@ -2202,7 +2239,6 @@ function showNotification(message) {
   // Prevent stacking multiple event listeners
   okBtn.addEventListener('click', closeModal);
 }
-
 
 // Add slot button
 const addSlotBtn = document.getElementById('addSlotBtn');
@@ -2473,7 +2509,6 @@ function toAccelerator(e) {
   return [...parts, key].join('+');
 }
 
-// initial render and register
 renderShortcuts();
 window.ipcRenderer.invoke('shortcuts:register', shortcuts);
 
@@ -2577,8 +2612,7 @@ const defaultBasic = {
 
 let basicSettings = JSON.parse(localStorage.getItem('basicSettings') || JSON.stringify(defaultBasic));
 
-function saveBasicSettings(opts) {
-  const options = Object.assign({ propagateUsername: true }, opts);
+function saveBasicSettings() {
   localStorage.setItem('basicSettings', JSON.stringify(basicSettings));
   console.log('Basic settings saved:', basicSettings);
   updateSidebarUsername();
@@ -2935,8 +2969,8 @@ const defaultSources = {
     removeOnMemberLeave: true,
     removeAllOnLeaveOrDisband: true,
     showInviteTemp: true,
-    autoRefreshServerChange: false, // plus placeholder
-    autoRefreshGameEnd: false // plus placeholder
+    autoRefreshServerChange: false, 
+    autoRefreshGameEnd: false 
   },
   partyInvites: {
     enabled: true
@@ -2989,6 +3023,7 @@ function toggleSubsectionEnabled(containerId, enabled) {
 }
 
 // Bind Sources inputs
+// Game source elements
 const sourceGameToggle = document.getElementById('sourceGameToggle');
 const gameAddFromWho = document.getElementById('gameAddFromWho');
 const gameAddFromChat = document.getElementById('gameAddFromChat');
@@ -2996,23 +3031,31 @@ const gameRemoveOnDeath = document.getElementById('gameRemoveOnDeath');
 const gameRemoveOnDisconnect = document.getElementById('gameRemoveOnDisconnect');
 const gameRemoveOnServerChange = document.getElementById('gameRemoveOnServerChange');
 
+// Party source elements
 const sourcePartyToggle = document.getElementById('sourcePartyToggle');
 const partyRemoveOnMemberLeave = document.getElementById('partyRemoveOnMemberLeave');
 const partyRemoveAllOnLeaveOrDisband = document.getElementById('partyRemoveAllOnLeaveOrDisband');
 const partyShowInviteTemp = document.getElementById('partyShowInviteTemp');
 const partyRefreshServerChange = document.getElementById('partyRefreshServerChange');
 const partyRefreshGameEnd = document.getElementById('partyRefreshGameEnd');
-
 const sourcePartyInvitesToggle = document.getElementById('sourcePartyInvitesToggle');
 
+// Chat source elements
 const sourceChatToggle = document.getElementById('sourceChatToggle');
 const chatRemoveOnServerChange = document.getElementById('chatRemoveOnServerChange');
 const chatAddOnMention = document.getElementById('chatAddOnMention');
 const chatStringList = document.getElementById('chatStringList');
 const addChatStringBtn = document.getElementById('addChatString');
+
 // Manual source elements
 const sourceManualToggle = document.getElementById('sourceManualToggle');
 const manualClearOnGameStart = document.getElementById('manualClearOnGameStart');
+
+// Guild source elements
+const sourceGuildToggle = document.getElementById('sourceGuildToggle');
+const guildRemoveOnServerChange = document.getElementById('guildRemoveOnServerChange');
+const guildOnlineOnly = document.getElementById('guildOnlineOnly');
+
 
 if (sourceGameToggle) {
   sourceGameToggle.checked = sourcesSettings.game.enabled;
@@ -3106,7 +3149,6 @@ if (partyShowInviteTemp) {
   });
 }
 
-// Party auto-refresh options
 if (partyRefreshServerChange) {
   partyRefreshServerChange.checked = !!sourcesSettings.party.autoRefreshServerChange;
   partyRefreshServerChange.addEventListener('change', () => {
@@ -3157,11 +3199,6 @@ if (chatAddOnMention) {
   });
 }
 
-// Guild bindings
-const sourceGuildToggle = document.getElementById('sourceGuildToggle');
-const guildRemoveOnServerChange = document.getElementById('guildRemoveOnServerChange');
-const guildOnlineOnly = document.getElementById('guildOnlineOnly');
-
 if (sourceGuildToggle) {
   sourceGuildToggle.checked = !!sourcesSettings.guild?.enabled;
   toggleSubsectionEnabled('guildSourceOptions', sourcesSettings.guild.enabled);
@@ -3172,8 +3209,6 @@ if (sourceGuildToggle) {
     saveSourcesSettings();
   });
 }
-
-// Removed guildAddFromList toggle; guild additions are implicit when guild source is enabled.
 
 if (guildRemoveOnServerChange) {
   guildRemoveOnServerChange.checked = !!sourcesSettings.guild?.removeOnServerChange;
@@ -3193,7 +3228,6 @@ if (guildOnlineOnly) {
   });
 }
 
-// Manual bindings
 if (sourceManualToggle) {
   sourceManualToggle.checked = !!sourcesSettings.manual.enabled;
   toggleSubsectionEnabled('manualSourceOptions', sourcesSettings.manual.enabled);
@@ -3635,15 +3669,6 @@ async function updateAccountStats() {
   }
 }
 
-// Auto-update account stats when switching to profile panel
-function scheduleAccountStatsUpdate() {
-  const activePanel = document.querySelector('.panel.active');
-  if (activePanel && activePanel.id === 'panel-profile') {
-    updateAccountStats();
-  }
-}
-
-
 // Sync Now Handler (Firebase Cloud Sync)
 const syncNowBtn = document.getElementById('syncNowBtn');
 if (syncNowBtn) {
@@ -3987,4 +4012,3 @@ async function initialize() {
 
 // Start initialization
 initialize();
-
