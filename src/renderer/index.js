@@ -1335,12 +1335,11 @@ saveNickBtn?.addEventListener('click', () => {
   const nick = nickInput.value.trim();
   const real = realNameInput.value.trim();
 
-  // Limit für nicht-Plus-Nutzer
-  const isPlus = (localStorage.getItem('demoPlus') === 'true') || (window.userProfile && window.userProfile.isPlus);
+  /*const isPlus = (localStorage.getItem('demoPlus') === 'true') || (window.userProfile && window.userProfile.isPlus);
   if (!isPlus && nicks.length >= 10) {
     showNotification('Maximum of 10 nicknames without Plus allowed. Upgrade to Plus for unlimited entries!');
     return;
-  }
+  }*/
 
   if (nick && real) {
     if (!nicks.some(n => n.nick.toLowerCase() === nick.toLowerCase())) {
