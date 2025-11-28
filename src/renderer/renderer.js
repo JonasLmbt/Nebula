@@ -54,6 +54,7 @@ if (logoutBtn) {
 // -------------------------------
 // UPDATE UI (Username + Avatar)
 // -------------------------------
+
 function updateUI(user) {
   // ---------- LOGGED OUT ----------
   if (!user) {
@@ -67,6 +68,7 @@ function updateUI(user) {
     if (typeof authTokens !== "undefined") authTokens = null;
 
     window.dispatchEvent(new CustomEvent("nebula:logout"));
+    window.electronAPI.setUser(null);
 
     // UI: logged out
     if (usernameEl) usernameEl.textContent = "Not logged in";
@@ -87,11 +89,7 @@ function updateUI(user) {
     if (loginBtn) loginBtn.style.display = "flex";
     if (logoutBtn) logoutBtn.style.display = "none";
 
-    // Alte UI mitziehen
-    if (typeof updateProfileUI === "function") {
-      console.log("[updateUI] calling updateProfileUI() in LOGGED-OUT state");
-      updateProfileUI();
-    }
+    updateProfileUI();
 
     return;
   }
@@ -108,8 +106,8 @@ function updateUI(user) {
     plus: user.plus ?? null,
   };
 
-  // Bridge von neuem /api/auth/me → alte userProfile/authTokens-Logik
   window.userProfile = profile;
+  window.electronAPI.setUser(profile);
   localStorage.setItem("nebula_user", JSON.stringify(window.userProfile));
   localStorage.setItem("nebula_loggedin", "true");
 

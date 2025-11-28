@@ -6,7 +6,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // --- AUTH ---
     loginWithDiscord: () => ipcRenderer.invoke("auth:discord:login"),
     getUser: () => ipcRenderer.invoke("auth:discord:getUser"),
+    setUser: (user) => ipcRenderer.send("auth:setUser", user),
     logout: () => ipcRenderer.invoke("auth:logout"),
+    firebaseLogin: (token) => ipcRenderer.invoke("auth:firebase:login", token),
 
     // --- WINDOW CONTROLS ---
     minimize: () => ipcRenderer.send("window:minimize"),
@@ -21,7 +23,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // --- METRICS ---
     getMetrics: (userId) => ipcRenderer.invoke("metrics:get", userId),
     updateMetrics: (userId, metrics) => ipcRenderer.invoke("metrics:update", userId),
-    getMetricsUserId: () => ipcRenderer.invoke("metrics:getUserId"),
 
     // --- PLUS SYSTEM ---
     createCheckout: (userId, options) =>

@@ -206,7 +206,7 @@ function isNick(name) {
 
 
 // Session Stats Functions
-function normalizeBedwarsStats(player) {
+function normalizeBedwarsStats(player, decimals = 0) {
 if (!player || typeof player !== 'object') return {
   name: '', level: 0, ws: 0,
   fk: 0, fd: 0, fkdr: 0,
@@ -219,7 +219,7 @@ if (!player || typeof player !== 'object') return {
 const level = (typeof player.level === 'number')
   ? player.level
   : (player.stats?.Bedwars?.Experience != null
-      ? getBedWarsLevel(Number(player.stats.Bedwars.Experience))
+      ? getBedWarsLevel(Number(player.stats.Bedwars.Experience), decimals)
       : 0);
 
 // Raw values with multiple fallbacks
@@ -293,29 +293,72 @@ setAvatar("Steve");
 
 
 // ==========================================
-// Session Stats Functions
+// Session Stats System 
 // ==========================================
+
+// Global session state
+let sessionUuid = null;
+let lastFetchedStats = null;
+let sessionTimerInterval = null;
+
+// Helper: pick correct IPC bridge
+function getIpc() {
+  if (window.ipcRenderer) return window.ipcRenderer;
+  if (window.window && window.window.ipcRenderer) return window.window.ipcRenderer;
+  if (window.electronAPI && window.electronAPI.invoke) {
+    // small wrapper to mimic ipcRenderer.invoke
+    return {
+      invoke: window.electronAPI.invoke,
+      send: window.electronAPI.send || (() => {})
+    };
+  }
+  return null;
+}
+
+// Helper: show a simple error in the session panel
+function showSessionError(message) {
+  const sessionStats = document.getElementById("sessionStats");
+  const sessionTitle = document.getElementById("sessionTitle");
+  if (sessionTitle) sessionTitle.textContent = "Bedwars Session Stats";
+
+  if (!sessionStats) return;
+
+  sessionStats.innerHTML = `
+    <div style="text-align:center;color:#ef4444;padding:40px 20px;">
+      <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
+      <div style="font-size:16px;margin-bottom:8px;">Session Start Failed</div>
+      <div style="font-size:13px;line-height:1.5;">
+        ${message}
+      </div>
+    </div>
+  `;
+}
 
 // Start a new session for the given username
 async function startSession(username) {
-  if (!username || username.trim() === '') {
-    console.log('Cannot start session: no username provided');
+  window.ipcRenderer.send("session:started");
+  const ipc = getIpc();
+  if (!ipc) {
+    console.log("Cannot start session: IPC not available");
     return;
   }
 
-  // Wait for IPC to be available
-  if (!window.window.ipcRenderer) {
-    console.log('IPC not ready yet, waiting...');
-    setTimeout(() => startSession(username), 500);
+  if (!username || username.trim() === "") {
+    console.log("Cannot start session: no username provided");
     return;
   }
 
-  console.log('Starting session for:', username);
+  console.log("Starting session for:", username);
   sessionUsername = username;
   startTime = new Date();
+  startStats = null;
+  lastFetchedStats = null;
 
-  // Show loading state
-  const sessionStats = document.getElementById('sessionStats');
+  const sessionStats = document.getElementById("sessionStats");
+  const sessionTitle = document.getElementById("sessionTitle");
+  if (sessionTitle) sessionTitle.textContent = "Bedwars Session Stats";
+
+  // Loading UI
   if (sessionStats) {
     sessionStats.innerHTML = `
       <div style="text-align:center;color:var(--muted);padding:40px 20px;">
@@ -330,326 +373,291 @@ async function startSession(username) {
   }
 
   try {
-    // First check API status
-    const apiStatus = await window.window.ipcRenderer.invoke('api:getStatus');
-    console.log('API Status:', apiStatus);
-    
-  const rawResult = await window.window.ipcRenderer.invoke('bedwars:stats', username);
-    console.log('Session API raw result:', rawResult);
-    const normalized = normalizeBedwarsStats(rawResult);
-    console.log('Session API normalized result:', normalized);
-    
-    if (rawResult && !rawResult.error && (rawResult.name || normalized.name)) {
-      startStats = normalized; // store normalized for diff calculations
-      sessionUuid = normalized.uuid || rawResult.uuid || null;
-      if (usernameInput) {
-        // Initial value from settings (or from normalized stats if you prefer)
-        usernameInput.value = (basicSettings.username || '').trim();
+    // Optional: check API status
+    const apiStatus = await ipc.invoke("api:getStatus").catch(() => null);
+    console.log("API Status:", apiStatus);
 
-        const applyUsernameChange = () => {
-          const prev = (basicSettings.username || '').trim();
-          const next = (usernameInput.value || '').trim();
+    const rawResult = await ipc.invoke("bedwars:stats", username);
+    console.log("Session API raw result:", rawResult);
 
-          if (prev === next) return;
+    const normalized = normalizeBedwarsStats(rawResult, 2);
+    console.log("Session API normalized result:", normalized);
 
-          // Remove old player source if needed
-          if (prev) {
-            removePlayerSource(prev, 'username');
-          }
-
-          basicSettings.username = next;
-          localStorage.setItem('username', next);
-          updateSidebarUsername();
-
-          // Use the preload bridge instead of require('electron')
-          try {
-            if (window.window.ipcRenderer) {
-              window.window.ipcRenderer.send('set:username', basicSettings.username || '');
-            } else if (window.electronAPI && window.electronAPI.setUsername) {
-              window.electronAPI.setUsername(basicSettings.username || '');
-            }
-          } catch (e) {
-            console.error('Failed to send username IPC update:', e);
-          }
-
-          // Restart session if IGN changed
-          if (next && next !== sessionUsername) {
-            startSession(next);
-          }
-        };
-
-        // Trigger on blur (user leaves the field)
-        usernameInput.addEventListener('blur', applyUsernameChange);
-
-        // Optional: also trigger on Enter key
-        usernameInput.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            applyUsernameChange();
-            usernameInput.blur();
-          }
-        });
-
-        // Start session on app load if username exists (delayed)
-        const savedUsername = basicSettings.username || '';
-        if (savedUsername) {
-          console.log('Found saved username on app load:', savedUsername);
-          localStorage.setItem('username', savedUsername);
-          setTimeout(() => {
-            if (!sessionUsername) {
-              console.log('Starting session on app load for:', savedUsername);
-              startSession(savedUsername);
-            }
-          }, 400);
-        }
-      }
-      // Create detailed error message with API status
-      let detailedError = `
-        <div style="text-align:center;color:#ef4444;padding:40px 20px;">
-          <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
-          <div style="font-size:16px;margin-bottom:8px;">Session Start Failed</div>
-          <div style="font-size:13px;line-height:1.5;margin-bottom:12px;">
-            ${errorMsg}
-          </div>
-      `;
-      
-      // Add API status information if available
-      if (apiStatus) {
-        detailedError += `
-          <div style="font-size:11px;color:var(--muted);text-align:left;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin:16px 0;">
-            <strong>API Status:</strong><br>
-            Backend: ${apiStatus.backendAvailable ? '🟢 Available' : '🔴 Down'}<br>
-            User Key: ${apiStatus.config.hasUserKey ? '🟢 Set' : '🔴 Not Set'}<br>
-            Enhanced System: ${apiStatus.config.useEnhanced ? 'Enabled' : 'Disabled'}
-          </div>
-        `;
-      }
-      
-      detailedError += `
-          <div style="font-size:13px;line-height:1.5;">
-            <strong>What Session Stats Do:</strong><br>
-            • Track your progress since app start<br>
-            • Show stat changes (wins, kills, etc.)<br>
-            • Update automatically while playing
-          </div>
-        </div>
-      `;
-      
-      // Show specific error message
-      if (sessionStats) {
-        sessionStats.innerHTML = detailedError;
-      }
+    if (!rawResult || rawResult.error || !(rawResult.name || normalized.name)) {
+      const msg = rawResult?.error || "Could not fetch initial stats for this player.";
+      showSessionError(msg);
+      return;
     }
+
+    // Success: store baseline
+    startStats = normalized;
+    lastFetchedStats = normalized;
+    sessionUuid = normalized.uuid || rawResult.uuid || null;
+
+    // Render initial session view (start = current)
+    generateSessionHTML(startStats, startStats);
+
+    // Start timer for elapsed time
+    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+    sessionTimerInterval = setInterval(updateSessionTime, 1000);
+
+    console.log("Session successfully started for:", sessionUsername);
   } catch (error) {
-  console.error('Failed to start session (exception):', error);
-  
-  // Show network error with API diagnostics
-  if (sessionStats) {
-    sessionStats.innerHTML = `
-      <div style="text-align:center;color:#ef4444;padding:40px 20px;">
-        <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
-        <div style="font-size:16px;margin-bottom:8px;">Connection Error</div>
-        <div style="font-size:13px;line-height:1.5;margin-bottom:12px;">
-          Could not connect to Hypixel API.
-        </div>
-        <div style="font-size:11px;color:var(--muted);text-align:left;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin:16px 0;">
-          <strong>Error Details:</strong><br>
-          ${error.message || error}<br><br>
-          <strong>Current API Setup:</strong><br>
-          Enhanced API System: Active<br>
-          .env HYPIXEL_KEY: ${process?.env?.HYPIXEL_KEY ? 'Set' : 'Missing'}<br>
-          User API Key: Check Client Settings
-        </div>
-        <div style="font-size:13px;line-height:1.5;">
-          You can configure API keys in <strong>Client Settings</strong>.<br>
-          Try using your own API key if the backend is down.
-        </div>
-      </div>
-    `;
+    console.error("Failed to start session (exception):", error);
+    showSessionError(error.message || String(error));
   }
-}
 }
 
 // Update session stats by fetching current data
 async function updateSession() {
-if (!startStats || !sessionUsername) return;
-
-// Wait for IPC to be available
-if (!window.window.ipcRenderer) {
-  console.log('IPC not ready for session update, skipping...');
-  return;
-}
-
-console.log('Updating session for:', sessionUsername);
-
-try {
-  const rawCurrent = await window.window.ipcRenderer.invoke('bedwars:stats', sessionUsername);
-  console.log('Session update raw result:', rawCurrent);
-  const currentNormalized = normalizeBedwarsStats(rawCurrent);
-  console.log('Session update normalized:', currentNormalized);
-  
-  if (rawCurrent && !rawCurrent.error) {
-    generateSessionHTML(startStats, currentNormalized);
-  } else {
-    console.error('Session update error:', rawCurrent?.error);
+  const ipc = getIpc();
+  if (!ipc) {
+    console.log("IPC not ready for session update, skipping...");
+    return;
   }
-} catch (error) {
-  console.error('Failed to update session:', error);
-}
+  if (!startStats || !sessionUsername) return;
+
+  console.log("Updating session for:", sessionUsername);
+
+  try {
+    const rawCurrent = await ipc.invoke("bedwars:stats", sessionUsername);
+    console.log("Session update raw result:", rawCurrent);
+
+    const currentNormalized = normalizeBedwarsStats(rawCurrent, 2);
+    console.log("Session update normalized:", currentNormalized);
+
+    if (rawCurrent && !rawCurrent.error) {
+      lastFetchedStats = currentNormalized;
+      generateSessionHTML(startStats, currentNormalized);
+    } else {
+      console.error("Session update error:", rawCurrent?.error);
+    }
+  } catch (error) {
+    console.error("Failed to update session:", error);
+  }
 }
 
 // Update session time display
 function updateSessionTime() {
-const sessionTime = document.getElementById('sessionTime');
-if (!sessionTime || !startTime) return;
+  const sessionTime = document.getElementById("sessionTime");
+  if (!sessionTime || !startTime) return;
 
-const secsElapsed = Math.floor((new Date() - startTime) / 1000);
-const minsElapsed = Math.floor(secsElapsed / 60);
-const hoursElapsed = Math.floor(minsElapsed / 60);
+  const secsElapsed = Math.floor((new Date() - startTime) / 1000);
+  const minsElapsed = Math.floor(secsElapsed / 60);
+  const hoursElapsed = Math.floor(minsElapsed / 60);
 
-let timeText = 'Session: ';
-if (hoursElapsed > 0) {
-  timeText += `${hoursElapsed}h ${minsElapsed % 60}m`;
-} else {
-  timeText += `${minsElapsed}m`;
-}
+  let timeText = "Session: ";
+  if (hoursElapsed > 0) {
+    timeText += `${hoursElapsed}h ${minsElapsed % 60}m`;
+  } else {
+    timeText += `${minsElapsed}m`;
+  }
 
-sessionTime.textContent = timeText;
+  sessionTime.textContent = timeText;
 }
 
 // Generate HTML for a session stat row
 function sessionStatHTML(startVal, currentVal, isNegativeStat = false) {
-if (startVal === undefined || currentVal === undefined) {
-  return '<span style="color: #ef4444;">?</span>';
+  if (startVal === undefined || currentVal === undefined) {
+    return '<span style="color: #ef4444;">?</span>';
+  }
+
+  const diff = currentVal - startVal;
+  const diffDisplay =
+    Math.abs(diff) < 0.001 ? diff.toFixed(3) : diff.toLocaleString();
+
+  let diffClass = "neutral";
+  if (diff > 0) {
+    diffClass = isNegativeStat ? "negative" : "positive";
+  } else if (diff < 0) {
+    diffClass = isNegativeStat ? "positive" : "negative";
+  }
+
+  return `
+    <div class="session-stat-value">
+      <span class="session-stat-start">${startVal.toLocaleString()}</span>
+      <span class="session-stat-arrow">→</span>
+      <span class="session-stat-current">${currentVal.toLocaleString()}</span>
+      <span class="session-stat-diff ${diffClass}">[${diff > 0 ? "+" : ""}${diffDisplay}]</span>
+    </div>
+  `;
 }
 
-const diff = currentVal - startVal;
-const diffDisplay = Math.abs(diff) < 0.001 ? diff.toFixed(3) : diff.toLocaleString();
-
-let diffClass = 'neutral';
-if (diff > 0) {
-  diffClass = isNegativeStat ? 'negative' : 'positive';
-} else if (diff < 0) {
-  diffClass = isNegativeStat ? 'positive' : 'negative';
-}
-
-return `
-  <div class="session-stat-value">
-    <span class="session-stat-start">${startVal.toLocaleString()}</span>
-    <span class="session-stat-arrow">→</span>
-    <span class="session-stat-current">${currentVal.toLocaleString()}</span>
-    <span class="session-stat-diff ${diffClass}">[${diff > 0 ? '+' : ''}${diffDisplay}]</span>
-  </div>
-`;
-}
-
-// Generate HTML for a session stat row
+// Generate full session stats HTML
 function generateSessionHTML(startPlayer, currentPlayer) {
-const sessionStats = document.getElementById('sessionStats');
-const sessionTitle = document.getElementById('sessionTitle');
+  const sessionStats = document.getElementById("sessionStats");
+  const sessionTitle = document.getElementById("sessionTitle");
 
-sessionTitle.textContent = 'Bedwars Session Stats';
+  if (sessionTitle) sessionTitle.textContent = "Bedwars Session Stats";
+  if (!sessionStats) return;
 
-console.log('Generating session HTML:', { startPlayer, currentPlayer });
+  console.log("Generating session HTML:", { startPlayer, currentPlayer });
+  let html = "";
 
-let html = '';
+  function getStat(player, statName) {
+    if (!player) return 0;
+    if (typeof player[statName] === "number") return player[statName];
+    return 0;
+  }
 
-// Helper function to safely get stat value
-function getStat(player, statName) {
-  if (!player) return 0;
-  if (typeof player[statName] === 'number') return player[statName];
-  return 0;
+  const startLevel =
+    startPlayer?.level ??
+    (startPlayer?.stats?.Bedwars?.Experience != null
+      ? getBedWarsLevel(Number(startPlayer.stats.Bedwars.Experience), 2)
+      : 0);
+
+  const currentLevel =
+    currentPlayer?.level ??
+    (currentPlayer?.stats?.Bedwars?.Experience != null
+      ? getBedWarsLevel(Number(currentPlayer.stats.Bedwars.Experience), 2)
+      : 0);
+
+  // General
+  html += `
+    <div class="session-category">
+      <div class="session-category-title">
+        <svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg>
+        General
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Stars</span>
+        ${sessionStatHTML(startLevel, currentLevel)}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Win Streak</span>
+        ${sessionStatHTML(getStat(startPlayer, "ws"), getStat(currentPlayer, "ws"))}
+      </div>
+    </div>
+  `;
+
+  // Combat
+  html += `
+    <div class="session-category">
+      <div class="session-category-title">
+        <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
+        Combat
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Final Kills</span>
+        ${sessionStatHTML(getStat(startPlayer, "fk"), getStat(currentPlayer, "fk"))}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Final Deaths</span>
+        ${sessionStatHTML(getStat(startPlayer, "fd"), getStat(currentPlayer, "fd"), true)}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">FKDR</span>
+        ${sessionStatHTML(getStat(startPlayer, "fkdr"), getStat(currentPlayer, "fkdr"))}
+      </div>
+    </div>
+  `;
+
+  // Games
+  html += `
+    <div class="session-category">
+      <div class="session-category-title">
+        <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+        Games
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Wins</span>
+        ${sessionStatHTML(getStat(startPlayer, "wins"), getStat(currentPlayer, "wins"))}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Losses</span>
+        ${sessionStatHTML(getStat(startPlayer, "losses"), getStat(currentPlayer, "losses"), true)}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">WLR</span>
+        ${sessionStatHTML(getStat(startPlayer, "wlr"), getStat(currentPlayer, "wlr"))}
+      </div>
+    </div>
+  `;
+
+  // Beds
+  html += `
+    <div class="session-category">
+      <div class="session-category-title">
+        <svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg>
+        Beds
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Beds Broken</span>
+        ${sessionStatHTML(getStat(startPlayer, "bb"), getStat(currentPlayer, "bb"))}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">Beds Lost</span>
+        ${sessionStatHTML(getStat(startPlayer, "bl"), getStat(currentPlayer, "bl"), true)}
+      </div>
+      <div class="session-stat-row">
+        <span class="session-stat-label">BBLR</span>
+        ${sessionStatHTML(getStat(startPlayer, "bblr"), getStat(currentPlayer, "bblr"))}
+      </div>
+    </div>
+  `;
+
+  sessionStats.innerHTML = html;
+  updateSessionTime();
 }
 
-// Level/Stars - Use the same logic as main table
-const startLevel = startPlayer?.level ?? (startPlayer?.stats?.Bedwars?.Experience != null ? getBedWarsLevel(Number(startPlayer.stats.Bedwars.Experience)) : 0);
-const currentLevel = currentPlayer?.level ?? (currentPlayer?.stats?.Bedwars?.Experience != null ? getBedWarsLevel(Number(currentPlayer.stats.Bedwars.Experience)) : 0);
+// Calculate stat differences between start and end
+function calculateDiff(start, end) {
+  const diff = {};
+  if (!start || !end) return diff;
 
-html += `
-  <div class="session-category">
-    <div class="session-category-title">
-      <svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg>
-      General
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Stars</span>
-      ${sessionStatHTML(startLevel, currentLevel)}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Win Streak</span>
-      ${sessionStatHTML(getStat(startPlayer, 'ws'), getStat(currentPlayer, 'ws'))}
-    </div>
-  </div>
-`;
-
-// Combat Stats
-html += `
-  <div class="session-category">
-    <div class="session-category-title">
-      <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
-      Combat
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Final Kills</span>
-      ${sessionStatHTML(getStat(startPlayer, 'fk'), getStat(currentPlayer, 'fk'))}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Final Deaths</span>
-      ${sessionStatHTML(getStat(startPlayer, 'fd'), getStat(currentPlayer, 'fd'), true)}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">FKDR</span>
-      ${sessionStatHTML(getStat(startPlayer, 'fkdr'), getStat(currentPlayer, 'fkdr'))}
-    </div>
-  </div>
-`;
-
-// Game Stats  
-html += `
-  <div class="session-category">
-    <div class="session-category-title">
-      <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
-      Games
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Wins</span>
-      ${sessionStatHTML(getStat(startPlayer, 'wins'), getStat(currentPlayer, 'wins'))}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Losses</span>
-      ${sessionStatHTML(getStat(startPlayer, 'losses'), getStat(currentPlayer, 'losses'), true)}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">WLR</span>
-      ${sessionStatHTML(getStat(startPlayer, 'wlr'), getStat(currentPlayer, 'wlr'))}
-    </div>
-  </div>
-`;
-
-// Bed Stats
-html += `
-  <div class="session-category">
-    <div class="session-category-title">
-      <svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg>
-      Beds
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Beds Broken</span>
-      ${sessionStatHTML(getStat(startPlayer, 'bb'), getStat(currentPlayer, 'bb'))}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">Beds Lost</span>
-      ${sessionStatHTML(getStat(startPlayer, 'bl'), getStat(currentPlayer, 'bl'), true)}
-    </div>
-    <div class="session-stat-row">
-      <span class="session-stat-label">BBLR</span>
-      ${sessionStatHTML(getStat(startPlayer, 'bblr'), getStat(currentPlayer, 'bblr'))}
-    </div>
-  </div>
-`;
-
-sessionStats.innerHTML = html;
-updateSessionTime();
+  for (const key of Object.keys(start)) {
+    if (typeof start[key] === "number" && typeof end[key] === "number") {
+      diff[key] = end[key] - start[key];
+    }
+  }
+  return diff;
 }
+
+// Save current session data locally and to cloud if applicable
+async function saveCurrentSession() {
+  const ipc = getIpc();
+  if (!ipc) return;
+  if (!startStats || !sessionUsername) return;
+
+  const endStats = lastFetchedStats || startStats;
+  const endTime = new Date();
+
+  const sessionData = {
+    username: sessionUsername,
+    uuid: sessionUuid,
+    startTime,
+    endTime,
+    durationSec: Math.floor((endTime - startTime) / 1000),
+    startStats,
+    endStats,
+    diff: calculateDiff(startStats, endStats)
+  };
+
+  // Nimm dieselbe ID wie bei Metrics / Plus: Discord-ID
+  const uid =
+    (window.userProfile && window.userProfile.id) ||
+    window.firebaseUid || // fallback, falls du das später doch setzt
+    null;
+
+  console.log("[Sessions] saveCurrentSession → uid:", uid, "data:", sessionData);
+
+  try {
+    const result = await ipc.invoke("sessions:save", uid, sessionData);
+    console.log("[Sessions] Save result:", result);
+  } catch (err) {
+    console.error("[Sessions] Failed to save session:", err);
+  }
+  window.ipcRenderer.send("session:ended");
+}
+
+// Save session on window close
+window.addEventListener("beforeunload", () => {
+  console.log("Window unloading, saving session if active...");
+  if (startStats && sessionUsername) {
+    saveCurrentSession();
+    console.log("Session saved.");
+  }
+});
 
 // Column definitions (labeling + optional derived calculators)
 const STATS = {
@@ -848,19 +856,36 @@ function renderPlayerRow(player, dynamicStats) {
 }
 
 // Calculate BedWars level from experience
-function getBedWarsLevel(exp) {
+function getBedWarsLevel(exp, decimals = 0) {
   let level = 100 * (Math.floor(exp / 487000));
   exp = exp % 487000;
-  if (exp < 500) return level + exp / 500;
+
+  if (exp < 500) 
+    return round(level + exp / 500, decimals);
+
   level++;
-  if (exp < 1500) return level + (exp - 500) / 1000;
+  if (exp < 1500) 
+    return round(level + (exp - 500) / 1000, decimals);
+
   level++;
-  if (exp < 3500) return level + (exp - 1500) / 2000;
+  if (exp < 3500) 
+    return round(level + (exp - 1500) / 2000, decimals);
+
   level++;
-  if (exp < 7000) return level + (exp - 3500) / 3500;
+  if (exp < 7000) 
+    return round(level + (exp - 3500) / 3500, decimals);
+
   level++;
   exp -= 7000;
-  return level + exp / 5000;
+
+  return round(level + exp / 5000, decimals);
+}
+
+// Round number to specified decimals
+function round(num, decimals) {
+  if (decimals <= 0) return Math.floor(num); 
+  const factor = Math.pow(10, decimals);
+  return Math.round(num * factor) / factor;
 }
 
 // Update player level display. Accepts either a player object with stats or a stats-like object
@@ -3307,22 +3332,6 @@ renderChatStrings();
 // Firebase Cloud Sync (via Main Process)
 // ==========================================
 
-// Firebase is now handled in main process to avoid CSP issues
-let firebaseInitialized = false;
-
-// Check if Firebase is available
-async function checkFirebase() {
-  try {
-    const config = await window.ipcRenderer.invoke('firebase:getConfig');
-    firebaseInitialized = !!config.apiKey;
-    console.log('[Firebase] Available:', firebaseInitialized);
-    return firebaseInitialized;
-  } catch (error) {
-    console.error('[Firebase] Check failed:', error);
-    return false;
-  }
-}
-
 // Cloud Sync Functions (now using IPC)
 async function uploadUserSettings(userId) {
   try {
@@ -3338,7 +3347,7 @@ async function uploadUserSettings(userId) {
     };
     
     // Upload via main process
-    const result = await window.ipcRenderer.invoke('firebase:upload', userId, settings);
+    const result = await window.ipcRenderer.invoke('settings:save', userId, settings);
     
     if (result.error) {
       throw new Error(result.error);
@@ -3357,7 +3366,7 @@ async function uploadUserSettings(userId) {
 
 async function downloadUserSettings(userId) {
   try {
-    const result = await window.ipcRenderer.invoke('firebase:download', userId);
+    const result = await window.ipcRenderer.invoke('settings:get', userId);
     
     if (result.error) {
       throw new Error(result.error);
@@ -3408,7 +3417,7 @@ async function syncUserSettings(userId, direction = 'auto') {
       return result;
     } else {
       // Auto: Check which is newer
-      const downloadResult = await window.ipcRenderer.invoke('firebase:download', userId);
+      const downloadResult = await window.ipcRenderer.invoke('settings:get', userId);
       
       if (downloadResult.error) {
         throw new Error(downloadResult.error);
@@ -3674,11 +3683,6 @@ if (syncNowBtn) {
   syncNowBtn.addEventListener('click', async () => {
     if (!window.userProfile) {
       showNotification('Please login with Discord first');
-      return;
-    }
-
-    if (!firebaseInitialized) {
-      showNotification('Firebase not configured. Please check your .env settings.');
       return;
     }
 
@@ -3989,14 +3993,13 @@ async function checkAndRefreshToken() {
 
 // Initialize Firebase and profile UI on load
 async function initialize() {
-  const firebaseReady = await checkFirebase();
   updateProfileUI();
   checkAndRefreshToken();
   
   // Only start auto-sync if Firebase is ready
   if (firebaseReady) {
     setInterval(async () => {
-      if (window.userProfile && firebaseInitialized) {
+      if (window.userProfile) {
         try {
           console.log('[Firebase] Auto-sync check...');
           await syncUserSettings(window.userProfile.id, 'upload');

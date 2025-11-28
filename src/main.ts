@@ -6,6 +6,11 @@ import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './logs/chat-logger';
 import { HypixelApiRouter } from './logs/hypixelApiRouter';
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getFirestore, type Firestore } from "firebase/firestore";
+import { getAuth, signInWithCustomToken, type Auth } from "firebase/auth";
+
+
 
 // Bootstrap logging and error handling
 console.log("[Nebula:boot] main.ts top reached");
@@ -22,6 +27,7 @@ const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 // App version
 const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
 const appVersion = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version;
+let activeSession = false;
 
 // Main window reference
 let win: BrowserWindow | null = null;
@@ -33,7 +39,7 @@ let win: BrowserWindow | null = null;
 
 function initAutoUpdate() {
   if (!app.isPackaged) {
-    console.log('[AutoUpdate] Skipping – app is not packaged.');
+    console.log('[AutoUpdate] Skipping - app is not packaged.');
     return;
   }
 
@@ -196,7 +202,7 @@ app.whenReady().then(() => {
     ipcMain.on('set:username', (_e, username: string) => {
       if (chat) {
         chat.username = username;
-        console.log('Updated ChatLogger username:', username);
+        console.log('[App] Updated ChatLogger username:', username);
       }
     });
     ipcMain.on('set:logPath', (_e, newPath: string) => {
@@ -436,6 +442,16 @@ ipcMain.handle('external:open', async (_e, url: string) => {
   }
 });
 
+ipcMain.on("session:started", () => {
+  console.log("[Session] Started");
+  activeSession = true;
+});
+
+ipcMain.on("session:ended", () => {
+  console.log("[Session] Ended");
+  activeSession = false;
+});
+
 
 // ==========================================
 // Discord OAuth2 Authentication
@@ -511,216 +527,179 @@ ipcMain.handle("auth:logout", async () => {
   }
 });
 
+let currentUser: any = null;
+ipcMain.on("auth:setUser", (_e, user) => {
+  currentUser = user;
+});
 
-// ==========================================
-// Initialize Firebase in main process
-// ==========================================
 
-let firebaseApp: any = null;
-let firestore: any = null;
 
-async function initFirebaseMain() {
-  if (firebaseApp) return true; // Already initialized
-  
-  try {
-    const { initializeApp } = require('firebase/app');
-    const { getFirestore, doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
-    
-    const firebaseConfig = {
-      apiKey: 'AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I',
-      authDomain: 'nebula-502f4.firebaseapp.com',
-      projectId: 'nebula-502f4',
-      storageBucket: 'nebula-502f4.firebasestorage.app',
-      messagingSenderId: '228435926597',
-      appId: '1:228435926597:web:6a36ab3dc7040494ec0d2c'
-    };
-    
-    if (!firebaseConfig.apiKey) {
-      console.error('[Firebase Main] No API key found');
-      return false;
-    }
-    
-    firebaseApp = initializeApp(firebaseConfig);
-    firestore = getFirestore(firebaseApp);
-    
-    console.log('[Firebase Main] Initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('[Firebase Main] Initialization failed:', error);
-    return false;
+/* ----------------------------------------------------
+   Helper: Local Sessions
+----------------------------------------------------- */
+
+const backendUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
+
+function saveLocalSession(session: any) {
+  const filePath = path.join(app.getPath("userData"), "sessions.json");
+
+  let existing = [];
+  if (fs.existsSync(filePath)) {
+    try { existing = JSON.parse(fs.readFileSync(filePath, "utf8")); }
+    catch {}
   }
+
+  existing.push(session);
+  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
+
+  console.log("[Sessions] Saved locally:", session.username);
 }
 
-// Get Firebase configuration for renderer process
-ipcMain.handle('firebase:getConfig', async () => {
-  return {
-    apiKey: 'AIzaSyCh8Ah529cfSTd56xoM2YASY6UvTGMEi-I',
-    authDomain: 'nebula-502f4.firebaseapp.com',
-    projectId: 'nebula-502f4',
-    storageBucket: 'nebula-502f4.firebasestorage.app',
-    messagingSenderId: '228435926597',
-    appId: '1:228435926597:web:6a36ab3dc7040494ec0d2c'
-  };
-});
+function loadLocalSessions() {
+  const filePath = path.join(app.getPath("userData"), "sessions.json");
+  if (!fs.existsSync(filePath)) return [];
+  try { return JSON.parse(fs.readFileSync(filePath, "utf8")); }
+  catch { return []; }
+}
 
-// Firebase Cloud Sync Handlers
-ipcMain.handle('firebase:upload', async (_e, userId: string, settings: any) => {
-  if (!await initFirebaseMain()) {
-    return { error: 'Firebase not initialized' };
-  }
 
+// ==========================================
+// Account Settings System 
+// ==========================================
+
+// GET settings
+ipcMain.handle("settings:get", async (_e, uid: string) => {
   try {
-    const { doc, setDoc, getDoc, serverTimestamp, Timestamp } = require('firebase/firestore');
+    const res = await fetch(`${backendUrl}/api/cloud/getSettings/${uid}`);
+    const json = await res.json();
 
-    const userDocRef = doc(firestore, 'users', userId);
-    const snap = await getDoc(userDocRef);
-    
-    console.log(appVersion);
-    await setDoc(
-      userDocRef,
-      {
-        settings,
-        updatedAt: serverTimestamp(),
-        version: appVersion
-      },
-      { merge: true }
-    );
-
-    if (!snap.exists() || !snap.data().plus) {
-      const defaultPlus = {
-        plan: "none",
-        status: "inactive",
-        expiresAt: Timestamp.now(), 
-        stripeCustomerId: null
-      };
-
-      await setDoc(
-        userDocRef,
-        { plus: defaultPlus },
-        { merge: true }
-      );
-      console.log(`[Firebase] Added missing plus field with timestamp for user ${userId}`);
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('[Firebase Main] Upload failed:', error);
-    return { error: String(error) };
-  }
-});
-
-// Download user settings from Firebase
-ipcMain.handle('firebase:download', async (_e, userId: string) => {
-  if (!await initFirebaseMain()) {
-    return { error: 'Firebase not initialized' };
-  }
-  
-  try {
-    const { doc, getDoc } = require('firebase/firestore');
-    
-    const userDocRef = doc(firestore, 'users', userId);
-    const docSnap = await getDoc(userDocRef);
-    
-    if (!docSnap.exists()) {
-      return { success: true, data: null };
-    }
-    
-    const data = docSnap.data();
-    let timestamp = 0;
-    if (data.updatedAt) {
-      if (typeof data.updatedAt.toMillis === "function") {
-        timestamp = data.updatedAt.toMillis();
-      } else if (typeof data.updatedAt === "number") {
-        timestamp = data.updatedAt;
-      }
-    }
-    
-    console.log('[Firebase Main] Settings downloaded for user:', userId);
-    return { 
-      success: true, 
-      data: data.settings,
-      timestamp: timestamp
+    return {
+      success: json.success,
+      data: json.settings || null,
+      updatedAt: json.settingsUpdated || null
     };
-  } catch (error) {
-    console.error('[Firebase Main] Download failed:', error);
-    return { error: String(error) };
+  } catch (err) {
+    console.error("[Settings] GET failed:", err);
+    return { success: true, data: null, source: "local" };
   }
 });
 
+// SAVE settings
+ipcMain.handle("settings:save", async (_e, uid: string, settings: any) => {
+  try {
+    const res = await fetch(`${backendUrl}/api/cloud/saveSettings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, settings })
+    });
+
+    return await res.json();
+  } catch (err) {
+    console.error("[Settings] SAVE failed:", err);
+    return { success: false, error: String(err) };
+  }
+});
 
 // ==========================================
-// Account Metrics System
+// Account Metrics System 
 // ==========================================
 
-// Get account metrics (cloud + local merge)
-ipcMain.handle('metrics:get', async (_e, userId?: string) => {
-  const localMetrics = {
-    memberSince: Date.now(), // fallback
+function loadLocalMetrics() {
+  return {
+    memberSince: Date.now(),
     playersTracked: 0,
     sessionsCount: 0,
     totalLookups: 0
   };
+}
 
-  if (!userId || !await initFirebaseMain()) {
-    return { success: true, data: localMetrics, source: 'local' };
+// GET metrics
+ipcMain.handle("metrics:get", async (_e, uid?: string) => {
+  if (!uid) return { success: true, data: loadLocalMetrics(), source: "local" };
+
+  try {
+    const res = await fetch(`${backendUrl}/api/cloud/getMetrics/${uid}`);
+    const json = await res.json();
+
+    if (!json.success) throw new Error(json.error || "Backend error");
+
+    return {
+      success: true,
+      source: "cloud",
+      data: json.metrics || loadLocalMetrics(),
+      updatedAt: json.updatedAt
+    };
+  } catch (err) {
+    console.error("[Metrics] GET failed:", err);
+    return { success: true, data: loadLocalMetrics(), source: "local", fallback: true };
+  }
+});
+
+// SAVE metrics
+ipcMain.handle("metrics:update", async (_e, uid: string, metrics: any) => {
+  try {
+    const res = await fetch(`${backendUrl}/api/cloud/saveMetrics`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, metrics })
+    });
+
+    return await res.json();
+  } catch (err) {
+    console.error("[Metrics] SAVE failed:", err);
+    return { success: false, error: String(err) };
+  }
+});
+
+// ==========================================
+// Session History System 
+// ==========================================
+
+// SAVE SESSION
+ipcMain.handle("sessions:save", async (_e, uid: string, session: any) => {
+  saveLocalSession(session);
+
+  if (!uid) {
+    console.log("[Sessions] No UID → local only");
+    return { success: true, location: "local" };
   }
 
   try {
-    const { doc, getDoc } = require('firebase/firestore');
-    
-    const metricsDocRef = doc(firestore, 'metrics', userId);
-    const docSnap = await getDoc(metricsDocRef);
-    
-    if (!docSnap.exists()) {
-      return { success: true, data: localMetrics, source: 'local' };
+    const res = await fetch(`${backendUrl}/api/cloud/saveSession`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, session })
+    });
+
+    const json = await res.json();
+
+    if (!json.success) {
+      console.error("[Sessions] Backend error:", json.error);
+      return { success: false, location: "local", backup: true };
     }
 
-    const cloudData = docSnap.data();
-    const mergedData = {
-      memberSince: cloudData.memberSince || localMetrics.memberSince,
-      playersTracked: Math.max(cloudData.playersTracked || 0, localMetrics.playersTracked),
-      sessionsCount: Math.max(cloudData.sessionsCount || 0, localMetrics.sessionsCount),
-      totalLookups: Math.max(cloudData.totalLookups || 0, localMetrics.totalLookups)
-    };
-
-    return { success: true, data: mergedData, source: 'cloud', timestamp: cloudData.updatedAt?.toMillis() || 0 };
-  } catch (error) {
-    console.error('[Metrics] Get failed:', error);
-    return { success: true, data: localMetrics, source: 'local', error: String(error) };
+    return { success: true, location: "cloud" };
+  } catch (err) {
+    console.error("[Sessions] SAVE failed:", err);
+    return { success: false, location: "local", error: String(err) };
   }
 });
 
-// Update account metrics in cloud
-ipcMain.handle('metrics:update', async (_e, userId: string, metrics: any) => {
-  if (!userId || !await initFirebaseMain()) {
-    return { error: 'Firebase not available or no user ID' };
-  }
+// GET SESSIONS
+ipcMain.handle("sessions:get", async (_e, uid: string) => {
+  if (!uid) return { success: true, source: "local", data: loadLocalSessions() };
 
   try {
-    const { doc, setDoc, serverTimestamp } = require('firebase/firestore');
-    
-    const metricsDocRef = doc(firestore, 'metrics', userId);
-    await setDoc(metricsDocRef, {
-      memberSince: metrics.memberSince,
-      playersTracked: metrics.playersTracked,
-      sessionsCount: metrics.sessionsCount,
-      totalLookups: metrics.totalLookups,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    const res = await fetch(`${backendUrl}/api/cloud/getSessions/${uid}`);
+    const json = await res.json();
 
-    console.log('[Metrics] Updated in cloud for user:', userId);
-    return { success: true };
-  } catch (error) {
-    console.error('[Metrics] Update failed:', error);
-    return { error: String(error) };
+    if (!json.success) throw new Error(json.error);
+
+    return { success: true, source: "cloud", data: json.sessions || [] };
+  } catch (err) {
+    console.error("[Sessions] GET failed:", err);
+    return { success: true, source: "local", fallback: true, data: loadLocalSessions() };
   }
-});
-
-// Get current Discord user ID (for metrics)
-ipcMain.handle('metrics:getUserId', async () => {
-  // We don't store user state globally, return null for now
-  // The renderer will manage user ID via Discord login flow
-  return null;
 });
 
 
@@ -729,51 +708,47 @@ ipcMain.handle('metrics:getUserId', async () => {
 // ==========================================
 
 // Plus subscription check via Firebase
-ipcMain.handle('plus:checkStatus', async (_e, userId: string) => {
-  if (!await initFirebaseMain()) {
-    return { isPlus: false, error: 'Firebase not initialized' };
-  }
-  
+ipcMain.handle("plus:checkStatus", async (_e, uid: string) => {
+  if (!uid) return { isPlus: false, error: "Missing UID" };
+
   try {
-    const { doc, getDoc } = require('firebase/firestore');
-    
-    const userDocRef = doc(firestore, 'users', userId);
-    const docSnap = await getDoc(userDocRef);
-    
-    if (!docSnap.exists()) {
-      // kein User-Dokument -> kein Plus
+    const backendUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
+
+    const res = await fetch(`${backendUrl}/api/plus/check-status/${uid}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      return { isPlus: false, error: data.error || "Unknown backend error" };
+    }
+
+    // Backend liefert:
+    // {
+    //   success: true,
+    //   plus: true,
+    //   plusData: { plan, status, expiresAt, stripeCustomerId }
+    // }
+
+    if (!data.plus) {
       return { isPlus: false };
     }
 
-    const data = docSnap.data();
-    const plus = data.plus;
+    const expires = data.plusData?.expiresAt?._seconds
+      ? data.plusData.expiresAt._seconds * 1000
+      : null;
 
-    // kein plus-Feld oder keine expiresAt -> kein Plus
-    if (!plus || !plus.expiresAt) {
-      return { isPlus: false };
-    }
-
-    const expiresAtMs = plus.expiresAt.toMillis();
-    const now = Date.now();
-
-    if (expiresAtMs > now && (plus.status || 'active') === 'active') {
-      // aktives Plus
-      return {
-        isPlus: true,
-        type: 'paid',
-        expiresAt: expiresAtMs,
-        plan: plus.plan || 'plus',
-        status: plus.status || 'active',
-      };
-    }
-
-    // abgelaufen oder nicht active
-    return { isPlus: false };
-  } catch (error) {
-    console.error('[Plus] Status check failed:', error);
-    return { isPlus: false, error: String(error) };
+    return {
+      isPlus: true,
+      type: "paid",
+      plan: data.plusData?.plan || "unknown",
+      status: data.plusData?.status || "active",
+      expiresAt: expires
+    };
+  } catch (err) {
+    console.error("[Plus] Status check failed:", err);
+    return { isPlus: false, error: String(err) };
   }
 });
+
 
 // Create Stripe checkout session via backend API
 ipcMain.handle("plus:createCheckout", async (_e, options) => {
