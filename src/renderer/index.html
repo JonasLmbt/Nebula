@@ -228,14 +228,14 @@
             <span class="nav-label">Overlay</span>
           </button>
 
-          <button class="nav-item" data-panel="session">
-            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-session"/></svg></span>
-            <span class="nav-label">Session</span>
-          </button>
-
           <button class="nav-item" data-panel="nicks">
             <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-nicks"/></svg></span>
             <span class="nav-label">Nicks</span>
+          </button>
+
+          <button class="nav-item" data-panel="session">
+            <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#i-session"/></svg></span>
+            <span class="nav-label">Session</span>
           </button>
 
     <!-- Direct settings entries -->
@@ -297,42 +297,150 @@
         </div>
       </div>
 
-      <!-- Session Panel -->
+      <!-- Unified Session Panel -->
       <div class="panel" id="panel-session">
-        <div class="session-container">
-          <div class="session-header">
-            <div class="session-info">
-              <h2 style="margin:0 0 8px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
-                <span class="settings-icon">
-                  <svg class="icon" aria-hidden="true"><use href="#i-session"/></svg>
-                </span>
-                <span id="sessionTitle">Session Stats</span>
-              </h2>
-              <div class="session-player">
-                  <img id="sessionAvatar"
-                      src=""
-                      style="width:48px;height:48px;border-radius:8px;margin-right:12px;"
-                      alt="Player Avatar">
-                <div>
-                  <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
-                  <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
+
+        <!-- TAB HEADER -->
+        <div class="session-tab-header">
+          <button class="session-tab active" id="tabLive">
+            <svg class="icon"><use href="#i-session"/></svg>
+            Live Session
+          </button>
+
+          <button class="session-tab" id="tabAnalytics">
+            <svg class="icon"><use href="#i-stats"/></svg>
+            Analytics
+          </button>
+        </div>
+
+        <!-- LIVE SESSION CONTENT -->
+        <div id="sessionLiveContent" class="session-tab-content active">
+
+          <div class="session-container">
+            <div class="session-header">
+              <div class="session-info">
+                <h2 style="margin:0 0 8px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
+                  <svg class="icon"><use href="#i-session"/></svg>
+                  <span id="sessionTitle">Session Stats</span>
+                </h2>
+
+                <div class="session-player">
+                  <img id="sessionAvatar" src="" style="width:48px;height:48px;border-radius:8px;margin-right:12px;">
+                  <div>
+                    <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
+                    <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div id="sessionStatsContainer" style="background:var(--panel);border-radius:12px;padding:20px;margin-top:16px;">
+              <div id="sessionStats"></div>
             </div>
           </div>
 
-          <div class="session-content">
-            <div id="sessionStatsContainer" style="background:var(--panel);border-radius:12px;padding:20px;margin-top:16px;">
-              <div id="sessionStats" style="font-size:14px;line-height:1.6;">
-                <div style="text-align:center;color:var(--muted);padding:40px 20px;">
-                  <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
-                  <div style="font-size:16px;margin-bottom:8px;">No Session Active</div>
-                  <div style="font-size:13px;">Enter your Minecraft IGN in Profile settings and start playing to track session stats!</div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
+
+
+        <!-- ANALYTICS CONTENT -->
+        <div id="sessionAnalyticsContent" class="session-tab-content">
+
+          <div class="analysis-header">
+            <svg class="icon"><use href="#i-stats"/></svg>
+            <span>Session Analytics</span>
+          </div>
+
+          <!-- Metric Cards -->
+          <div class="analysis-cards">
+
+            <div class="card" id="analysis_totalSessions">
+              <div class="card-title">Total Sessions</div>
+              <div class="card-value">0</div>
+            </div>
+
+            <div class="card" id="analysis_totalWins">
+              <div class="card-title">Total Wins</div>
+              <div class="card-value">0</div>
+            </div>
+
+            <div class="card" id="analysis_totalFinals">
+              <div class="card-title">Total Finals</div>
+              <div class="card-value">0</div>
+            </div>
+
+            <div class="card" id="analysis_avgFKDR">
+              <div class="card-title">Avg FKDR</div>
+              <div class="card-value">0</div>
+            </div>
+
+          </div>
+
+          <!-- --- PERIOD SUMMARY --- -->
+          <div class="analysis-section">
+              <h3 class="analysis-title">Period Summary</h3>
+
+              <div class="analysis-filter">
+                  <label>Period:</label>
+                  <select id="analysis_range">
+                      <option value="today">Today</option>
+                      <option value="7d">Last 7 Days</option>
+                      <option value="30d">Last 30 Days</option>
+                      <option value="365d">Last 12 Months</option>
+                      <option value="all">All sessions</option>
+                  </select>
+              </div>
+
+              <div id="periodSummary" class="period-summary">
+                  <!-- Dynamisch gefüllt -->
+              </div>
+          </div>
+
+          <!-- --- TIME SERIES CHART --- -->
+          <div class="analysis-section">
+              <h3 class="analysis-title">Stat History</h3>
+
+              <div class="analysis-filter">
+                  <label>Statistik:</label>
+                  <select id="analysis_stat">
+                      <option value="fkdr">FKDR</option>
+                      <option value="wlr">WLR</option>
+                      <option value="level">Level</option>
+                      <option value="fk">Final Kills</option>
+                      <option value="fd">Final Deaths</option>
+                      <option value="bb">Beds Broken</option>
+                      <option value="bl">Beds Lost</option>
+                      <option value="wins">Wins</option>
+                      <option value="losses">Losses</option>
+                  </select>
+              </div>
+
+              <canvas id="chart_dynamic"></canvas>
+          </div>
+      </div>
+
+          <!-- Universal chart canvas -->
+          <div class="analysis-section">
+              <canvas id="chart_dynamic"></canvas>
+          </div>
+
+          <!-- Charts -->
+          <div class="analysis-section">
+            <div class="analysis-title">FKDR Over Time</div>
+            <canvas id="chart_fkdr"></canvas>
+          </div>
+
+          <div class="analysis-section">
+            <div class="analysis-title">Wins Per Session</div>
+            <canvas id="chart_wins"></canvas>
+          </div>
+
+          <div class="analysis-section">
+            <div class="analysis-title">Final Kills Per Session</div>
+            <canvas id="chart_finals"></canvas>
+          </div>
+
+        </div>
+
       </div>
 
       <!-- Nicks Panel -->
@@ -924,9 +1032,9 @@
     <div class="grip g-tr" data-edge="top-right"></div>
     <div class="grip g-bl" data-edge="bottom-left"></div>
     <div class="grip g-br" data-edge="bottom-right"></div>
-    
+      
+      <script src="./chart.umd.js"></script>
       <script type="module" src="./index.js"></script>
       <script type="module" src="./renderer.js"></script>
   </body>
-
 </html>

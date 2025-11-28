@@ -659,6 +659,42 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+
+import { renderSessionAnalysis } from "./panels/sessionAnalytics.js";
+
+window.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("sessionAnalysisButton");
+    if (!btn) {
+        console.warn("[SessionAnalysis] Button not found");
+        return;
+    }
+
+    btn.addEventListener("click", () => {
+        renderSessionAnalysis();
+    });
+});
+
+document.getElementById("tabLive").addEventListener("click", () => {
+  document.getElementById("tabLive").classList.add("active");
+  document.getElementById("tabAnalytics").classList.remove("active");
+
+  document.getElementById("sessionLiveContent").classList.add("active");
+  document.getElementById("sessionAnalyticsContent").classList.remove("active");
+});
+
+document.getElementById("tabAnalytics").addEventListener("click", () => {
+  document.getElementById("tabAnalytics").classList.add("active");
+  document.getElementById("tabLive").classList.remove("active");
+
+  document.getElementById("sessionAnalyticsContent").classList.add("active");
+  document.getElementById("sessionLiveContent").classList.remove("active");
+
+  // Load analytics data when tab opens
+  renderSessionAnalysis();
+});
+
+
+
 // Column definitions (labeling + optional derived calculators)
 const STATS = {
 // Core

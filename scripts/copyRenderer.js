@@ -16,6 +16,11 @@ function copyRecursive(src, dest) {
       fs.copyFileSync(srcPath, destPath);
     }
   }
+
+  fs.copyFileSync(
+    "./node_modules/chart.js/dist/chart.umd.js",
+    path.join(dest, "chart.umd.js")
+  );
 }
 
 copyRecursive("src/renderer", "dist/renderer");

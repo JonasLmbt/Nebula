@@ -5,7 +5,6 @@
   "main": "dist/main.js",
   "author": "Jonas Lambrecht",
   "license": "MIT",
-
   "scripts": {
     "build": "rimraf dist && tsc && node scripts/copyRenderer.js",
     "dist": "npm run build && electron-builder --publish always",
@@ -13,41 +12,36 @@
     "dev": "npm run build && electron . --enable-logging",
     "publish-release": "node deploy-installer.js"
   },
-
   "devDependencies": {
     "@types/node": "^24.10.0",
     "@types/node-fetch": "^2.6.13",
     "@types/tail": "^2.2.3",
+    "cpy": "^10.1.0",
     "electron": "^39.1.0",
     "electron-builder": "^26.0.12",
     "rimraf": "^6.1.0",
-    "cpy": "^10.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
-
   "dependencies": {
+    "chart.js": "^4.5.1",
     "dotenv": "^16.6.1",
     "electron-updater": "^6.6.2",
     "firebase": "^12.5.0",
     "node-fetch": "^2.6.7",
     "tail": "^2.2.6"
   },
-
   "repository": {
     "type": "git",
     "url": "https://github.com/JonasLmbt/Nebula.git"
   },
-
   "build": {
     "appId": "com.jonaslmbt.nebula",
     "productName": "Nebula",
-
     "directories": {
       "output": "release",
       "buildResources": "build"
     },
-
     "files": [
       "dist/**/*",
       "assets/**/*",
@@ -56,16 +50,13 @@
       "!src/**/*",
       "!node_modules/.cache/**/*"
     ],
-
     "asar": true,
-
     "win": {
       "target": [
         "nsis",
         "portable"
       ]
     },
-
     "mac": {
       "target": [
         "dmg",
@@ -73,14 +64,12 @@
       ],
       "category": "public.app-category.utilities"
     },
-
     "nsis": {
       "oneClick": true,
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": false
     },
-
     "publish": [
       {
         "provider": "github",
