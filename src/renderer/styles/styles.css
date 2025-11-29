@@ -543,3 +543,125 @@ outline:2px solid var(--accent);outline-offset:2px;
     justify-content: space-between;
     font-size: 14px;
 }
+
+.export-btn {
+    margin-left: auto;
+    padding: 6px 12px;
+    background: var(--blue);
+    border-radius: 6px;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+}
+.export-btn:hover {
+    opacity: 0.8;
+}
+
+/* Clean custom Select styling */
+select {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 36px 6px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;       /* removes default arrow */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    position: relative;
+}
+
+/* Beautiful hover effect */
+select:hover {
+    border-color: var(--accent);
+}
+
+/* Ensure consistent height */
+select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0, 200, 255, 0.15);
+}
+
+/* Wrapper to display a custom arrow */
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+/* Custom arrow */
+.select-wrapper::after {
+    content: "▾";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+    font-size: 12px;
+}
+
+/* Wrapping container */
+.nebula-dropdown {
+    position: relative;
+    width: 160px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 36px 8px 12px;
+    cursor: pointer;
+    color: var(--text);
+    user-select: none;
+}
+
+/* Selected visible item */
+.nebula-dropdown-selected {
+    font-size: 14px;
+}
+
+/* Arrow */
+.nebula-dropdown-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+}
+
+/* The dropdown list */
+.nebula-dropdown-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: none;
+    flex-direction: column;
+    z-index: 3000;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+/* Items */
+.nebula-dropdown-list div {
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.nebula-dropdown-list div:hover {
+    background: var(--accent-faded);
+    color: white;
+}
+
+.session-mode-selector {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 10px;
+}

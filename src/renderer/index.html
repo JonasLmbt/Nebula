@@ -324,6 +324,18 @@
                   <span id="sessionTitle">Session Stats</span>
                 </h2>
 
+                <div class="session-mode-selector">
+                  <label>Mode:</label>
+                  <select id="sessionModeSelect">
+                    <option value="overall">Overall</option>
+                    <option value="eight_one">Solo</option>
+                    <option value="eight_two">Doubles</option>
+                    <option value="four_three">3v3v3v3</option>
+                    <option value="four_four">4v4v4v4</option>
+                    <option value="two_four">4v4</option>
+                  </select>
+                </div>
+
                 <div class="session-player">
                   <img id="sessionAvatar" src="" style="width:48px;height:48px;border-radius:8px;margin-right:12px;">
                   <div>
@@ -341,7 +353,6 @@
 
         </div>
 
-
         <!-- ANALYTICS CONTENT -->
         <div id="sessionAnalyticsContent" class="session-tab-content">
 
@@ -350,97 +361,147 @@
             <span>Session Analytics</span>
           </div>
 
+          <!-- Global Filters -->
+          <div class="analysis-filter-row">
+            <div class="analysis-filter">
+              <label>Mode:</label>
+              <div class="nebula-dropdown" id="analyticsModeDropdown">
+                <div class="nebula-dropdown-selected" id="analyticsModeSelected">Overall</div>
+                <div class="nebula-dropdown-arrow">▾</div>
+
+                <div class="nebula-dropdown-list" id="analyticsModeList">
+                  <div data-value="overall">Overall</div>
+                  <div data-value="eight_one">Solo</div>
+                  <div data-value="eight_two">Doubles</div>
+                  <div data-value="four_three">3s</div>
+                  <div data-value="four_four">4s</div>
+                  <div data-value="two_four">4v4</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="analysis-filter">
+              <label>Period:</label>
+              <div class="nebula-dropdown" id="rangeDropdown">
+                <div class="nebula-dropdown-selected" id="rangeSelected">All sessions</div>
+                <div class="nebula-dropdown-arrow">▾</div>
+
+                <div class="nebula-dropdown-list" id="rangeList">
+                  <div data-value="today">Today</div>
+                  <div data-value="7d">Last 7 Days</div>
+                  <div data-value="30d">Last 30 Days</div>
+                  <div data-value="365d">Last 12 Months</div>
+                  <div data-value="all">All sessions</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Metric Cards -->
           <div class="analysis-cards">
 
-            <div class="card" id="analysis_totalSessions">
+            <div class="card" id="an_totalSessions">
               <div class="card-title">Total Sessions</div>
               <div class="card-value">0</div>
+              <div class="card-sub">Filtered by period & mode</div>
             </div>
 
-            <div class="card" id="analysis_totalWins">
-              <div class="card-title">Total Wins</div>
+            <div class="card" id="an_totalPlaytime">
+              <div class="card-title">Total Playtime</div>
               <div class="card-value">0</div>
+              <div class="card-sub">hh:mm</div>
             </div>
 
-            <div class="card" id="analysis_totalFinals">
-              <div class="card-title">Total Finals</div>
+            <div class="card" id="an_avgDuration">
+              <div class="card-title">Avg Session Duration</div>
               <div class="card-value">0</div>
+              <div class="card-sub">minutes</div>
             </div>
 
-            <div class="card" id="analysis_avgFKDR">
+            <div class="card" id="an_totalGames">
+              <div class="card-title">Games Played</div>
+              <div class="card-value">0</div>
+              <div class="card-sub">Δ games in sessions</div>
+            </div>
+
+            <div class="card" id="an_totalWins">
+              <div class="card-title">Wins</div>
+              <div class="card-value">0</div>
+              <div class="card-sub">Δ wins in sessions</div>
+            </div>
+
+            <div class="card" id="an_avgFkdr">
               <div class="card-title">Avg FKDR</div>
               <div class="card-value">0</div>
+              <div class="card-sub">based on total FK/FD</div>
             </div>
 
           </div>
 
-          <!-- --- PERIOD SUMMARY --- -->
+          <!-- --- MODE OVERVIEW TABLE --- -->
           <div class="analysis-section">
-              <h3 class="analysis-title">Period Summary</h3>
+            <h3 class="analysis-title">Mode Overview (selected period)</h3>
+            <div class="mode-table-wrapper">
+              <table id="modeSummaryTable" class="mode-summary-table">
+                <thead>
+                  <tr>
+                    <th>Mode</th>
+                    <th>Games</th>
+                    <th>Wins</th>
+                    <th>Winrate</th>
+                    <th>Finals</th>
+                    <th>FKDR</th>
+                    <th>Beds</th>
+                    <th>BBLR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-              <div class="analysis-filter">
-                  <label>Period:</label>
-                  <select id="analysis_range">
-                      <option value="today">Today</option>
-                      <option value="7d">Last 7 Days</option>
-                      <option value="30d">Last 30 Days</option>
-                      <option value="365d">Last 12 Months</option>
-                      <option value="all">All sessions</option>
-                  </select>
-              </div>
-
-              <div id="periodSummary" class="period-summary">
-                  <!-- Dynamisch gefüllt -->
-              </div>
+          <!-- --- PERIOD SUMMARY (for selected mode) --- -->
+          <div class="analysis-section">
+            <h3 class="analysis-title">Period Summary (selected mode)</h3>
+            <div id="periodSummary" class="period-summary">
+              <!-- Filled by JS -->
+            </div>
           </div>
 
           <!-- --- TIME SERIES CHART --- -->
           <div class="analysis-section">
-              <h3 class="analysis-title">Stat History</h3>
+            <h3 class="analysis-title">Stat History (per session)</h3>
 
-              <div class="analysis-filter">
-                  <label>Statistik:</label>
-                  <select id="analysis_stat">
-                      <option value="fkdr">FKDR</option>
-                      <option value="wlr">WLR</option>
-                      <option value="level">Level</option>
-                      <option value="fk">Final Kills</option>
-                      <option value="fd">Final Deaths</option>
-                      <option value="bb">Beds Broken</option>
-                      <option value="bl">Beds Lost</option>
-                      <option value="wins">Wins</option>
-                      <option value="losses">Losses</option>
-                  </select>
+            <div class="analysis-filter">
+              <label>Stat: </label>
+              <div class="nebula-dropdown" id="statDropdown">
+                <div class="nebula-dropdown-selected" id="statSelected">FKDR</div>
+                <div class="nebula-dropdown-arrow">▾</div>
+
+                <div class="nebula-dropdown-list" id="statList">
+                  <div data-value="fkdr">FKDR (end)</div>
+                  <div data-value="wlr">WLR (end)</div>
+                  <div data-value="level">Bedwars Level (end)</div>
+                  <div data-value="games">Games per Session (Δ)</div>
+                  <div data-value="wins">Wins per Session (Δ)</div>
+                  <div data-value="fk">Finals per Session (Δ)</div>
+                  <div data-value="bb">Beds Broken per Session (Δ)</div>
+                </div>
               </div>
+            </div>
 
-              <canvas id="chart_dynamic"></canvas>
-          </div>
-      </div>
-
-          <!-- Universal chart canvas -->
-          <div class="analysis-section">
-              <canvas id="chart_dynamic"></canvas>
+            <canvas id="chart_dynamic"></canvas>
           </div>
 
-          <!-- Charts -->
-          <div class="analysis-section">
-            <div class="analysis-title">FKDR Over Time</div>
-            <canvas id="chart_fkdr"></canvas>
+          <!-- Export Button -->
+          <div style="text-align:right;margin-top:12px;">
+            <button id="exportCsvBtn" class="export-btn">
+              Export CSV
+            </button>
           </div>
-
-          <div class="analysis-section">
-            <div class="analysis-title">Wins Per Session</div>
-            <canvas id="chart_wins"></canvas>
-          </div>
-
-          <div class="analysis-section">
-            <div class="analysis-title">Final Kills Per Session</div>
-            <canvas id="chart_finals"></canvas>
-          </div>
-
         </div>
-
       </div>
 
       <!-- Nicks Panel -->
@@ -902,7 +963,7 @@
                 <div class="settings-row" style="margin: 0;">
                   <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
                     <div style="display:flex;gap:8px;align-items:center;width:100%">
-                      <input id="usernameInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;"/>
+                      <input id="ignInput" type="text" placeholder="Enter your Minecraft IGN..." class="settings-input" style="flex:1;padding: 12px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text); font-size: 14px; box-sizing: border-box;"/>
                       <!-- <button id="usernameLockBtn" type="button" style="padding:11px 14px;border:0;border-radius:8px;background:transparent;color:var(--accent);font-size:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="IGN bearbeiten">
                         <svg id="lockIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.7;transition:opacity 0.2s;"><path id="lockBody" d="M5 11h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path id="lockShackle" d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                       </button> -->

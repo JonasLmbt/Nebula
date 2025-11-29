@@ -1,3 +1,19 @@
+export interface BedwarsModeStats {
+  gamesPlayed: number;
+  fk: number;
+  fd: number;
+  fkdr: number;
+  wins: number;
+  losses: number;
+  wlr: number;
+  bb: number;
+  bl: number;
+  bblr: number;
+  kills: number;
+  deaths: number;
+  kdr: number;
+}
+
 export interface NormalizedBedwarsStats {
   name: string;
   level: number;
@@ -14,6 +30,7 @@ export interface NormalizedBedwarsStats {
   bedsLost: number;
   kills: number;
   deaths: number;
+  kdr: number;
   mode: string | null;
   winsPerLevel: number;
   fkPerLevel: number;
@@ -27,12 +44,21 @@ export interface NormalizedBedwarsStats {
   rankTag: string | null;
   rankColor: string | null;
   uuid?: string;
+  modes?: {
+    overall?: BedwarsModeStats;     // Overall stats
+    eight_one?: BedwarsModeStats;   // Solo
+    eight_two?: BedwarsModeStats;   // Doubles
+    four_three?: BedwarsModeStats;  // 3s
+    four_four?: BedwarsModeStats;   // 4s
+    two_four?: BedwarsModeStats;    // 4v4
+  }
 }
 
 
 export function normalizeHypixelBedwarsStats(
   player: any,
   requestedName: string,
+  requestedUuid: string,
   guild: any | null
 ): NormalizedBedwarsStats {
   const bw = player?.stats?.Bedwars || {};
@@ -125,8 +151,18 @@ export function normalizeHypixelBedwarsStats(
 
   const rankInfo = getRankInfo(player ?? {});
 
+  let modes = {
+    overall: extractModeStats(bw, ""),
+    eight_one: extractModeStats(bw, "eight_one_"),
+    eight_two: extractModeStats(bw, "eight_two_"),
+    four_three: extractModeStats(bw, "four_three_"),
+    four_four: extractModeStats(bw, "four_four_"),
+    two_four: extractModeStats(bw, "two_four_"),
+  };
+
   return {
     name: player.displayname ?? requestedName,
+    uuid: player.uuid ?? requestedUuid,
     level: stars,
     experience: bw.Experience ?? 0,
     ws,
@@ -141,6 +177,7 @@ export function normalizeHypixelBedwarsStats(
     bedsLost: bw.beds_lost_bedwars ?? 0,
     kills: bw.kills_bedwars ?? 0,
     deaths: bw.deaths_bedwars ?? 0,
+    kdr: +( (bw.kills_bedwars ?? 0) / Math.max(1, (bw.deaths_bedwars ?? 0)) ).toFixed(2),
     mode: mostPlayed,
     winsPerLevel: +(wins / Math.max(1, stars)).toFixed(2),
     fkPerLevel: +(fk / Math.max(1, stars)).toFixed(2),
@@ -161,5 +198,35 @@ export function normalizeHypixelBedwarsStats(
     mbblr: null,
     rankTag: rankInfo.tag,
     rankColor: rankInfo.color,
+    modes: modes ?? undefined
+  };
+}
+
+
+function extractModeStats(bw: any, key: string): BedwarsModeStats {
+  const gamesPlayed = key === "" ? bw[`${key}games_played_bedwars_1`] : bw[`${key}games_played_bedwars`];
+  const fk = bw[`${key}final_kills_bedwars`] ?? 0;
+  const fd = bw[`${key}final_deaths_bedwars`] ?? 0;
+  const wins = bw[`${key}wins_bedwars`] ?? 0;
+  const losses = bw[`${key}losses_bedwars`] ?? 0;
+  const bb = bw[`${key}beds_broken_bedwars`] ?? 0;
+  const bl = bw[`${key}beds_lost_bedwars`] ?? 0;
+  const kills = bw[`${key}kills_bedwars`] ?? 0;
+  const deaths = bw[`${key}deaths_bedwars`] ?? 0;
+
+  return {
+    gamesPlayed,
+    fk,
+    fd,
+    fkdr: +(fk / Math.max(1, fd)).toFixed(2),
+    wins,
+    losses,
+    wlr: +(wins / Math.max(1, losses)).toFixed(2),
+    bb,
+    bl,
+    bblr: +(bb / Math.max(1, bl)).toFixed(2),
+    kills,
+    deaths,
+    kdr: +(kills / Math.max(1, deaths)).toFixed(2),
   };
 }

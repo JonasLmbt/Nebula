@@ -15,7 +15,7 @@ if (savedUser && savedLoggedIn === "true") {
 const loginBtn = document.getElementById("discordLoginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
-const usernameEl = document.getElementById("profileUsername");
+const ignEl = document.getElementById("profileUsername");
 const avatarEl = document.getElementById("profileAvatar");
 const statusEl = document.getElementById("profileStatus");
 
@@ -71,7 +71,7 @@ function updateUI(user) {
     window.electronAPI.setUser(null);
 
     // UI: logged out
-    if (usernameEl) usernameEl.textContent = "Not logged in";
+    if (ignEl) ignEl.textContent = "Not logged in";
     if (avatarEl) {
       avatarEl.innerHTML = "";
       avatarEl.classList.add("empty");
@@ -98,8 +98,8 @@ function updateUI(user) {
   // Neues Profil-Objekt bauen
   const profile = {
     id: user.id,
-    username: user.username,
-    tag: user.username, // optional
+    ign: user.ign,
+    tag: user.ign, // optional
     avatar: user.avatar
       ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
       : null,
@@ -114,14 +114,14 @@ function updateUI(user) {
   window.dispatchEvent(new CustomEvent("nebula:login", { detail: user }));
 
   // UI: logged in
-  if (usernameEl) usernameEl.textContent = user.username;
+  if (ignEl) ignEl.textContent = user.ign;
 
   if (avatarEl) {
     avatarEl.classList.remove("empty");
     if (user.avatar) {
       avatarEl.innerHTML = `<img src="https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png" />`;
     } else {
-      avatarEl.innerHTML = `<div style="font-size:36px;font-weight:700">${user.username[0].toUpperCase()}</div>`;
+      avatarEl.innerHTML = `<div style="font-size:36px;font-weight:700">${user.ign[0].toUpperCase()}</div>`;
     }
   }
 
@@ -159,6 +159,28 @@ async function pollLogin() {
     // Poll every 2 seconds
     setTimeout(pollLogin, 2000);
 }
+
+
+async function exportSessionsCSV(sessions) {
+    const { sessionsToCSV } = require('./session/sessionAnalytics.js');
+    const csv = sessionsToCSV(sessions);
+    if (!csv) return;
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "nebula_sessions.csv";
+    link.click();
+
+    URL.revokeObjectURL(url);
+}
+
+document.getElementById("exportCsvBtn")?.addEventListener("click", () => {
+    exportSessionsCSV(sessions);
+});
+
 
 // Start polling immediately
 pollLogin();

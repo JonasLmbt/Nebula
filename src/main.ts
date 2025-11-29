@@ -6,11 +6,6 @@ import fetch from 'node-fetch';
 import 'dotenv/config';
 import { MinecraftChatLogger } from './logs/chat-logger';
 import { HypixelApiRouter } from './logs/hypixelApiRouter';
-import { initializeApp, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getAuth, signInWithCustomToken, type Auth } from "firebase/auth";
-
-
 
 // Bootstrap logging and error handling
 console.log("[Nebula:boot] main.ts top reached");
@@ -23,10 +18,9 @@ const backendBaseUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay
 // Hypixel API Key
 const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
 
+let globalIgn: string | null = null;
 
 // App version
-const packageJsonPath = path.resolve(__dirname, '..', 'package.json');
-const appVersion = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version;
 let activeSession = false;
 
 // Main window reference
@@ -191,7 +185,7 @@ app.whenReady().then(() => {
       if (win) win.webContents.send('chat:guildMemberLeft', name);
     });
     chat.on('usernameMention', (name: string) => {
-      if (win) win.webContents.send('chat:usernameMention', name);
+      if (win) win.webContents.send('chat:userIgnMention', name);
     });
     chat.on('logPathChanged', (payload: { path: string; client?: string }) => {
       if (win) win.webContents.send('chat:logPathChanged', payload);
@@ -199,12 +193,14 @@ app.whenReady().then(() => {
     chat.on('error', (err) => console.error('ChatLogger error:', err));
 
     // Allow renderer to update username
-    ipcMain.on('set:username', (_e, username: string) => {
+    ipcMain.on('set:ign', (_e, username: string) => {
+      globalIgn = username;
       if (chat) {
         chat.username = username;
-        console.log('[App] Updated ChatLogger username:', username);
       }
+      console.log('[App] Updated username:', username);
     });
+
     ipcMain.on('set:logPath', (_e, newPath: string) => {
       try {
         if (chat && typeof newPath === 'string' && newPath.trim().length) {
@@ -374,8 +370,8 @@ const apiRouter = new HypixelApiRouter({
 });
 
 // --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
-ipcMain.handle('bedwars:stats', async (_e, name: string) => {
-  return await apiRouter.getStats(name);
+ipcMain.handle('bedwars:stats', async (_e, ign: string) => {
+  return await apiRouter.getStats(ign);
 });
 
 // --- IPC: Always-on-top toggle from renderer appearance settings
@@ -451,6 +447,8 @@ ipcMain.on("session:ended", () => {
   console.log("[Session] Ended");
   activeSession = false;
 });
+
+ipcMain.handle("get:ign", () => globalIgn);
 
 
 // ==========================================
@@ -532,35 +530,6 @@ ipcMain.on("auth:setUser", (_e, user) => {
   currentUser = user;
 });
 
-
-
-/* ----------------------------------------------------
-   Helper: Local Sessions
------------------------------------------------------ */
-
-const backendUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
-
-function saveLocalSession(session: any) {
-  const filePath = path.join(app.getPath("userData"), "sessions.json");
-
-  let existing = [];
-  if (fs.existsSync(filePath)) {
-    try { existing = JSON.parse(fs.readFileSync(filePath, "utf8")); }
-    catch {}
-  }
-
-  existing.push(session);
-  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
-
-  console.log("[Sessions] Saved locally:", session.username);
-}
-
-function loadLocalSessions() {
-  const filePath = path.join(app.getPath("userData"), "sessions.json");
-  if (!fs.existsSync(filePath)) return [];
-  try { return JSON.parse(fs.readFileSync(filePath, "utf8")); }
-  catch { return []; }
-}
 
 
 // ==========================================
@@ -651,56 +620,86 @@ ipcMain.handle("metrics:update", async (_e, uid: string, metrics: any) => {
   }
 });
 
-// ==========================================
-// Session History System 
-// ==========================================
+/* ----------------------------------------------------
+   Helper: Local Sessions
+----------------------------------------------------- */
 
-// SAVE SESSION
-ipcMain.handle("sessions:save", async (_e, uid: string, session: any) => {
-  saveLocalSession(session);
+const backendUrl = process.env.NEBULA_BACKEND_URL || "https://nebula-overlay.online";
 
-  if (!uid) {
-    console.log("[Sessions] No UID → local only");
-    return { success: true, location: "local" };
+function getSessionsFilePath() {
+  return path.join(app.getPath("userData"), "sessions.json");
+}
+
+function saveLocalSession(session: any) {
+  const filePath = getSessionsFilePath();
+
+  // Ensure upload flag exists
+  const sessionWithFlag = {
+    ...session,
+    upload: false, 
+  };
+
+  let existing: any[] = [];
+
+  if (fs.existsSync(filePath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (!Array.isArray(existing)) existing = [];
+    } catch (err) {
+      console.error("[Sessions] Failed to parse existing JSON, resetting:", err);
+      existing = [];
+    }
   }
 
+  existing.push(sessionWithFlag);
+
   try {
-    const res = await fetch(`${backendUrl}/api/cloud/saveSession`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, session })
-    });
-
-    const json = await res.json();
-
-    if (!json.success) {
-      console.error("[Sessions] Backend error:", json.error);
-      return { success: false, location: "local", backup: true };
-    }
-
-    return { success: true, location: "cloud" };
+    fs.writeFileSync(filePath, JSON.stringify(existing, null, 2), "utf8");
+    console.log("[Sessions] Saved locally:", session.ign);
   } catch (err) {
-    console.error("[Sessions] SAVE failed:", err);
+    console.error("[Sessions] Failed to write local sessions:", err);
+  }
+}
+
+function loadLocalSessions() {
+  const filePath = getSessionsFilePath();
+  if (!fs.existsSync(filePath)) return [];
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("[Sessions] Failed to load local sessions:", err);
+    return [];
+  }
+}
+
+
+/* ----------------------------------------------------
+   Session History System 
+----------------------------------------------------- */
+
+// SAVE SESSION (local only)
+ipcMain.handle("sessions:save", async (_e, session: any) => {
+
+  try {
+    saveLocalSession(session);
+  } catch (err) {
+    console.error("[Sessions] Local save failed:", err);
     return { success: false, location: "local", error: String(err) };
   }
+
+  // Cloud upload intentionally disabled for now
+  // return { success: true, location: "cloud" };
+
+  return { success: true, location: "local" };
 });
 
-// GET SESSIONS
-ipcMain.handle("sessions:get", async (_e, uid: string) => {
-  if (!uid) return { success: true, source: "local", data: loadLocalSessions() };
-
-  try {
-    const res = await fetch(`${backendUrl}/api/cloud/getSessions/${uid}`);
-    const json = await res.json();
-
-    if (!json.success) throw new Error(json.error);
-
-    return { success: true, source: "cloud", data: json.sessions || [] };
-  } catch (err) {
-    console.error("[Sessions] GET failed:", err);
-    return { success: true, source: "local", fallback: true, data: loadLocalSessions() };
-  }
-});
+  // GET SESSIONS (local only)
+  ipcMain.handle("sessions:get", async () => {
+    const local = loadLocalSessions();
+    return { success: true, source: "local", data: local };
+  });
 
 
 // ==========================================

@@ -5,6 +5,7 @@
 console.log('NEBULA LOADED - Version:', new Date().toISOString());
 
 import { starColor } from './utils/formatStars.js';
+import { getBedWarsLevel } from './utils/calculateStars.js';
 
 var authTokens = null;
 
@@ -15,8 +16,7 @@ let queue = [];
 
 // Session tracking variables
 let startStats = null;        // Stats when session started
-let startTime = new Date();   // Session start time
-let sessionUsername = null;   // Current session username
+let sessionIgn = null;   // Current session ign
 
 // Account Metrics Tracking
 let accountMetrics = JSON.parse(localStorage.getItem('accountMetrics') || JSON.stringify({
@@ -65,7 +65,6 @@ trackSessionStart();
 const TOPBAR_HEIGHT = 50; // fallback topbar height (will be measured dynamically)
 const MIN_HEIGHT = 120; // minimum window height for empty overlay
 const DEFAULT_HEIGHT = 560; // default full height
-const errorMsg = "Could not start session";
 let resizeTimeout = null;
 
 function updateOverlaySize() {
@@ -155,7 +154,7 @@ const finalHeight = Math.min(neededHeight, maxHeight);
 const displayedPlayers = new Set();
 const nickedPlayers = new Set(); // tracks players originally added via nick
 
-// playerSources: map normalized name -> set of sources ('username'|'manual'|'party'|'who'|'chat'|'invite'|'guild')
+// playerSources: map normalized name -> set of sources ('ign'|'manual'|'party'|'who'|'chat'|'invite'|'guild')
 const playerSources = new Map();
 
 // Track invite timeouts: map normalized name -> timeout ID
@@ -205,72 +204,12 @@ function isNick(name) {
 }
 
 
-// Session Stats Functions
-function normalizeBedwarsStats(player, decimals = 0) {
-if (!player || typeof player !== 'object') return {
-  name: '', level: 0, ws: 0,
-  fk: 0, fd: 0, fkdr: 0,
-  wins: 0, losses: 0, wlr: 0,
-  bb: 0, bl: 0, bblr: 0,
-  uuid: null
-};
 
-// Level / Stars
-const level = (typeof player.level === 'number')
-  ? player.level
-  : (player.stats?.Bedwars?.Experience != null
-      ? getBedWarsLevel(Number(player.stats.Bedwars.Experience), decimals)
-      : 0);
-
-// Raw values with multiple fallbacks
-const fk = Number(
-  player.fk ??
-  player.finalKills ??
-  player.stats?.Bedwars?.final_kills_bedwars ?? 0
-);
-const fd = Number(
-  player.fd ??
-  player.finalDeaths ??
-  player.stats?.Bedwars?.final_deaths_bedwars ?? 0
-);
-const wins = Number(
-  player.wins ??
-  player.stats?.Bedwars?.wins_bedwars ?? 0
-);
-const losses = Number(
-  player.losses ??
-  player.stats?.Bedwars?.losses_bedwars ?? 0
-);
-const bb = Number(
-  player.bb ??
-  player.bedsBroken ??
-  player.stats?.Bedwars?.beds_broken_bedwars ?? 0
-);
-const bl = Number(
-  player.bl ??
-  player.bedsLost ??
-  player.stats?.Bedwars?.beds_lost_bedwars ?? 0
-);
-const ws = Number(
-  player.ws ??
-  player.winstreak ??
-  player.stats?.Bedwars?.winstreak ?? 0
-);
-
-// Derived ratios (avoid division by zero)
-const fkdr = fd > 0 ? fk / fd : fk > 0 ? fk : 0;
-const wlr = losses > 0 ? wins / losses : wins > 0 ? wins : 0;
-const bblr = bl > 0 ? bb / bl : bb > 0 ? bb : 0;
-
-const uuid = (player.uuid || player.id || null);
-return { name: player.name || player.username || player.displayName || '', level, ws, fk, fd, fkdr, wins, losses, wlr, bb, bl, bblr, uuid };
-}
-
-// Fetch Mojang UUID from username
-async function fetchMojangUuid(name) {
-if (!name) return null;
+// Fetch Mojang UUID from ign
+async function fetchMojangUuid(ign) {
+if (!ign) return null;
 try {
-  const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
+  const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(ign)}`);
   if (!res.ok) return null;
   const data = await res.json();
   return (data && data.id) ? data.id : null; 
@@ -296,383 +235,23 @@ setAvatar("Steve");
 // Session Stats System 
 // ==========================================
 
-// Global session state
-let sessionUuid = null;
-let lastFetchedStats = null;
-let sessionTimerInterval = null;
+import { sessionManager } from "./session/sessionManager.js";
 
-// Helper: pick correct IPC bridge
-function getIpc() {
-  if (window.ipcRenderer) return window.ipcRenderer;
-  if (window.window && window.window.ipcRenderer) return window.window.ipcRenderer;
-  if (window.electronAPI && window.electronAPI.invoke) {
-    // small wrapper to mimic ipcRenderer.invoke
-    return {
-      invoke: window.electronAPI.invoke,
-      send: window.electronAPI.send || (() => {})
-    };
-  }
-  return null;
-}
+// Start session on load
+document.addEventListener("DOMContentLoaded", () => {
+  sessionManager.start();
+});
 
-// Helper: show a simple error in the session panel
-function showSessionError(message) {
-  const sessionStats = document.getElementById("sessionStats");
-  const sessionTitle = document.getElementById("sessionTitle");
-  if (sessionTitle) sessionTitle.textContent = "Bedwars Session Stats";
-
-  if (!sessionStats) return;
-
-  sessionStats.innerHTML = `
-    <div style="text-align:center;color:#ef4444;padding:40px 20px;">
-      <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-session"/></svg>
-      <div style="font-size:16px;margin-bottom:8px;">Session Start Failed</div>
-      <div style="font-size:13px;line-height:1.5;">
-        ${message}
-      </div>
-    </div>
-  `;
-}
-
-// Start a new session for the given username
-async function startSession(username) {
-  window.ipcRenderer.send("session:started");
-  const ipc = getIpc();
-  if (!ipc) {
-    console.log("Cannot start session: IPC not available");
-    return;
-  }
-
-  if (!username || username.trim() === "") {
-    console.log("Cannot start session: no username provided");
-    return;
-  }
-
-  console.log("Starting session for:", username);
-  sessionUsername = username;
-  startTime = new Date();
-  startStats = null;
-  lastFetchedStats = null;
-
-  const sessionStats = document.getElementById("sessionStats");
-  const sessionTitle = document.getElementById("sessionTitle");
-  if (sessionTitle) sessionTitle.textContent = "Bedwars Session Stats";
-
-  // Loading UI
-  if (sessionStats) {
-    sessionStats.innerHTML = `
-      <div style="text-align:center;color:var(--muted);padding:40px 20px;">
-        <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;animation:spin 2s linear infinite;"><use href="#i-session"/></svg>
-        <div style="font-size:16px;margin-bottom:8px;color:var(--text);">Loading Session Stats</div>
-        <div style="font-size:13px;">Fetching current stats for ${username}...</div>
-      </div>
-      <style>
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      </style>
-    `;
-  }
-
-  try {
-    // Optional: check API status
-    const apiStatus = await ipc.invoke("api:getStatus").catch(() => null);
-    console.log("API Status:", apiStatus);
-
-    const rawResult = await ipc.invoke("bedwars:stats", username);
-    console.log("Session API raw result:", rawResult);
-
-    const normalized = normalizeBedwarsStats(rawResult, 2);
-    console.log("Session API normalized result:", normalized);
-
-    if (!rawResult || rawResult.error || !(rawResult.name || normalized.name)) {
-      const msg = rawResult?.error || "Could not fetch initial stats for this player.";
-      showSessionError(msg);
-      return;
-    }
-
-    // Success: store baseline
-    startStats = normalized;
-    lastFetchedStats = normalized;
-    sessionUuid = normalized.uuid || rawResult.uuid || null;
-
-    // Render initial session view (start = current)
-    generateSessionHTML(startStats, startStats);
-
-    // Start timer for elapsed time
-    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
-    sessionTimerInterval = setInterval(updateSessionTime, 1000);
-
-    console.log("Session successfully started for:", sessionUsername);
-  } catch (error) {
-    console.error("Failed to start session (exception):", error);
-    showSessionError(error.message || String(error));
-  }
-}
-
-// Update session stats by fetching current data
-async function updateSession() {
-  const ipc = getIpc();
-  if (!ipc) {
-    console.log("IPC not ready for session update, skipping...");
-    return;
-  }
-  if (!startStats || !sessionUsername) return;
-
-  console.log("Updating session for:", sessionUsername);
-
-  try {
-    const rawCurrent = await ipc.invoke("bedwars:stats", sessionUsername);
-    console.log("Session update raw result:", rawCurrent);
-
-    const currentNormalized = normalizeBedwarsStats(rawCurrent, 2);
-    console.log("Session update normalized:", currentNormalized);
-
-    if (rawCurrent && !rawCurrent.error) {
-      lastFetchedStats = currentNormalized;
-      generateSessionHTML(startStats, currentNormalized);
-    } else {
-      console.error("Session update error:", rawCurrent?.error);
-    }
-  } catch (error) {
-    console.error("Failed to update session:", error);
-  }
-}
-
-// Update session time display
-function updateSessionTime() {
-  const sessionTime = document.getElementById("sessionTime");
-  if (!sessionTime || !startTime) return;
-
-  const secsElapsed = Math.floor((new Date() - startTime) / 1000);
-  const minsElapsed = Math.floor(secsElapsed / 60);
-  const hoursElapsed = Math.floor(minsElapsed / 60);
-
-  let timeText = "Session: ";
-  if (hoursElapsed > 0) {
-    timeText += `${hoursElapsed}h ${minsElapsed % 60}m`;
-  } else {
-    timeText += `${minsElapsed}m`;
-  }
-
-  sessionTime.textContent = timeText;
-}
-
-// Generate HTML for a session stat row
-function sessionStatHTML(startVal, currentVal, isNegativeStat = false) {
-  if (startVal === undefined || currentVal === undefined) {
-    return '<span style="color: #ef4444;">?</span>';
-  }
-
-  const diff = currentVal - startVal;
-  const diffDisplay =
-    Math.abs(diff) < 0.001 ? diff.toFixed(3) : diff.toLocaleString();
-
-  let diffClass = "neutral";
-  if (diff > 0) {
-    diffClass = isNegativeStat ? "negative" : "positive";
-  } else if (diff < 0) {
-    diffClass = isNegativeStat ? "positive" : "negative";
-  }
-
-  return `
-    <div class="session-stat-value">
-      <span class="session-stat-start">${startVal.toLocaleString()}</span>
-      <span class="session-stat-arrow">→</span>
-      <span class="session-stat-current">${currentVal.toLocaleString()}</span>
-      <span class="session-stat-diff ${diffClass}">[${diff > 0 ? "+" : ""}${diffDisplay}]</span>
-    </div>
-  `;
-}
-
-// Generate full session stats HTML
-function generateSessionHTML(startPlayer, currentPlayer) {
-  const sessionStats = document.getElementById("sessionStats");
-  const sessionTitle = document.getElementById("sessionTitle");
-
-  if (sessionTitle) sessionTitle.textContent = "Bedwars Session Stats";
-  if (!sessionStats) return;
-
-  console.log("Generating session HTML:", { startPlayer, currentPlayer });
-  let html = "";
-
-  function getStat(player, statName) {
-    if (!player) return 0;
-    if (typeof player[statName] === "number") return player[statName];
-    return 0;
-  }
-
-  const startLevel =
-    startPlayer?.level ??
-    (startPlayer?.stats?.Bedwars?.Experience != null
-      ? getBedWarsLevel(Number(startPlayer.stats.Bedwars.Experience), 2)
-      : 0);
-
-  const currentLevel =
-    currentPlayer?.level ??
-    (currentPlayer?.stats?.Bedwars?.Experience != null
-      ? getBedWarsLevel(Number(currentPlayer.stats.Bedwars.Experience), 2)
-      : 0);
-
-  // General
-  html += `
-    <div class="session-category">
-      <div class="session-category-title">
-        <svg class="icon" aria-hidden="true"><use href="#i-stats"/></svg>
-        General
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Stars</span>
-        ${sessionStatHTML(startLevel, currentLevel)}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Win Streak</span>
-        ${sessionStatHTML(getStat(startPlayer, "ws"), getStat(currentPlayer, "ws"))}
-      </div>
-    </div>
-  `;
-
-  // Combat
-  html += `
-    <div class="session-category">
-      <div class="session-category-title">
-        <svg class="icon" aria-hidden="true"><use href="#i-target"/></svg>
-        Combat
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Final Kills</span>
-        ${sessionStatHTML(getStat(startPlayer, "fk"), getStat(currentPlayer, "fk"))}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Final Deaths</span>
-        ${sessionStatHTML(getStat(startPlayer, "fd"), getStat(currentPlayer, "fd"), true)}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">FKDR</span>
-        ${sessionStatHTML(getStat(startPlayer, "fkdr"), getStat(currentPlayer, "fkdr"))}
-      </div>
-    </div>
-  `;
-
-  // Games
-  html += `
-    <div class="session-category">
-      <div class="session-category-title">
-        <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
-        Games
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Wins</span>
-        ${sessionStatHTML(getStat(startPlayer, "wins"), getStat(currentPlayer, "wins"))}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Losses</span>
-        ${sessionStatHTML(getStat(startPlayer, "losses"), getStat(currentPlayer, "losses"), true)}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">WLR</span>
-        ${sessionStatHTML(getStat(startPlayer, "wlr"), getStat(currentPlayer, "wlr"))}
-      </div>
-    </div>
-  `;
-
-  // Beds
-  html += `
-    <div class="session-category">
-      <div class="session-category-title">
-        <svg class="icon" aria-hidden="true"><use href="#i-overlay"/></svg>
-        Beds
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Beds Broken</span>
-        ${sessionStatHTML(getStat(startPlayer, "bb"), getStat(currentPlayer, "bb"))}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">Beds Lost</span>
-        ${sessionStatHTML(getStat(startPlayer, "bl"), getStat(currentPlayer, "bl"), true)}
-      </div>
-      <div class="session-stat-row">
-        <span class="session-stat-label">BBLR</span>
-        ${sessionStatHTML(getStat(startPlayer, "bblr"), getStat(currentPlayer, "bblr"))}
-      </div>
-    </div>
-  `;
-
-  sessionStats.innerHTML = html;
-  updateSessionTime();
-}
-
-// Calculate stat differences between start and end
-function calculateDiff(start, end) {
-  const diff = {};
-  if (!start || !end) return diff;
-
-  for (const key of Object.keys(start)) {
-    if (typeof start[key] === "number" && typeof end[key] === "number") {
-      diff[key] = end[key] - start[key];
-    }
-  }
-  return diff;
-}
-
-// Save current session data locally and to cloud if applicable
-async function saveCurrentSession() {
-  const ipc = getIpc();
-  if (!ipc) return;
-  if (!startStats || !sessionUsername) return;
-
-  const endStats = lastFetchedStats || startStats;
-  const endTime = new Date();
-
-  const sessionData = {
-    username: sessionUsername,
-    uuid: sessionUuid,
-    startTime,
-    endTime,
-    durationSec: Math.floor((endTime - startTime) / 1000),
-    startStats,
-    endStats,
-    diff: calculateDiff(startStats, endStats)
-  };
-
-  // Nimm dieselbe ID wie bei Metrics / Plus: Discord-ID
-  const uid =
-    (window.userProfile && window.userProfile.id) ||
-    window.firebaseUid || // fallback, falls du das später doch setzt
-    null;
-
-  console.log("[Sessions] saveCurrentSession → uid:", uid, "data:", sessionData);
-
-  try {
-    const result = await ipc.invoke("sessions:save", uid, sessionData);
-    console.log("[Sessions] Save result:", result);
-  } catch (err) {
-    console.error("[Sessions] Failed to save session:", err);
-  }
-  window.ipcRenderer.send("session:ended");
-}
-
-// Save session on window close
+// Stop session on unload
 window.addEventListener("beforeunload", () => {
-  console.log("Window unloading, saving session if active...");
-  if (startStats && sessionUsername) {
-    saveCurrentSession();
-    console.log("Session saved.");
-  }
+  sessionManager.stop();
 });
 
-
-import { renderSessionAnalysis } from "./panels/sessionAnalytics.js";
-
-window.addEventListener("DOMContentLoaded", () => {
-    const btn = document.getElementById("sessionAnalysisButton");
-    if (!btn) {
-        console.warn("[SessionAnalysis] Button not found");
-        return;
-    }
-
-    btn.addEventListener("click", () => {
-        renderSessionAnalysis();
-    });
+document.getElementById("sessionModeSelect")?.addEventListener("change", () => {
+  sessionManager.update();
 });
+
+import { setupStatHistory } from "./session/sessionAnalytics.js";
 
 document.getElementById("tabLive").addEventListener("click", () => {
   document.getElementById("tabLive").classList.add("active");
@@ -690,10 +269,10 @@ document.getElementById("tabAnalytics").addEventListener("click", () => {
   document.getElementById("sessionLiveContent").classList.remove("active");
 
   // Load analytics data when tab opens
-  renderSessionAnalysis();
+  setTimeout(() => {
+      setupStatHistory(window.__nebulaSessions);
+  }, 50);
 });
-
-
 
 // Column definitions (labeling + optional derived calculators)
 const STATS = {
@@ -872,7 +451,7 @@ function renderPlayerRow(player, dynamicStats) {
       ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
   ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
   ${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Gepinnt"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
-      ${sessionUsername && String(player.name).trim().toLowerCase() === String(sessionUsername).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
+      ${sessionIgn && String(player.name).trim().toLowerCase() === String(sessionIgn).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
     </td>`,
     dynamicCells
   ].join('');
@@ -889,39 +468,6 @@ function renderPlayerRow(player, dynamicStats) {
       </td>
     </tr>
   `);
-}
-
-// Calculate BedWars level from experience
-function getBedWarsLevel(exp, decimals = 0) {
-  let level = 100 * (Math.floor(exp / 487000));
-  exp = exp % 487000;
-
-  if (exp < 500) 
-    return round(level + exp / 500, decimals);
-
-  level++;
-  if (exp < 1500) 
-    return round(level + (exp - 500) / 1000, decimals);
-
-  level++;
-  if (exp < 3500) 
-    return round(level + (exp - 1500) / 2000, decimals);
-
-  level++;
-  if (exp < 7000) 
-    return round(level + (exp - 3500) / 3500, decimals);
-
-  level++;
-  exp -= 7000;
-
-  return round(level + exp / 5000, decimals);
-}
-
-// Round number to specified decimals
-function round(num, decimals) {
-  if (decimals <= 0) return Math.floor(num); 
-  const factor = Math.pow(10, decimals);
-  return Math.round(num * factor) / factor;
 }
 
 // Update player level display. Accepts either a player object with stats or a stats-like object
@@ -972,9 +518,9 @@ if (wasNick) { nickedPlayers.add(normName); originalNicks[res.name.toLowerCase()
 function removePlayer(name) {
   const key = String(getRealName(name) || name).trim().toLowerCase();
   
-  // NEVER remove the session username (own user)
-  if (sessionUsername && key === String(sessionUsername).trim().toLowerCase()) {
-    console.log('Preventing removal of session username:', name);
+  // NEVER remove the session ign (own user)
+  if (sessionIgn && key === String(sessionIgn).trim().toLowerCase()) {
+    console.log('Preventing removal of session ign:', name);
     return;
   }
   // Prevent removal if pinned
@@ -1014,9 +560,9 @@ function addPlayerSource(name, source) {
 function removePlayerSource(name, source) {
   const key = String(getRealName(name) || name).toLowerCase();
   
-  // NEVER remove sources for session username (own user)
-  if (sessionUsername && key === String(sessionUsername).trim().toLowerCase()) {
-    console.log('Preventing source removal for session username:', name, 'source:', source);
+  // NEVER remove sources for session ign (own user)
+  if (sessionIgn && key === String(sessionIgn).trim().toLowerCase()) {
+    console.log('Preventing source removal for session ign:', name, 'source:', source);
     return;
   }
   // Do not alter sources for pinned players (they are immutable except manual unpin)
@@ -1066,23 +612,23 @@ function clearInviteTimeout(name) {
   }
 }
 
-// Clear all players except those with username source
-function clearAllButUsername() {
-  // Remove all non-username-backed players; keep username-only
-  const selfKey = sessionUsername ? String(sessionUsername).trim().toLowerCase() : null;
+// Clear all players except those with ign source
+function clearAllButUserIgn() {
+  // Remove all non-userIgn-backed players; keep ign-only
+  const selfKey = sessionIgn ? String(sessionIgn).trim().toLowerCase() : null;
   for (const [key, set] of Array.from(playerSources.entries())) {
-    // Always preserve the session user even if it (temporarily) lacks an explicit 'username' source
+    // Always preserve the session user even if it (temporarily) lacks an explicit 'ign' source
     if (selfKey && key === selfKey) {
-      playerSources.set(key, new Set(['username']));
+      playerSources.set(key, new Set(['ign']));
       continue;
     }
     // Preserve pinned players entirely
     if (pinnedPlayers.has(key)) {
       continue;
     }
-    if (set.has('username')) {
-      // Keep only username source
-      playerSources.set(key, new Set(['username']));
+    if (set.has('ign')) {
+      // Keep only ign source
+      playerSources.set(key, new Set(['ign']));
       continue;
     }
     // remove entirely
@@ -1139,9 +685,9 @@ window.ipcRenderer.on('chat:players', (_e, newPlayers) => {
     const incomingSet = new Set(newPlayers.map(p => String(p).trim().toLowerCase()));
     for (const [key, sources] of Array.from(playerSources.entries())) {
       if (sources.has('who') && !incomingSet.has(key)) {
-        // Don't remove the session username - keep it in the overlay
-        if (sessionUsername && key === String(sessionUsername).trim().toLowerCase()) {
-          // Keep session username but remove the 'who' source
+        // Don't remove the session ign - keep it in the overlay
+        if (sessionIgn && key === String(sessionIgn).trim().toLowerCase()) {
+          // Keep session ign but remove the 'who' source
           sources.delete('who');
           playerSources.set(key, sources);
           continue;
@@ -1190,7 +736,7 @@ window.ipcRenderer.on('chat:finalKill', (_e, name) => {
   try {
     if (!name || typeof name !== 'string') return;
     if (sourcesSettings?.game?.removeOnDeath) {
-      // Only remove the 'who' source; keep other sources (manual, party, chat, username)
+      // Only remove the 'who' source; keep other sources (manual, party, chat, ign)
       removePlayerSource(name, 'who');
     }
   } catch (err) {
@@ -1508,8 +1054,8 @@ if (guildListMode && guildBatchAccepted && (msg.indexOf(' ●  ') !== -1 || msg.
   }
 });
 
-// Username mention → add player if enabled under chat settings
-window.ipcRenderer.on('chat:usernameMention', (_e, name) => {
+// UserIgn mention → add player if enabled under chat settings
+window.ipcRenderer.on('chat:userIgnMention', (_e, name) => {
   try {
     if (!name || typeof name !== 'string') return;
     if (!sourcesSettings?.chat?.enabled) return;
@@ -1517,11 +1063,11 @@ window.ipcRenderer.on('chat:usernameMention', (_e, name) => {
       addPlayer(name, 'chat');
     }
   } catch (err) {
-    console.error('Error handling chat:usernameMention', err);
+    console.error('Error handling chat:userIgnMention', err);
   }
 });
 
-// Server change → remove who/chat/username/guild sources if enabled
+// Server change → remove who/chat/ign/guild sources if enabled
 window.ipcRenderer.on('chat:serverChange', () => {
   try {
     // Enter pre-game lobby phase on server change; game not yet started
@@ -1542,8 +1088,8 @@ window.ipcRenderer.on('chat:serverChange', () => {
           sources.delete('chat');
           changed = true;
         }
-        if (sources.has('username')) {
-          sources.delete('username');
+        if (sources.has('ign')) {
+          sources.delete('ign');
           changed = true;
         }
       }
@@ -1570,7 +1116,7 @@ window.ipcRenderer.on('chat:serverChange', () => {
   }
 });
 
-// Lobby join → remove who/chat/username sources if enabled
+// Lobby join → remove who/chat/ign sources if enabled
 window.ipcRenderer.on('chat:lobbyJoined', () => {
   try {
     // Leaving game back to lobby: disable pre-game chat auto-add
@@ -1591,8 +1137,8 @@ window.ipcRenderer.on('chat:lobbyJoined', () => {
           sources.delete('chat');
           changed = true;
         }
-        if (sources.has('username')) {
-          sources.delete('username');
+        if (sources.has('ign')) {
+          sources.delete('ign');
           changed = true;
         }
       }
@@ -1737,14 +1283,14 @@ input.addEventListener("keydown", e => {
 });
 
 // Top bar buttons
-document.getElementById("clearAll").addEventListener("click", () => { queue = []; clearAllButUsername(); updateOverlaySize(); });
+document.getElementById("clearAll").addEventListener("click", () => { queue = []; clearAllButUserIgn(); updateOverlaySize(); });
 document.getElementById("refresh").addEventListener("click", fetchAll);
 document.getElementById("minBtn").addEventListener("click", () => window.ipcRenderer.send("window:minimize"));
 document.getElementById("closeBtn").addEventListener("click", () => window.ipcRenderer.send("window:close"));
 
 // Shortcut-triggered actions from main
 window.ipcRenderer.on('shortcut:refresh', () => fetchAll());
-window.ipcRenderer.on('shortcut:clear', () => { queue = []; clearAllButUsername(); });
+window.ipcRenderer.on('shortcut:clear', () => { queue = []; clearAllButUserIgn(); });
 
 // Window resizing grips
 let resizing = null;
@@ -1828,11 +1374,6 @@ function showPanel(id) {
   
   // Session panel specific logic
   if (id === 'session') {
-    console.log('=== Session Panel Debug ===');
-    console.log('typeof basicSettings:', typeof basicSettings);
-    console.log('basicSettings exists:', !!basicSettings);
-    console.log('basicSettings object:', basicSettings);
-    
     // Ensure basicSettings is available
     if (typeof basicSettings === 'undefined' || !basicSettings) {
       console.log('basicSettings not available, loading from localStorage');
@@ -1840,23 +1381,21 @@ function showPanel(id) {
       console.log('Loaded basicSettings:', basicSettings);
     }
     
-    // Get username from basicSettings (not localStorage)
-    const username = basicSettings.username?.trim();
-    console.log('Session panel opened, username from basicSettings:', username);
-    console.log('sessionUsername:', sessionUsername);
-    console.log('startStats:', startStats);
+    // Get ign from basicSettings (not localStorage)
+    const ign = basicSettings.ign?.trim();
+    console.log('Session panel opened, ign from basicSettings:', ign);
+
+    const sessionStats = document.getElementById('sessionStats');
+    const sessionIgnEl = document.getElementById('sessionIgn');
+    const sessionTime = document.getElementById('sessionTime');
     
-    if (!username) {
-      // No username set - show instructions
-      const sessionStats = document.getElementById('sessionStats');
-      const sessionIgn = document.getElementById('sessionIgn');
-      const sessionTime = document.getElementById('sessionTime');
-      
+    if (!ign) {
+      // No ingame name set - show instructions
       if (sessionStats) {
         sessionStats.innerHTML = `
           <div style="text-align:center;color:var(--muted);padding:40px 20px;">
             <svg class="icon" aria-hidden="true" style="width:48px;height:48px;margin-bottom:12px;opacity:0.5;"><use href="#i-profile"/></svg>
-            <div style="font-size:16px;margin-bottom:8px;color:var(--text);">No Username Set</div>
+            <div style="font-size:16px;margin-bottom:8px;color:var(--text);">No Ingame Name Set</div>
             <div style="font-size:13px;line-height:1.5;">
               Go to <strong>Profile</strong> and enter your Minecraft IGN to start tracking session stats.<br><br>
               Session stats show your progress since opening the app!
@@ -1864,20 +1403,21 @@ function showPanel(id) {
           </div>
         `;
       }
-      if (sessionIgn) sessionIgn.textContent = 'No player selected';
+      if (sessionIgnEl) sessionIgnEl.textContent = 'No player selected';
       if (sessionTime) sessionTime.textContent = 'Session not started';
-    } else if (username !== sessionUsername) {
-      console.log('Starting session because username changed:', username, '!==', sessionUsername);
-      startSession(username);
-      sessionIgn.textContent = username;
-      setAvatar(username);
-    } else if (sessionUsername && startStats) {
+    } else if (ign !== sessionIgnEl.textContent) {
+      console.log('Starting session because ingame name changed:', ign, '!==', sessionIgnEl.textContent);
+      sessionIgnEl.textContent = ign;
+      sessionIgn = ign;
+      setAvatar(ign);
+      sessionManager.start(ign)
+    } else if (sessionIgnEl && startStats) {
       console.log('Updating existing session');
       updateSession();
-      sessionIgn.textContent = username;
-      setAvatar(username);
+      sessionIgnEl.textContent = ign;
+      setAvatar(ign);
     } else {
-      console.log('Session state unclear - startStats:', !!startStats, 'sessionUsername:', sessionUsername);
+      console.log('Session state unclear - startStats:', !!startStats, 'sessionIgnEl:', sessionIgnEl);
     }
     console.log('=== End Session Panel Debug ===');
   }
@@ -2666,7 +2206,7 @@ applyAppearance();
 const defaultBasic = {
   logFile: 'badlion', // selected client key OR 'custom'
   customLogPath: '', // manual path if logFile === 'custom'
-  username: '',
+  ign: '',
   lastDetected: { client: '', path: '' }
 };
 
@@ -2675,18 +2215,10 @@ let basicSettings = JSON.parse(localStorage.getItem('basicSettings') || JSON.str
 function saveBasicSettings() {
   localStorage.setItem('basicSettings', JSON.stringify(basicSettings));
   console.log('Basic settings saved:', basicSettings);
-  updateSidebarUsername();
-  // Ensure username entry exists when set
-  if (basicSettings.username && basicSettings.username.trim()) {
-    addPlayer(basicSettings.username.trim(), 'username');
+  // Ensure ign entry exists when set
+  if (basicSettings.ign && basicSettings.ign.trim()) {
+    addPlayer(basicSettings.ign.trim(), 'ign');
   }
-}
-
-function updateSidebarUsername() {
-const sidebarUsernameEl = document.getElementById('sidebarUsername');
-if (sidebarUsernameEl) {
-    sidebarUsernameEl.textContent = basicSettings.username || 'username';
-}
 }
 
 // Bind Basic inputs
@@ -2697,7 +2229,7 @@ const autoDetectBtn = document.getElementById('autoDetectBtn');
 const customRow = document.getElementById('customPathRow');
 const customPathInput = document.getElementById('customLogPathInput');
 const applyCustomBtn = document.getElementById('applyCustomPathBtn');
-const usernameInput = document.getElementById('usernameInput');
+const ignInput = document.getElementById('ignInput');
 
 function updateClientButtons() {
   if (!clientGrid) return;
@@ -2807,35 +2339,35 @@ updateClientStatus('Path switched');
   });
 } catch {}
 
-if (usernameInput) {
-  usernameInput.value = basicSettings.username || '';
-  usernameInput.addEventListener('input', () => {
-    const prev = (basicSettings.username || '').trim();
-    const next = (usernameInput.value || '').trim();
+if (ignInput) {
+  ignInput.value = basicSettings.ign || '';
+  ignInput.addEventListener('input', () => {
+    const prev = (basicSettings.ign || '').trim();
+    const next = (ignInput.value || '').trim();
     if (prev && prev.toLowerCase() !== next.toLowerCase()) {
-      // Remove old username source (but keep row if other sources exist)
-      removePlayerSource(prev, 'username');
+      // Remove old ign source (but keep row if other sources exist)
+      removePlayerSource(prev, 'ign');
     }
-    basicSettings.username = next;
-    localStorage.setItem('username', next); // For session tracking (keep for compatibility)
+    basicSettings.ign = next;
+    localStorage.setItem('ign', next); // For session tracking (keep for compatibility)
     saveBasicSettings();
     
-    // Start new session if username changed and we have a valid username
-    if (next && next !== sessionUsername) {
-      setTimeout(() => startSession(next), 100); // Small delay to ensure save completes
+    // Start new session if ign changed and we have a valid ign
+    if (next && next !== sessionIgn) {
+      setTimeout(() => sessionManager.start(next), 100); // Small delay to ensure save completes
     }
   });
   
-  // Start session on app load if username exists (delayed)
-  const savedUsername = basicSettings.username || '';
-  if (savedUsername) {
-    console.log('Found saved username on app load:', savedUsername);
-    localStorage.setItem('username', savedUsername);
+  // Start session on app load if ign exists (delayed)
+  const savedIgn = basicSettings.ign || '';
+  if (savedIgn) {
+    console.log('Found saved ign on app load:', savedIgn);
+    localStorage.setItem('ign', savedIgn);
     // Wait a bit for IPC to be ready
     setTimeout(() => {
       if (window.window.ipcRenderer) {
-        console.log('Starting session on app load for:', savedUsername);
-        startSession(savedUsername);
+        console.log('[Session] Starting on app load for:', savedIgn);
+        sessionManager.start(savedIgn);
       } else {
         console.log('IPC not ready, session start skipped');
       }
@@ -3005,14 +2537,13 @@ updateApiStatus();
 // Auto-refresh status every 30 seconds
 setInterval(updateApiStatus, 30000);
 
-// Initialize sidebar username on load and ensure presence in list
-updateSidebarUsername();
-if (basicSettings.username && basicSettings.username.trim()) {
-addPlayer(basicSettings.username.trim(), 'username');
+// Initialize sidebar ign on load and ensure presence in list
+if (basicSettings.ign && basicSettings.ign.trim()) {
+addPlayer(basicSettings.ign.trim(), 'ign');
 renderTable();
 }
-// Send initial username to main on load
-try { window.ipcRenderer.send('set:username', basicSettings.username || ''); } catch (e) {}
+// Send initial ign to main on load
+try { window.ipcRenderer.send('set:ign', basicSettings.ign || ''); } catch (e) {}
 
 // --- Sources Settings
 const defaultSources = {
@@ -3491,7 +3022,7 @@ async function syncUserSettings(userId, direction = 'auto') {
 // Update profile UI
 export function updateProfileUI() {
   const avatar = document.getElementById('profileAvatar');
-  const username = document.getElementById('profileUsername');
+  const ign = document.getElementById('profileUsername');
   const status = document.getElementById('profileStatus');
   const loginBtn = document.getElementById('discordLoginBtn');
   const logoutBtn = document.getElementById('logoutBtn');
@@ -3505,13 +3036,13 @@ export function updateProfileUI() {
     if (avatar) {
       avatar.classList.remove('empty');
       if (window.userProfile.avatar) {
-        avatar.innerHTML = `<img src="${window.userProfile.avatar}" alt="${window.userProfile.username}" />`;
+        avatar.innerHTML = `<img src="${window.userProfile.avatar}" alt="${window.userProfile.ign}" />`;
       } else {
-        // Show first letter of username if no avatar
-        avatar.innerHTML = `<div style="font-size:36px;font-weight:700">${window.userProfile.username[0].toUpperCase()}</div>`;
+        // Show first letter of ign if no avatar
+        avatar.innerHTML = `<div style="font-size:36px;font-weight:700">${window.userProfile.ign[0].toUpperCase()}</div>`;
       }
     }
-    if (username) username.textContent = window.userProfile.tag || window.userProfile.username;
+    if (ign) ign.textContent = window.userProfile.tag || window.userProfile.ign;
     if (status) {
       status.classList.remove('offline');
       status.innerHTML = '<span class="status-dot"></span><span>Connected via Discord</span>';
@@ -3536,7 +3067,7 @@ export function updateProfileUI() {
       avatar.classList.add('empty');
       avatar.innerHTML = '';
     }
-    if (username) username.textContent = 'Not logged in';
+    if (ign) ign.textContent = 'Not logged in';
     if (status) {
       status.classList.add('offline');
       status.innerHTML = '<span class="status-dot"></span><span>Local account only</span>';
@@ -4000,53 +3531,3 @@ function showPaymentVerificationDialog() {
   // Handle cancellation
   document.getElementById('paymentCancelBtn').onclick = closeModal;
 }
-
-// Token refresh logic (check if token needs refresh on app start)
-async function checkAndRefreshToken() {
-  if (!authTokens || !authTokens.refreshToken) return;
-
-  const authTimestamp = parseInt(localStorage.getItem('authTimestamp') || '0');
-  const now = Date.now();
-  const tokenAge = now - authTimestamp;
-  const expiresIn = (authTokens.expiresIn || 604800) * 1000; // Default 7 days
-
-  // Refresh if token is older than 80% of expiry time
-  if (tokenAge > expiresIn * 0.8) {
-    console.log('Refreshing Discord token...');
-    const result = await window.ipcRenderer.invoke('auth:discord:refresh', authTokens.refreshToken);
-    
-    if (result.success) {
-      authTokens = result.tokens;
-      localStorage.setItem('authTokens', JSON.stringify(authTokens));
-      localStorage.setItem('authTimestamp', Date.now().toString());
-      console.log('Token refreshed successfully');
-    } else {
-      console.error('Token refresh failed:', result.error);
-      // Optionally logout user if refresh fails
-    }
-  }
-}
-
-// Initialize Firebase and profile UI on load
-async function initialize() {
-  updateProfileUI();
-  checkAndRefreshToken();
-  
-  // Only start auto-sync if Firebase is ready
-  if (firebaseReady) {
-    setInterval(async () => {
-      if (window.userProfile) {
-        try {
-          console.log('[Firebase] Auto-sync check...');
-          await syncUserSettings(window.userProfile.id, 'upload');
-        } catch (error) {
-          console.warn('[Firebase] Auto-sync failed:', error);
-          // Don't show notification for background sync failures
-        }
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-  }
-}
-
-// Start initialization
-initialize();

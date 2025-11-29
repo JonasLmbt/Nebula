@@ -93,7 +93,7 @@ export class HypixelApiRouter {
   private async fetchPlayerData(name: string, uuid: string): Promise<any | null> {
     const cached = this.playerCache.get(name);
     if (cached && Date.now() - cached.timestamp < this.TTL) {
-        console.log(`[API Router] Using cached player data for ${name} (${uuid})`);
+        console.log(`[API Router] Fetched player data for ${name} (${uuid}) using CACHE`);
         return cached.data;
     }
 
@@ -156,7 +156,7 @@ export class HypixelApiRouter {
     const cached = this.guildCache.get(name);
 
     if (cached && Date.now() - cached.timestamp < this.TTL) {
-        console.log(`[API Router] Using cached guild data for ${name} (${uuid})`);
+        console.log(`[API Router] Fetched guild data for ${name} (${uuid}) using CACHE`);
         return cached.data;
     }
 
@@ -221,7 +221,7 @@ export class HypixelApiRouter {
       const guild = await this.fetchGuildData(name, uuid);
 
       // Step 3: normalize
-      const result = normalizeHypixelBedwarsStats(player, name, guild);
+      const result = normalizeHypixelBedwarsStats(player, name, uuid, guild);
 
       return result;
   }
