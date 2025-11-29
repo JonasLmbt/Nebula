@@ -60,7 +60,7 @@ class SessionManager {
     if (!this.ign || !this.startStats) return;
     document.getElementById('sessionIgn').textContent = this.ign;
     try {
-      const raw = await this.ipc.invoke("bedwars:stats", this.ign);
+      const raw = await this.ipc.invoke("bedwars:stats", this.ign, true);
       if (!raw || raw.error) return;
 
       const normalized = raw;

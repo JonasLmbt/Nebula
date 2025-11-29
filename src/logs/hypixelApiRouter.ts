@@ -90,9 +90,9 @@ export class HypixelApiRouter {
       return json.player ?? null;
   }
 
-  private async fetchPlayerData(name: string, uuid: string): Promise<any | null> {
+  private async fetchPlayerData(name: string, uuid: string, bypassCache = false): Promise<any | null> {
     const cached = this.playerCache.get(name);
-    if (cached && Date.now() - cached.timestamp < this.TTL) {
+    if (!bypassCache && cached && Date.now() - cached.timestamp < this.TTL) {
         console.log(`[API Router] Fetched player data for ${name} (${uuid}) using CACHE`);
         return cached.data;
     }
@@ -131,6 +131,13 @@ export class HypixelApiRouter {
         }
     }
 
+    if (bypassCache && !player) {
+        if (cached && Date.now() - cached.timestamp < this.TTL) {
+          console.log(`[API Router] Fetched player data for ${name} (${uuid}) using CACHE`);
+          return cached.data;
+      }
+    }
+
     if (player) {
         this.playerCache.set(name, { data: player, timestamp: Date.now() });
     }
@@ -152,10 +159,10 @@ export class HypixelApiRouter {
       return json.guild ?? null;
   }
 
-  private async fetchGuildData(name: string, uuid: string): Promise<any | null> {
+  private async fetchGuildData(name: string, uuid: string, bypassCache = false): Promise<any | null> {
     const cached = this.guildCache.get(name);
 
-    if (cached && Date.now() - cached.timestamp < this.TTL) {
+    if (!bypassCache &&cached && Date.now() - cached.timestamp < this.TTL) {
         console.log(`[API Router] Fetched guild data for ${name} (${uuid}) using CACHE`);
         return cached.data;
     }
@@ -194,6 +201,13 @@ export class HypixelApiRouter {
         }
     }
 
+    if (bypassCache && !guild) {
+            if (cached && Date.now() - cached.timestamp < this.TTL) {
+          console.log(`[API Router] Fetched guild data for ${name} (${uuid}) using CACHE`);
+          return cached.data;
+      }
+    }
+
     this.guildCache.set(name, { data: guild, timestamp: Date.now() });
     return guild;
   }
@@ -203,7 +217,7 @@ export class HypixelApiRouter {
    * MAIN: getStats()
    * ------------------------------------------------------------ */
 
-  async getStats(name: string) {
+  async getStats(name: string, bypassCache = false): Promise<any> {
       const uuid = await this.getUUID(name);
       if (!uuid || uuid.length === 0 || uuid === null) {
           // nick
@@ -211,14 +225,14 @@ export class HypixelApiRouter {
       }
 
       // Step 1: player data
-      const player = await this.fetchPlayerData(name, uuid);
+      const player = await this.fetchPlayerData(name, uuid, bypassCache);
 
       if (!player) {
           return { error: "Player not found" };
       }
 
       // Step 2: guild data
-      const guild = await this.fetchGuildData(name, uuid);
+      const guild = await this.fetchGuildData(name, uuid, bypassCache);
 
       // Step 3: normalize
       const result = normalizeHypixelBedwarsStats(player, name, uuid, guild);

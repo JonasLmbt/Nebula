@@ -370,8 +370,8 @@ const apiRouter = new HypixelApiRouter({
 });
 
 // --- IPC: Bedwars Stats Fetch (Enhanced with safe fallback)
-ipcMain.handle('bedwars:stats', async (_e, ign: string) => {
-  return await apiRouter.getStats(ign);
+ipcMain.handle('bedwars:stats', async (_e, ign: string, bypassCache: boolean = false) => {
+  return await apiRouter.getStats(ign, bypassCache);
 });
 
 // --- IPC: Always-on-top toggle from renderer appearance settings
