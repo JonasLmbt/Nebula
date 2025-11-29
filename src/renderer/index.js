@@ -451,7 +451,7 @@ function renderPlayerRow(player, dynamicStats) {
       ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
   ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
   ${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Pinned"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
-      ${sessionIgn && String(player.name).trim().toLowerCase() === String(sessionIgn).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
+      ${basicSettings.ign && String(player.name).trim().toLowerCase() === String(basicSettings.ign).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
     </td>`,
     dynamicCells
   ].join('');
@@ -615,7 +615,7 @@ function clearInviteTimeout(name) {
 // Clear all players except those with ign source
 function clearAllButUserIgn() {
   // Remove all non-userIgn-backed players; keep ign-only
-  const selfKey = sessionIgn ? String(sessionIgn).trim().toLowerCase() : null;
+  const selfKey = basicSettings.ign ? String(basicSettings.ign).trim().toLowerCase() : null;
   for (const [key, set] of Array.from(playerSources.entries())) {
     // Always preserve the session user even if it (temporarily) lacks an explicit 'ign' source
     if (selfKey && key === selfKey) {
@@ -636,7 +636,7 @@ function clearAllButUserIgn() {
     if (tr) tr.remove();
     displayedPlayers.delete(key);
     playerSources.delete(key);
-nickedPlayers.delete(key);
+    nickedPlayers.delete(key);
     delete originalNicks[key];
   }
   // Clean any stray rows
@@ -1135,10 +1135,6 @@ window.ipcRenderer.on('chat:lobbyJoined', () => {
       if (sourcesSettings?.chat?.removeOnServerChange) {
         if (sources.has('chat')) {
           sources.delete('chat');
-          changed = true;
-        }
-        if (sources.has('ign')) {
-          sources.delete('ign');
           changed = true;
         }
       }
@@ -2349,7 +2345,7 @@ if (ignInput) {
     
     // Start new session if ign changed and we have a valid ign
     if (next && next !== sessionIgn) {
-      setTimeout(() => sessionManager.start(next), 100); // Small delay to ensure save completes
+      setTimeout(() => { sessionManager.stop(); sessionManager.start(next); }, 100); // Small delay to ensure save completes
     }
   });
   
@@ -2362,6 +2358,7 @@ if (ignInput) {
     setTimeout(() => {
       if (window.window.ipcRenderer) {
         console.log('[Session] Starting on app load for:', savedIgn);
+        sessionManager.stop(); // ensure previous session saved
         sessionManager.start(savedIgn);
       } else {
         console.log('IPC not ready, session start skipped');
@@ -2534,7 +2531,7 @@ setInterval(updateApiStatus, 30000);
 
 // Initialize sidebar ign on load and ensure presence in list
 if (basicSettings.ign && basicSettings.ign.trim()) {
-addPlayer(basicSettings.ign.trim(), 'ign');
+console.log('Initialized overlay with saved IGN:', basicSettings.ign.trim());
 renderTable();
 }
 // Send initial ign to main on load
@@ -3526,3 +3523,5 @@ function showPaymentVerificationDialog() {
   // Handle cancellation
   document.getElementById('paymentCancelBtn').onclick = closeModal;
 }
+
+addPlayer(basicSettings.ign.trim(), 'ign');
