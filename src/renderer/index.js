@@ -7,7 +7,7 @@ console.log('NEBULA LOADED - Version:', new Date().toISOString());
 import { starColor } from './utils/formatStars.js';
 import { getBedWarsLevel } from './utils/calculateStars.js';
 
-var authTokens = null;
+let overlayMode = "overall"; // default overlay mode
 
 try { window.window.ipcRenderer = window.ipcRenderer; } catch (_) { /* noop */ }
 const rows = document.getElementById("rows");
@@ -237,11 +237,6 @@ setAvatar("Steve");
 
 import { sessionManager } from "./session/sessionManager.js";
 
-// Start session on load
-document.addEventListener("DOMContentLoaded", () => {
-  sessionManager.start();
-});
-
 // Stop session on unload
 window.addEventListener("beforeunload", () => {
   sessionManager.stop();
@@ -276,55 +271,53 @@ document.getElementById("tabAnalytics").addEventListener("click", () => {
 
 // Column definitions (labeling + optional derived calculators)
 const STATS = {
-// Core
-level: { name: 'Level', short: 'Lvl', type: 'number' }, // No colorRules - uses prestige coloring
-ws: { name: 'Win Streak', short: 'WS', type: 'number', colorRules: true },
-mode: { name: 'Most Played Mode', short: 'Mode', type: 'text' },
-fkdr: { name: 'Final K/D Ratio', short: 'FKDR', type: 'number', colorRules: true },
-wlr: { name: 'Win/Loss Ratio', short: 'WLR', type: 'number', colorRules: true },
-bblr: { name: 'Bed Break/Loss Ratio', short: 'BBLR', type: 'number', colorRules: true },
-fk: { name: 'Final Kills', short: 'F. Kills', type: 'number', colorRules: true },
-fd: { name: 'Final Deaths', short: 'F. Deaths', type: 'number', colorRules: true },
-wins: { name: 'Wins', short: 'Wins', type: 'number', colorRules: true },
-losses: { name: 'Losses', short: 'Losses', type: 'number', colorRules: true },
-bedsBroken: { name: 'Beds Broken', short: 'Beds', type: 'number', colorRules: true },
-bedsLost: { name: 'Beds Lost', short: 'Beds L.', type: 'number', colorRules: true },
-kills: { name: 'Kills', short: 'Kills', type: 'number', colorRules: true },
-deaths: { name: 'Deaths', short: 'Deaths', type: 'number', colorRules: true },
+  // Core
+  level: { name: 'Level', short: 'Lvl', type: 'number' }, // No colorRules - uses prestige coloring
+  ws: { name: 'Win Streak', short: 'WS', type: 'number', colorRules: true },
+  mode: { name: 'Most Played Mode', short: 'Mode', type: 'text' },
+  fkdr: { name: 'Final K/D Ratio', short: 'FKDR', type: 'number', colorRules: true },
+  wlr: { name: 'Win/Loss Ratio', short: 'WLR', type: 'number', colorRules: true },
+  bblr: { name: 'Bed Break/Loss Ratio', short: 'BBLR', type: 'number', colorRules: true },
+  fk: { name: 'Final Kills', short: 'F. Kills', type: 'number', colorRules: true },
+  fd: { name: 'Final Deaths', short: 'F. Deaths', type: 'number', colorRules: true },
+  wins: { name: 'Wins', short: 'Wins', type: 'number', colorRules: true },
+  losses: { name: 'Losses', short: 'Losses', type: 'number', colorRules: true },
+  bedsBroken: { name: 'Beds Broken', short: 'Beds', type: 'number', colorRules: true },
+  bedsLost: { name: 'Beds Lost', short: 'Beds L.', type: 'number', colorRules: true },
+  kills: { name: 'Kills', short: 'Kills', type: 'number', colorRules: true },
+  deaths: { name: 'Deaths', short: 'Deaths', type: 'number', colorRules: true },
 
-// Derived
-winsPerLevel: { name: 'Wins per Level', short: 'Wins/Level', type: 'number', colorRules: true, calc: (p) => {
-  const lvl = (p && (typeof p.level === 'number' ? p.level : (p.stats?.Bedwars?.Experience != null ? Math.floor(getBedWarsLevel(Number(p.stats.Bedwars.Experience))) : 0))) || 0;
-  const wins = Number(p?.wins ?? 0);
-  return lvl > 0 ? wins / lvl : 0;
-}},
-fkPerLevel: { name: 'Final Kills per Level', short: 'FK/Level', type: 'number', colorRules: true, calc: (p) => {
-  const lvl = (p && (typeof p.level === 'number' ? p.level : (p.stats?.Bedwars?.Experience != null ? Math.floor(getBedWarsLevel(Number(p.stats.Bedwars.Experience))) : 0))) || 0;
-  const fk = Number(p?.fk ?? 0);
-  return lvl > 0 ? fk / lvl : 0;
-}},
-bedwarsScore: { name: 'Bedwars Score', short: 'Score', type: 'number', colorRules: true, calc: (p) => {
-  // Konsistente Formel mit Backend (multiplikativ): fkdr * wlr * (level / 100)
-  // Fallback: wenn level fehlt -> aus Experience berechnen
-  let level = Number(p?.level ?? 0);
-  if ((!level || !Number.isFinite(level)) && p?.experience != null) {
-    try { level = Math.floor(getBedWarsLevel(Number(p.experience))); } catch {}
-  }
-  const fkdr = Number(p?.fkdr ?? 0);
-  const wlr = Number(p?.wlr ?? 0);
-  if (!Number.isFinite(fkdr) || !Number.isFinite(wlr) || !Number.isFinite(level)) return 0;
-  const score = fkdr * wlr * (level / 100);
-  return Number.isFinite(score) ? +score.toFixed(2) : 0;
-}},
+  // Derived
+  winsPerLevel: { name: 'Wins per Level', short: 'Wins/Level', type: 'number', colorRules: true, calc: (p) => {
+    const lvl = (p && (typeof p.level === 'number' ? p.level : (p.stats?.Bedwars?.Experience != null ? Math.floor(getBedWarsLevel(Number(p.stats.Bedwars.Experience))) : 0))) || 0;
+    const wins = Number(p?.wins ?? 0);
+    return lvl > 0 ? wins / lvl : 0;
+  }},
+  fkPerLevel: { name: 'Final Kills per Level', short: 'FK/Level', type: 'number', colorRules: true, calc: (p) => {
+    const lvl = (p && (typeof p.level === 'number' ? p.level : (p.stats?.Bedwars?.Experience != null ? Math.floor(getBedWarsLevel(Number(p.stats.Bedwars.Experience))) : 0))) || 0;
+    const fk = Number(p?.fk ?? 0);
+    return lvl > 0 ? fk / lvl : 0;
+  }},
+  bedwarsScore: { name: 'Bedwars Score', short: 'Score', type: 'number', colorRules: true, calc: (p) => {
+    let level = Number(p?.level ?? 0);
+    if ((!level || !Number.isFinite(level)) && p?.experience != null) {
+      try { level = Math.floor(getBedWarsLevel(Number(p.experience))); } catch {}
+    }
+    const fkdr = Number(p?.fkdr ?? 0);
+    const wlr = Number(p?.wlr ?? 0);
+    if (!Number.isFinite(fkdr) || !Number.isFinite(wlr) || !Number.isFinite(level)) return 0;
+    const score = fkdr * wlr * (level / 100);
+    return Number.isFinite(score) ? +score.toFixed(2) : 0;
+  }},
 
-// Monthly (if provided by backend)
-mfkdr: { name: 'Monthly Final K/D Ratio', short: 'Monthly FKDR', type: 'number', colorRules: true, disabled: true },
-mwlr: { name: 'Monthly Win/Loss Ratio', short: 'Monthly WLR', type: 'number', colorRules: true, disabled: true },
-mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'Monthly BBLR', type: 'number', colorRules: true, disabled: true },
+  // Monthly (if provided by backend)
+  mfkdr: { name: 'Monthly Final K/D Ratio', short: 'Monthly FKDR', type: 'number', colorRules: true, disabled: true },
+  mwlr: { name: 'Monthly Win/Loss Ratio', short: 'Monthly WLR', type: 'number', colorRules: true, disabled: true },
+  mbblr: { name: 'Monthly Bed Break/Loss Ratio', short: 'Monthly BBLR', type: 'number', colorRules: true, disabled: true },
 
-// Meta
-guildName: { name: 'Guild Name', short: 'Guild', type: 'text' },
-guildTag: { name: 'Guild Tag', short: 'Tag', type: 'text' },
+  // Meta
+  guildName: { name: 'Guild Name', short: 'Guild', type: 'text' },
+  guildTag: { name: 'Guild Tag', short: 'Tag', type: 'text' },
 };
 
 // Sorting state
@@ -375,17 +368,17 @@ function getSortValue(player, key) {
     }
     case 'networkLevel': return getNumeric(player?.networkLevel ?? 0);
     case 'ws': return getNumeric(player?.ws ?? 0);
-    case 'fkdr': return getNumeric(player?.fkdr ?? 0);
-    case 'wlr': return getNumeric(player?.wlr ?? 0);
-    case 'bblr': return getNumeric(player?.bblr ?? 0);
-    case 'fk': return getNumeric(player?.fk ?? 0);
-    case 'fd': return getNumeric(player?.fd ?? 0);
-    case 'wins': return getNumeric(player?.wins ?? 0);
-    case 'losses': return getNumeric(player?.losses ?? 0);
-    case 'bedsBroken': return getNumeric(player?.bedsBroken ?? 0);
-    case 'bedsLost': return getNumeric(player?.bedsLost ?? 0);
-    case 'kills': return getNumeric(player?.kills ?? 0);
-    case 'deaths': return getNumeric(player?.deaths ?? 0);
+    case 'fkdr': return getNumeric(player.modes?.[overlayMode]?.fkdr ?? player.fkdr ?? 0);
+    case 'wlr': return getNumeric(player.modes?.[overlayMode]?.wlr ?? player?.wlr ?? 0);
+    case 'bblr': return getNumeric(player.modes?.[overlayMode]?.bblr ?? player?.bblr ?? 0);
+    case 'fk': return getNumeric(player.modes?.[overlayMode]?.fk ?? player?.fk ?? 0);
+    case 'fd': return getNumeric(player.modes?.[overlayMode]?.fd ?? player?.fd ?? 0);
+    case 'wins': return getNumeric(player.modes?.[overlayMode]?.wins ?? player?.wins ?? 0);
+    case 'losses': return getNumeric(player.modes?.[overlayMode]?.losses ?? player?.losses ?? 0);
+    case 'bedsBroken': return getNumeric(player.modes?.[overlayMode]?.bedsBroken ?? player?.bedsBroken ?? 0);
+    case 'bedsLost': return getNumeric(player.modes?.[overlayMode]?.bedsLost ?? player?.bedsLost ?? 0);
+    case 'kills': return getNumeric(player.modes?.[overlayMode]?.kills ?? player?.kills ?? 0);
+    case 'deaths': return getNumeric(player.modes?.[overlayMode]?.deaths ?? player?.deaths ?? 0);
     case 'winsPerLevel': return getNumeric(STATS.winsPerLevel.calc(player));
     case 'fkPerLevel': return getNumeric(STATS.fkPerLevel.calc(player));
     case 'score': // legacy alias
@@ -425,8 +418,16 @@ function renderPlayerRow(player, dynamicStats) {
   const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
   const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
   const dynamicCells = selectedStats.map(key => {
-    if (key === 'level' || key === 'name') return '';
-    let val = player[key];
+  if (key === 'level' || key === 'name') return '';
+    let val;
+    // If stat is mode-specific (ws, fkdr, wlr, bblr etc)
+    if (player.modes && player.modes[overlayMode] && player.modes[overlayMode][key] !== undefined) {
+        val = player.modes[overlayMode][key];
+    }
+    // If stat is global (level, ws, networkLevel etc)
+    else {
+        val = player[key];
+    }
     // Support calc functions for derived stats if backend didn't send field
     const statDef = STATS[key];
     if ((val == null || (typeof val === 'number' && isNaN(val))) && statDef && typeof statDef.calc === 'function') {
@@ -445,12 +446,11 @@ function renderPlayerRow(player, dynamicStats) {
       ${(() => {
         if (showNick || isUnresolved) return `<span class="player-name" style="color:#ffffff">${esc(displayName)}</span>`;
         if (player.rankTag) return `<span class="player-name" style="color:${player.rankColor || '#ffffff'}">${esc(displayName)}</span>`;
-        // Unranked -> grau wie Stone Prestige
         return `<span class="player-name" style="color:#AAAAAA">${esc(displayName)}</span>`;
       })()}
       ${hasNick ? `<span class="nick-indicator" title="${esc(tooltipOther)}"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-ghost"/></svg></span>` : ''}
   ${isPartyMember ? `<span class="party-indicator" title="Party Member"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-party"/></svg></span>` : ''}
-  ${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Gepinnt"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
+  ${pinnedPlayers.has(key) ? `<span class="pin-indicator" title="Pinned"><svg class="icon icon-inline" aria-hidden="true"><use href="#i-pin"/></svg></span>` : ''}
       ${sessionIgn && String(player.name).trim().toLowerCase() === String(sessionIgn).trim().toLowerCase() ? `<span class="self-indicator" title="You"><svg class="icon icon-inline" aria-hidden="true" style="color: var(--accent);"><use href="#i-self"/></svg></span>` : ''}
     </td>`,
     dynamicCells
@@ -497,21 +497,21 @@ async function fetchPlayerStats(name) {
     return;
   }
 
-console.log('Received stats for', realName, ':', res);
+  console.log('Received stats for', realName, ':', res);
 
-// Track successful stats lookup for metrics
-trackStatsLookup(res.name || realName);
+  // Track successful stats lookup for metrics
+  trackStatsLookup(res.name || realName);
 
-const normName = String(res.name || realName).toLowerCase();
-displayedPlayers.add(normName);
-playerCache[normName] = res;
-if (wasNick) { nickedPlayers.add(normName); originalNicks[res.name.toLowerCase()] = name; } else nickedPlayers.delete(normName);
-  
-  // After caching stats simply re-render table (row rendering centralised there)
-  renderTable();
+  const normName = String(res.name || realName).toLowerCase();
+  displayedPlayers.add(normName);
+  playerCache[normName] = res;
+  if (wasNick) { nickedPlayers.add(normName); originalNicks[res.name.toLowerCase()] = name; } else nickedPlayers.delete(normName);
+    
+    // After caching stats simply re-render table (row rendering centralised there)
+    renderTable();
 
-  // Rebind menu events for the new row
-  bindMenus();
+    // Rebind menu events for the new row
+    bindMenus();
 }
 
 // Remove a player row and all state completely
@@ -1407,19 +1407,14 @@ function showPanel(id) {
       if (sessionTime) sessionTime.textContent = 'Session not started';
     } else if (ign !== sessionIgnEl.textContent) {
       console.log('Starting session because ingame name changed:', ign, '!==', sessionIgnEl.textContent);
-      sessionIgnEl.textContent = ign;
       sessionIgn = ign;
       setAvatar(ign);
       sessionManager.start(ign)
-    } else if (sessionIgnEl && startStats) {
+    } else if (sessionIgnEl.textContent === ign) {
       console.log('Updating existing session');
-      updateSession();
-      sessionIgnEl.textContent = ign;
+      sessionManager.update();
       setAvatar(ign);
-    } else {
-      console.log('Session state unclear - startStats:', !!startStats, 'sessionIgnEl:', sessionIgnEl);
-    }
-    console.log('=== End Session Panel Debug ===');
+    } 
   }
   
   document.querySelectorAll('.panel').forEach(p => {

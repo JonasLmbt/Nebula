@@ -33,6 +33,7 @@ class SessionManager {
     this.startStats = null;
 
     renderInitialSessionUI(ign);
+    document.getElementById('sessionIgn').textContent = ign;
 
     try {
       const raw = await this.ipc.invoke("bedwars:stats", ign);
@@ -57,6 +58,7 @@ class SessionManager {
 
   async update() {
     if (!this.ign || !this.startStats) return;
+    document.getElementById('sessionIgn').textContent = this.ign;
     try {
       const raw = await this.ipc.invoke("bedwars:stats", this.ign);
       if (!raw || raw.error) return;

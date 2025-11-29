@@ -1,4 +1,5 @@
 export function renderInitialSessionUI(ign) {
+  document.getElementById('sessionIgn').textContent = ign;
   const el = document.getElementById("sessionStats");
   if (!el) return;
 
@@ -174,4 +175,3 @@ function fmt(value) {
   if (Number.isInteger(value)) return value.toString();
   return value.toFixed(2);
 }
-
