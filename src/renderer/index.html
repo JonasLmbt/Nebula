@@ -905,6 +905,24 @@
               Columns Settings
             </h2>
           
+            <div class="columns-mode-selector">
+              <label style="font-size:14px;color:var(--text);margin-right:8px;">Mode:</label>
+
+              <div class="nebula-dropdown" id="columnModeDropdown">
+                <div class="nebula-dropdown-selected" id="columnModeSelected">Overall</div>
+                <div class="nebula-dropdown-arrow">▾</div>
+
+                <div class="nebula-dropdown-list" id="columnModeList">
+                  <div data-value="overall">Overall</div>
+                  <div data-value="eight_one">Solo</div>
+                  <div data-value="eight_two">Doubles</div>
+                  <div data-value="four_three">3s</div>
+                  <div data-value="four_four">4s</div>
+                  <div data-value="two_four">4v4</div>
+                </div>
+              </div>
+            </div>
+        
           <div class="layout-editor" id="statLayoutEditor">
             <div class="layout-help">Drag stats from the palette into slots below. Empty slots are not shown in the overlay. Level and Name are always fixed at the beginning. Click on a filled slot to configure color rules.</div>
             <div class="layout-palette" id="layoutPalette"></div>

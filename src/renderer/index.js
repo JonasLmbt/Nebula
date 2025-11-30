@@ -15,7 +15,6 @@ const input = document.getElementById("playerInput");
 let queue = [];
 
 // Session tracking variables
-let startStats = null;        // Stats when session started
 let sessionIgn = null;   // Current session ign
 
 // Account Metrics Tracking
@@ -687,6 +686,40 @@ function addPlayer(name, source) {
     });
   }
 }
+
+
+// column mode dropdown
+const colModeDropdown = document.getElementById("columnModeDropdown");
+const colModeSelected = document.getElementById("columnModeSelected");
+const colModeList = document.getElementById("columnModeList");
+
+colModeDropdown.addEventListener("click", () => {
+  colModeList.style.display =
+    colModeList.style.display === "flex" ? "none" : "flex";
+});
+
+colModeList.querySelectorAll("div").forEach(item => {
+  item.addEventListener("click", () => {
+    colModeSelected.textContent = item.textContent;
+    colModeDropdown.dataset.value = item.dataset.value;
+
+    colModeList.style.display = "none";
+
+    // Store in settings
+    statSettings.selectedMode = item.dataset.value;
+    saveStatSettings();
+
+    // Update overlay immediately
+    renderTable();
+  });
+});
+
+document.addEventListener("click", (e) => {
+  if (!colModeDropdown.contains(e.target)) {
+    colModeList.style.display = "none";
+  }
+});
+
 
 // Handle incoming player lists (from chat logger)
 window.ipcRenderer.on('chat:players', (_e, newPlayers) => {
@@ -1605,6 +1638,7 @@ function saveStatSettings() {
     }
   } catch {}
   localStorage.setItem('statSettings', JSON.stringify(statSettings));
+  overlayMode = statSettings.selectedMode || 'overall';
   renderTable();
   renderStatLayoutSlots();
   renderStatLayoutPalette();
