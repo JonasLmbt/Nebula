@@ -39,31 +39,31 @@ export function getBedWarsLevel(exp: number, decimals = 0): number {
 // Interfaces
 // ---------------------------------------------
 export interface BedwarsModeStats {
-  gamesPlayed: number;
-  fk: number;
-  fd: number;
-  fkdr: number;
-  wins: number;
-  losses: number;
-  wlr: number;
-  bb: number;
-  bl: number;
-  bblr: number;
-  kills: number;
-  deaths: number;
-  kdr: number;
+  gamesPlayed: number | null;
+  fk: number | null;
+  fd: number | null;
+  fkdr: number | null;
+  wins: number | null;
+  losses: number | null;
+  wlr: number | null;
+  bb: number | null;
+  bl: number | null;
+  bblr: number | null;
+  kills: number | null;
+  deaths: number | null;
+  kdr: number | null;
 }
 
 export interface NormalizedBedwarsStats {
   name: string;
   level: number;
   experience: number;
-  ws: number;
+  ws: number | null;
   mode: string | null;
-  winsPerLevel: number;
-  fkPerLevel: number;
-  bedwarsScore: number;
-  networkLevel: number;
+  winsPerLevel: number | null;
+  fkPerLevel: number | null;
+  bedwarsScore: number | null;
+  networkLevel: number | null;
   guildName: string | null;
   guildTag: string | null;
   mfkdr: number | null;
@@ -71,7 +71,7 @@ export interface NormalizedBedwarsStats {
   mbblr: number | null;
   rankTag: string | null;
   rankColor: string | null;
-  uuid?: string;
+  uuid?: string | null;
 
   modes?: {
     overall?: BedwarsModeStats;
@@ -93,16 +93,16 @@ function extractModeStats(bw: any, prefix: string): BedwarsModeStats {
       ? "games_played_bedwars_1"
       : `${prefix}games_played_bedwars`;
 
-  const gamesPlayed = Number(bw[gamesPlayedKey] ?? 0);
+  const gamesPlayed = Number(bw[gamesPlayedKey] ?? null);
 
-  const fk     = Number(bw[`${prefix}final_kills_bedwars`] ?? 0);
-  const fd     = Number(bw[`${prefix}final_deaths_bedwars`] ?? 0);
-  const wins   = Number(bw[`${prefix}wins_bedwars`] ?? 0);
-  const losses = Number(bw[`${prefix}losses_bedwars`] ?? 0);
-  const bb     = Number(bw[`${prefix}beds_broken_bedwars`] ?? 0);
-  const bl     = Number(bw[`${prefix}beds_lost_bedwars`] ?? 0);
-  const kills  = Number(bw[`${prefix}kills_bedwars`] ?? 0);
-  const deaths = Number(bw[`${prefix}deaths_bedwars`] ?? 0);
+  const fk     = Number(bw[`${prefix}final_kills_bedwars`] ?? null);
+  const fd     = Number(bw[`${prefix}final_deaths_bedwars`] ?? null);
+  const wins   = Number(bw[`${prefix}wins_bedwars`] ?? null);
+  const losses = Number(bw[`${prefix}losses_bedwars`] ?? null);
+  const bb     = Number(bw[`${prefix}beds_broken_bedwars`] ?? null);
+  const bl     = Number(bw[`${prefix}beds_lost_bedwars`] ?? null);
+  const kills  = Number(bw[`${prefix}kills_bedwars`] ?? null);
+  const deaths = Number(bw[`${prefix}deaths_bedwars`] ?? null);
 
   return {
     gamesPlayed,
@@ -121,6 +121,33 @@ function extractModeStats(bw: any, prefix: string): BedwarsModeStats {
     kills,
     deaths,
     kdr: +(kills / Math.max(1, deaths)).toFixed(2),
+  };
+}
+
+function returnNullModeStats(): BedwarsModeStats {
+  return {
+    gamesPlayed: null, fk: null, fd: null, fkdr: null,
+    wins: null, losses: null, wlr: null,
+    bb: null, bl: null, bblr: null,
+    kills: null, deaths: null, kdr: null,
+  };
+}
+
+function returnNullModes(): {
+  overall: BedwarsModeStats;
+  eight_one: BedwarsModeStats; 
+  eight_two: BedwarsModeStats;
+  four_three: BedwarsModeStats;
+  four_four: BedwarsModeStats;
+  two_four: BedwarsModeStats;
+} {
+  return {
+    overall: returnNullModeStats(),
+    eight_one: returnNullModeStats(),
+    eight_two: returnNullModeStats(),
+    four_three: returnNullModeStats(),
+    four_four: returnNullModeStats(),
+    two_four: returnNullModeStats(),
   };
 }
 
@@ -186,9 +213,10 @@ function getRankInfo(player: any) {
 export function normalizeHypixelBedwarsStats(
   player: any,
   requestedName: string,
-  requestedUuid: string,
-  guild: any | null
+  requestedUuid: string | null,
+  guild: any | null,
 ): NormalizedBedwarsStats {
+
 
   const bw = player?.stats?.Bedwars || {};
 
@@ -270,5 +298,30 @@ export function normalizeHypixelBedwarsStats(
     rankColor: rankInfo.color,
 
     modes,
+  };
+}
+
+export function normalizeHypixelBedwarsStatsNick(
+  requestedName: string,
+): NormalizedBedwarsStats {
+  return {
+    name: requestedName,
+    uuid: null,
+    level: 0,
+    experience: 0,
+    ws: null,
+    mode: null,
+    winsPerLevel: null,
+    fkPerLevel: null,
+    bedwarsScore: null,
+    networkLevel: null,
+    guildName: null,
+    guildTag: null,
+    mfkdr: null,
+    mwlr: null,
+    mbblr: null,
+    rankTag: '[NICK]',
+    rankColor: '#fff',
+    modes: returnNullModes(),
   };
 }

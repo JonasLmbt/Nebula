@@ -1,6 +1,6 @@
 // --- Enhanced API System with 3-tier Backend Support ---
 const HYPIXEL_KEY = process.env.HYPIXEL_KEY || '';
-import { normalizeHypixelBedwarsStats } from "./hypixelNormalizer"; 
+import { normalizeHypixelBedwarsStats, normalizeHypixelBedwarsStatsNick } from "./hypixelNormalizer"; 
 
 interface ApiRouterConfig {
   backendUrl?: string
@@ -221,7 +221,7 @@ export class HypixelApiRouter {
       const uuid = await this.getUUID(name);
       if (!uuid || uuid.length === 0 || uuid === null) {
           // nick
-          return { name, level: 0, experience: 0, ws: null, fkdr: null, wlr: null, bblr: null, fk: null, fd: null, wins: null, losses: null, bedsBroken: null, bedsLost: null, kills: null, deaths: null, mode: null, winsPerLevel: null, fkPerLevel: null, bedwarsScore: null, networkLevel: null, guildName: null, guildTag: null, mfkdr: null, mwlr: null, mbblr: null, rankTag: '[NICK]', rankColor: '#fff'};
+          return normalizeHypixelBedwarsStatsNick(name);
       }
 
       // Step 1: player data
