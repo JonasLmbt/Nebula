@@ -512,6 +512,29 @@ export class MinecraftChatLogger extends EventEmitter {
       return;
     }
 
+    // Detect: "Kicked <RANK?> Name because they were offline."
+    if (
+      msg.indexOf("because they were offline") !== -1 &&
+      msg.indexOf("Kicked ") === 0 &&      // starts with "Kicked "
+      msg.indexOf(":") === -1             // avoid chat prefix
+    ) {
+      const parts = msg.split(" ");
+      let kicked = parts[1];
+      if (kicked.startsWith("[")) {
+        kicked = parts[2];
+      }
+      const kickedPlayer = cleanName(kicked || "");
+      if (kickedPlayer) {
+        this.partyMembers.delete(kickedPlayer);
+        this.emit("partyUpdated", Array.from(this.partyMembers));
+        if (this.players.has(kickedPlayer)) {
+          this.players.delete(kickedPlayer);
+          this.emit("playersUpdated", Array.from(this.players));
+        }
+      }
+      return;
+    }
+
     // Game start detection (clear list)
     if (msg.indexOf('The game starts in 1 second!') !== -1 && msg.indexOf(':') === -1) {
       // Fire a gameStart event shortly after countdown finishes
