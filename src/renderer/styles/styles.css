@@ -575,6 +575,12 @@ select {
     position: relative;
 }
 
+#chart_dynamic {
+  height: 240px !important;
+  max-height: 240px;
+}
+
+
 /* Beautiful hover effect */
 select:hover {
     border-color: var(--accent);

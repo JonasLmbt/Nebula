@@ -351,46 +351,49 @@ function updateStatHistoryChart() {
     cfg.accessor(s, analyticsState.currentMode)
   );
 
-  if (analyticsState.chart) {
-    analyticsState.chart.destroy();
+  if (!analyticsState.chart) {
+    analyticsState.chart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: cfg.label,
+            data,
+            tension: 0.25,
+            pointRadius: 3,
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: { maxRotation: 45, minRotation: 0, autoSkip: true },
+          },
+          y: {
+            beginAtZero: true,
+          },
+        },
+        plugins: {
+          legend: {
+            display: true,
+          },
+          tooltip: {
+            mode: "index",
+            intersect: false,
+          },
+        },
+      },
+    });
+  } else {
+    analyticsState.chart.data.labels = labels;
+    analyticsState.chart.data.datasets[0].data = data;
+    analyticsState.chart.data.datasets[0].label = cfg.label;
+    analyticsState.chart.update();
   }
-
-  analyticsState.chart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: cfg.label,
-          data,
-          tension: 0.25,
-          pointRadius: 3,
-          borderWidth: 2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: {
-          ticks: { maxRotation: 45, minRotation: 0, autoSkip: true },
-        },
-        y: {
-          beginAtZero: true,
-        },
-      },
-      plugins: {
-        legend: {
-          display: true,
-        },
-        tooltip: {
-          mode: "index",
-          intersect: false,
-        },
-      },
-    },
-  });
 }
 
 // ---------- CSV EXPORT ----------
@@ -563,6 +566,14 @@ function setupDropdowns() {
 
 export async function setupStatHistory() {
 
+    if (analyticsState.initialized) {
+        // nur Filter neu anwenden, KEIN neues Setup
+        applyFiltersAndRender();
+        return;
+    }
+
+  analyticsState.initialized = true;
+  
   // Sessions direkt holen
   const sessions = await loadSessionsFromBackend();
 
