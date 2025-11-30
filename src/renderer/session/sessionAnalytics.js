@@ -298,68 +298,6 @@ function updateOverviewCards() {
   set("an_avgFkdr", fmtNumber(avgFkdr));
 }
 
-function updatePeriodSummary() {
-  const container = document.getElementById("periodSummary");
-  if (!container) return;
-
-  const {
-    sessionCount,
-    totalDurationSec,
-    totalGames,
-    totalWins,
-    totalFinals,
-    totalBeds,
-    avgFkdr,
-    winrate,
-  } = computeAggregates(analyticsState.filtered, analyticsState.currentMode);
-
-  if (sessionCount === 0) {
-    container.innerHTML = `
-      <div class="period-summary-empty">
-        No sessions found for this period.
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="period-summary-grid">
-      <div>
-        <div class="label">Sessions</div>
-        <div class="value">${fmtNumber(sessionCount)}</div>
-      </div>
-      <div>
-        <div class="label">Total Time</div>
-        <div class="value">${fmtMinutes(totalDurationSec)}</div>
-      </div>
-      <div>
-        <div class="label">Games Played</div>
-        <div class="value">${fmtNumber(totalGames)}</div>
-      </div>
-      <div>
-        <div class="label">Wins</div>
-        <div class="value">${fmtNumber(totalWins)}</div>
-      </div>
-      <div>
-        <div class="label">Final Kills</div>
-        <div class="value">${fmtNumber(totalFinals)}</div>
-      </div>
-      <div>
-        <div class="label">Beds Broken</div>
-        <div class="value">${fmtNumber(totalBeds)}</div>
-      </div>
-      <div>
-        <div class="label">Winrate</div>
-        <div class="value">${fmtNumber(winrate)}%</div>
-      </div>
-      <div>
-        <div class="label">FKDR</div>
-        <div class="value">${fmtNumber(avgFkdr)}</div>
-      </div>
-    </div>
-  `;
-}
-
 function updateModeOverviewTable() {
   const tableBody = document.querySelector(
     "#modeSummaryTable tbody"
@@ -522,7 +460,6 @@ function applyFiltersAndRender() {
   );
 
   updateOverviewCards();
-  updatePeriodSummary();
   updateModeOverviewTable();
   updateStatHistoryChart();
 }

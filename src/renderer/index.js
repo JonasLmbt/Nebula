@@ -269,6 +269,15 @@ document.getElementById("tabAnalytics").addEventListener("click", () => {
   }, 50);
 });
 
+document.getElementById("restartSessionBtn").addEventListener("click", async () => {
+  // 1. Save current session
+  sessionManager.stop();
+
+  // 2. Reset session state
+  sessionManager.start()
+});
+
+
 // Column definitions (labeling + optional derived calculators)
 const STATS = {
   // Core
@@ -490,7 +499,7 @@ async function fetchPlayerStats(name) {
   if (displayedPlayers.has(key)) return; // Skip if already displayed
   const wasNick = isNick(name);
   
-  const res = await window.ipcRenderer.invoke("bedwars:stats", realName);
+  const res = await window.ipcRenderer.invoke("bedwars:stats", realName, false);
 
   if (res.error) {
     console.error('[DEBUG] Stats error for', realName, ':', res.error);
@@ -652,6 +661,9 @@ function clearAllButUserIgn() {
 function addPlayer(name, source) {
   name = String(name || '').trim();
   if (!name) return;
+  if (name === basicSettings.ign) {
+    source = 'ign'; // always treat own ign as 'ign' source
+  }
   addPlayerSource(name, source);
   const key = String(getRealName(name) || name).trim().toLowerCase();
   // Update activeNickState heuristic: if user supplied the nick (not real) and it's registered, mark active.

@@ -70,6 +70,13 @@
       <symbol id="i-ghost" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2c-4.42 0-8 3.58-8 8v12l2-2 2 2 2-2 2 2 2-2 2 2 2-2V10c0-4.42-3.58-8-8-8zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 1a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
       </symbol>
+      <symbol id="i-restart" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4v6h6" />
+          <path d="M20 20v-6h-6" />
+          <path d="M4 10a8 8 0 0113.856-5.856L20 4" />
+          <path d="M20 14a8 8 0 01-13.856 5.856L4 20" />
+      </symbol>
       <symbol id="i-party" viewBox="0 0 24 24" fill="currentColor">
         <path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
       </symbol>
@@ -326,7 +333,7 @@
         <div id="sessionLiveContent" class="session-tab-content active">
 
           <div class="session-container">
-            <div class="session-header">
+            <div class="session-header" style="display:flex;align-items:center;justify-content:space-between;">
               <div class="session-info">
                 <h2 style="margin:0 0 8px;font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px">
                   <svg class="icon"><use href="#i-session"/></svg>
@@ -344,13 +351,20 @@
                     <option value="two_four">4v4</option>
                   </select>
                 </div>
-
-                <div class="session-player">
-                  <img id="sessionAvatar" src="" style="width:48px;height:48px;border-radius:8px;margin-right:12px;">
-                  <div>
-                    <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
-                    <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
+                <div class="session-player" style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <img id="sessionAvatar" src="" style="width:48px;height:48px;border-radius:8px;">
+                    <div>
+                      <div id="sessionIgn" style="font-size:16px;font-weight:600;color:var(--text);">No player selected</div>
+                      <div id="sessionTime" style="font-size:12px;color:var(--muted);margin-top:2px;">Session not started</div>
+                    </div>
                   </div>
+                  <button id="restartSessionBtn" style="padding:8px 14px;border-radius:8px;background:var(--panelAccent);color:var(--text);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;border:none;">
+                    <svg class="icon" style="width:16px;height:16px;">
+                      <use href="#i-refresh"/>
+                    </svg>
+                    Restart
+                  </button>
                 </div>
               </div>
             </div>
@@ -468,14 +482,6 @@
                   <!-- Filled by JS -->
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          <!-- --- PERIOD SUMMARY (for selected mode) --- -->
-          <div class="analysis-section">
-            <h3 class="analysis-title">Period Summary (selected mode)</h3>
-            <div id="periodSummary" class="period-summary">
-              <!-- Filled by JS -->
             </div>
           </div>
 

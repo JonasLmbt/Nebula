@@ -42,6 +42,15 @@ export function renderSessionStats(start, current) {
     return;
   }
 
+  const MODE_LABELS = {
+  overall: "Overall",
+  eight_one: "Solo",
+  eight_two: "Doubles",
+  four_three: "3v3v3v3",
+  four_four: "4v4v4v4",
+  two_four: "4v4",
+  };
+  
   container.innerHTML = `
 
     <!-- ==================== GENERAL ==================== -->
@@ -66,7 +75,7 @@ export function renderSessionStats(start, current) {
     <div class="session-category">
       <div class="session-category-title">
         <svg class="icon"><use href="#i-filter"/></svg>
-        Mode: ${modeKey}
+        Mode: ${MODE_LABELS[modeKey] || modeKey}
       </div>
       <div class="session-stat-row">
         <span class="session-stat-label">Games Played</span>

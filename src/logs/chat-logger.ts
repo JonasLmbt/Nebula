@@ -491,6 +491,27 @@ export class MinecraftChatLogger extends EventEmitter {
       return;
     }
 
+    // Detect: "<RANK> Name has been removed from the party."
+    if (
+      msg.indexOf("has been removed from the party") !== -1 &&
+      msg.indexOf(":") === -1
+    ) {
+      let pkick = msg.split(" ")[0]; 
+      if (pkick.startsWith("[")) {
+        pkick = msg.split(" ")[1];
+      }
+      const kickedPlayer = cleanName(pkick || "");
+      if (kickedPlayer) {
+        this.partyMembers.delete(kickedPlayer);
+        this.emit("partyUpdated", Array.from(this.partyMembers));
+        if (this.players.has(kickedPlayer)) {
+          this.players.delete(kickedPlayer);
+          this.emit("playersUpdated", Array.from(this.players));
+        }
+      }
+      return;
+    }
+
     // Game start detection (clear list)
     if (msg.indexOf('The game starts in 1 second!') !== -1 && msg.indexOf(':') === -1) {
       // Fire a gameStart event shortly after countdown finishes
