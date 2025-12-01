@@ -401,6 +401,28 @@ function getSortValue(player, key) {
   }
 }
 
+// Resolve a stat value for a player based on overlay mode and fallbacks
+function resolveStat(player, key, overlayMode) {
+  // 1. Mode-based stats
+  if (player.modes && player.modes[overlayMode]) {
+    const modeStats = player.modes[overlayMode];
+
+    if (modeStats && Object.prototype.hasOwnProperty.call(modeStats, key)) {
+      const val = modeStats[key];
+      return Number.isFinite(val) ? val : 0;
+    }
+  }
+
+  // 2. Global stats (ws, networkLevel, rankTag, etc.)
+  if (player[key] !== undefined) {
+    const val = player[key];
+    return Number.isFinite(val) ? val : val ?? 0;
+  }
+
+  // 3. Fallback
+  return 0;
+}
+
 // Insert row for this player (used by both fetchPlayerStats and renderTable)
 function renderPlayerRow(player, dynamicStats) {
   // Debug log
@@ -427,15 +449,7 @@ function renderPlayerRow(player, dynamicStats) {
   const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
   const dynamicCells = selectedStats.map(key => {
   if (key === 'level' || key === 'name') return '';
-    let val;
-    // If stat is mode-specific (ws, fkdr, wlr, bblr etc)
-    if (player.modes && player.modes[overlayMode] && player.modes[overlayMode][key] !== undefined) {
-        val = player.modes[overlayMode][key];
-    }
-    // If stat is global (level, ws, networkLevel etc)
-    else {
-        val = player[key];
-    }
+    let val = resolveStat(player, key, overlayMode);
     // Support calc functions for derived stats if backend didn't send field
     const statDef = STATS[key];
     if ((val == null || (typeof val === 'number' && isNaN(val))) && statDef && typeof statDef.calc === 'function') {
