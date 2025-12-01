@@ -409,18 +409,18 @@ function resolveStat(player, key, overlayMode) {
 
     if (modeStats && Object.prototype.hasOwnProperty.call(modeStats, key)) {
       const val = modeStats[key];
-      return Number.isFinite(val) ? val : 0;
+      return Number.isFinite(val) ? val : null;
     }
   }
 
   // 2. Global stats (ws, networkLevel, rankTag, etc.)
   if (player[key] !== undefined) {
     const val = player[key];
-    return Number.isFinite(val) ? val : val ?? 0;
+    return Number.isFinite(val) ? val : val ?? null;
   }
 
   // 3. Fallback
-  return 0;
+  return null;
 }
 
 // Insert row for this player (used by both fetchPlayerStats and renderTable)
