@@ -448,16 +448,36 @@ function renderPlayerRow(player, dynamicStats) {
   const tooltipOther = hasNick ? (showNick ? realName : originalNick) : '';
   const selectedStats = dynamicStats || statSettings.layout.filter(k => k && statSettings.visible.includes(k));
   const dynamicCells = selectedStats.map(key => {
-  if (key === 'level' || key === 'name') return '';
-    let val = resolveStat(player, key, overlayMode);
-    // Support calc functions for derived stats if backend didn't send field
-    const statDef = STATS[key];
-    if ((val == null || (typeof val === 'number' && isNaN(val))) && statDef && typeof statDef.calc === 'function') {
-      try { val = statDef.calc(player); } catch { val = null; }
-    }
-    const colorStyle = getColorForValue(key, typeof val === 'number' ? val : Number(val));
-    return `<td class="metric" ${colorStyle}>${fmt(val)}</td>`;
-  }).join('');
+      if (key === "level" || key === "name") return "";
+
+      let val = resolveStat(player, key, overlayMode);
+
+      // 1) Derived stat fallback (STATS[key].calc)
+      const statDef = STATS[key];
+      if (
+          (val === null || val === undefined || Number.isNaN(val)) &&
+          statDef &&
+          typeof statDef.calc === "function"
+      ) {
+          try {
+              const calcVal = statDef.calc(player);
+              val = Number.isFinite(calcVal) ? calcVal : 0;
+          } catch {
+              val = 0;
+          }
+      }
+
+      // 2) Final sanitizing → avoid NaN/null/undefined
+      if (val === null || val === undefined || Number.isNaN(val)) {
+          val = 0;
+      }
+
+      // 3) Safe numeric conversion for color mapping
+      const numericVal = Number.isFinite(Number(val)) ? Number(val) : 0;
+      const colorStyle = getColorForValue(key, numericVal);
+
+      return `<td class="metric" ${colorStyle}>${fmt(numericVal)}</td>`;
+  }).join("");
   const orderedCells = [
     `<td class="lvl">${levelHTML}</td>`,
     `<td class="name">
