@@ -254,7 +254,7 @@ export class MinecraftChatLogger extends EventEmitter {
     }
 
     // Lobby join detection
-    if ((msg.includes('joined the lobby!') || msg.includes('rewards!')) && !msg.includes(':')) {
+    if ((msg.includes('joined the lobby!') || msg.includes('rewards!')) && !msg.includes(':') || msg.includes('slid into the lobby!')) {
       this.inLobby = true;
       this.emit('lobbyJoined');
       return;
