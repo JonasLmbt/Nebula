@@ -452,28 +452,34 @@ function renderPlayerRow(player, dynamicStats) {
 
       let val = resolveStat(player, key, overlayMode);
 
-      // 1) Derived stat fallback (STATS[key].calc)
+      // CASE 1: String values (mode, rankTag, guildTag, etc.)
+      if (typeof val === "string") {
+          return `<td class="metric">${val}</td>`;
+      }
+
+      // CASE 2: Null/undefined → player hat KEINE stats für diesen key
+      // → NICHT als 0 rendern!
+      if (val === null || val === undefined) {
+          return `<td class="metric muted">—</td>`;
+      }
+
+      // CASE 3: Numeric fallback (STATS.calc)
       const statDef = STATS[key];
-      if (
-          (val === null || val === undefined || Number.isNaN(val)) &&
-          statDef &&
-          typeof statDef.calc === "function"
-      ) {
+      if ((!Number.isFinite(val)) && statDef && typeof statDef.calc === "function") {
           try {
-              const calcVal = statDef.calc(player);
-              val = Number.isFinite(calcVal) ? calcVal : 0;
+              val = statDef.calc(player);
           } catch {
-              val = 0;
+              val = null;
           }
       }
 
-      // 2) Final sanitizing → avoid NaN/null/undefined
-      if (val === null || val === undefined || Number.isNaN(val)) {
-          val = 0;
+      // CASE 4: Wenn nach calc immer noch kein Wert → anzeigen als „—“
+      if (val === null || val === undefined || !Number.isFinite(Number(val))) {
+          return `<td class="metric muted">—</td>`;
       }
 
-      // 3) Safe numeric conversion for color mapping
-      const numericVal = Number.isFinite(Number(val)) ? Number(val) : 0;
+      // CASE 5: Zahl → normal rendern
+      const numericVal = Number(val);
       const colorStyle = getColorForValue(key, numericVal);
 
       return `<td class="metric" ${colorStyle}>${fmt(numericVal)}</td>`;
@@ -1076,7 +1082,7 @@ window.ipcRenderer.on('chat:message', (_e, payload) => {
     }
 
     // Parse guild member lines (online: " ●  ", offline: " ?  ")
-if (guildListMode && guildBatchAccepted && (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1)) {
+    if (guildListMode && guildBatchAccepted && (msg.indexOf(' ●  ') !== -1 || msg.indexOf(' ?  ') !== -1)) {
       const isOnline = msg.indexOf(' ●  ') !== -1;
       
       // Skip offline members if onlineOnly is enabled

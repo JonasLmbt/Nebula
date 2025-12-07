@@ -1,6 +1,7 @@
 // sessionManager.js
 import { renderInitialSessionUI, renderSessionStats, showSessionError } from "./sessionRenderer.js";
 import { calculateDiff } from "./sessionDiff.js";
+import { skip } from "node:test";
 
 class SessionManager {
   constructor() {
@@ -58,33 +59,33 @@ class SessionManager {
     }
   }
 
-  async update() {
-    if (!this.ign || !this.startStats) return;
+  async update(skipCache = false) {
+      if (!this.ign || !this.startStats) return;
 
-    document.getElementById('sessionIgn').textContent = this.ign;
+      const now = Date.now();
 
-    const now = Date.now();
-    let skipCache = false;
+      // If caller forces skipCache → always uncached
+      if (skipCache) {
+          this.lastUncachedRequest = now;
+      } else {
+          // Automatic uncached only if 50s passed
+          const elapsed = now - (this.lastUncachedRequest || 0);
+          if (elapsed >= 50000) {
+              skipCache = true;
+              this.lastUncachedRequest = now;
+          }
+      }
 
-    // Allow uncached request only every 10 seconds
-    if (now - this.lastUncachedRequest >= 10000) {
-      skipCache = true;
-      this.lastUncachedRequest = now;
-    }
+      try {
+          const raw = await this.ipc.invoke("bedwars:stats", this.ign, skipCache);
+          if (!raw || raw.error) return;
 
-    try {
-      const raw = await this.ipc.invoke("bedwars:stats", this.ign, skipCache);
+          this.lastStats = raw;
+          renderSessionStats(this.startStats, raw);
 
-      if (!raw || raw.error) return;
-
-      const normalized = raw;
-      this.lastStats = normalized;
-
-      renderSessionStats(this.startStats, normalized);
-
-    } catch (err) {
-      console.error("[Session] Update failed", err);
-    }
+      } catch (err) {
+          console.error("[Session] Update failed", err);
+      }
   }
 
   startTimer() {
@@ -103,6 +104,8 @@ class SessionManager {
 
   async stop() {
     if (!this.startStats) return;
+
+    this.update(true)
 
     const endStats = this.lastStats || this.startStats;
     const endTime = new Date();
