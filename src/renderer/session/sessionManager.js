@@ -1,7 +1,6 @@
 // sessionManager.js
 import { renderInitialSessionUI, renderSessionStats, showSessionError } from "./sessionRenderer.js";
 import { calculateDiff } from "./sessionDiff.js";
-import { skip } from "node:test";
 
 class SessionManager {
   constructor() {
