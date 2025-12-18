@@ -154,8 +154,8 @@ app.whenReady().then(() => {
     chat.on('partyUpdated', (members: string[]) => {
       if (win) win.webContents.send('chat:party', members);
     });
-    chat.on('partyInvite', (inviter: string) => {
-      if (win) win.webContents.send('chat:partyInvite', inviter);
+    chat.on("partyInvite", (inviter: string, leader?: string) => {
+      if (win) win.webContents.send("chat:partyInvite", { inviter, leader: leader ?? null });
     });
     chat.on('partyInviteExpired', (player: string) => {
       if (win) win.webContents.send('chat:partyInviteExpired', player);

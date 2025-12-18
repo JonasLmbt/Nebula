@@ -907,18 +907,31 @@ window.ipcRenderer.on('chat:party', (_e, members) => {
 });
 
 // Party invite (only fetch stats, don't add to party source)
-window.ipcRenderer.on('chat:partyInvite', (_e, inviter) => {
+window.ipcRenderer.on("chat:partyInvite", (_e, payload) => {
   try {
-    if (!inviter || typeof inviter !== 'string') return;
     if (!sourcesSettings?.party?.enabled || !sourcesSettings?.party?.showInviteTemp || !sourcesSettings?.partyInvites?.enabled) return;
-    
-    console.log('Party invite received from:', inviter);
-    addPlayer(inviter, 'invite');
+
+    // Backwards compatible: old payload was just inviter string
+    const inviter = typeof payload === "string" ? payload : payload?.inviter;
+    const leader = typeof payload === "object" ? payload?.leader : null;
+
+    if (!inviter || typeof inviter !== "string") return;
+
+    console.log("Party invite received:", { inviter, leader });
+
+    // Add inviter temporarily
+    addPlayer(inviter, "invite");
     addInviteTimeout(inviter);
+
+    if (leader && typeof leader === "string") {
+      addPlayer(leader, "invite");
+      addInviteTimeout(leader);
+    }
+
     renderTable();
     updateOverlaySize();
   } catch (err) {
-    console.error('Error handling chat:partyInvite', err);
+    console.error("Error handling chat:partyInvite", err);
   }
 });
 
@@ -1152,52 +1165,74 @@ window.ipcRenderer.on('chat:userIgnMention', (_e, name) => {
   }
 });
 
-// Server change → remove who/chat/ign/guild sources if enabled
-window.ipcRenderer.on('chat:serverChange', () => {
+// Server change → remove who/chat/guild sources if enabled (never remove own IGN)
+window.ipcRenderer.on("chat:serverChange", () => {
   try {
     // Enter pre-game lobby phase on server change; game not yet started
     preGameLobby = true;
     gameInProgress = false;
-    if (!sourcesSettings?.game?.removeOnServerChange && !sourcesSettings?.chat?.removeOnServerChange && !sourcesSettings?.guild?.removeOnServerChange) return;
-    const allKeys = Array.from(playerSources.keys());
-    allKeys.forEach(key => {
+
+    if (
+      !sourcesSettings?.game?.removeOnServerChange &&
+      !sourcesSettings?.chat?.removeOnServerChange &&
+      !sourcesSettings?.guild?.removeOnServerChange
+    ) {
+      return;
+    }
+
+    const selfKey = sessionIgn ? String(sessionIgn).trim().toLowerCase() : null;
+
+    for (const key of Array.from(playerSources.keys())) {
+      // Always preserve own IGN source
+      if (selfKey && key === selfKey) {
+        playerSources.set(key, new Set(["ign"]));
+        continue;
+      }
+
       const sources = playerSources.get(key);
-      if (!sources) return;
+      if (!sources) continue;
+
       let changed = false;
-      if (sourcesSettings?.game?.removeOnServerChange && sources.has('who')) {
-        sources.delete('who');
+
+      // Remove "who" source on server change
+      if (sourcesSettings?.game?.removeOnServerChange && sources.has("who")) {
+        sources.delete("who");
         changed = true;
       }
-      if (sourcesSettings?.chat?.removeOnServerChange) {
-        if (sources.has('chat')) {
-          sources.delete('chat');
-          changed = true;
-        }
-        if (sources.has('ign')) {
-          sources.delete('ign');
-          changed = true;
-        }
-      }
-      if (sourcesSettings?.guild?.removeOnServerChange && sources.has('guild')) {
-        sources.delete('guild');
+
+      // Remove "chat" source on server change
+      if (sourcesSettings?.chat?.removeOnServerChange && sources.has("chat")) {
+        sources.delete("chat");
         changed = true;
       }
-      if (changed) {
-        if (sources.size === 0) {
-          if (!pinnedPlayers.has(key)) {
-            removePlayer(key);
-          } else {
-            playerSources.set(key, sources); // keep empty set for pinned
-          }
+
+      // IMPORTANT: do NOT remove "ign" here (that's your persistent own player)
+      // If you ever want to remove ign for non-self players, do it explicitly with a rule.
+
+      // Remove "guild" source on server change
+      if (sourcesSettings?.guild?.removeOnServerChange && sources.has("guild")) {
+        sources.delete("guild");
+        changed = true;
+      }
+
+      if (!changed) continue;
+
+      if (sources.size === 0) {
+        if (!pinnedPlayers.has(key)) {
+          removePlayer(key);
         } else {
+          // keep empty set for pinned players
           playerSources.set(key, sources);
         }
+      } else {
+        playerSources.set(key, sources);
       }
-    });
+    }
+
     renderTable();
     updateOverlaySize();
   } catch (err) {
-    console.error('Error handling chat:serverChange', err);
+    console.error("Error handling chat:serverChange", err);
   }
 });
 

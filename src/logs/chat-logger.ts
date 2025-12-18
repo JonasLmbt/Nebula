@@ -327,7 +327,7 @@ export class MinecraftChatLogger extends EventEmitter {
       return;
     }
 
-    // Party invite (incoming): Beispiel:
+    // Party invite (incoming): 
     // [MVP+] Zorbas05 has invited you to join their party!You have 60 seconds to accept. Click here to join!
     if (msg.indexOf('has invited you to join their party!') !== -1 && msg.indexOf(':') === -1) {
       console.log('[DBG:PARTY_INVITE_IN_RAW_MATCH_CANDIDATE]', msg);
@@ -359,7 +359,62 @@ export class MinecraftChatLogger extends EventEmitter {
       }
     }
 
-    // Party invite (outgoing): Beispiel:
+    // Party invite (incoming to someone else's party):
+    if (msg.indexOf("has invited you to join") !== -1 && msg.indexOf("party!") !== -1 && msg.indexOf(":") === -1) {
+      console.log("[DBG:PARTY_INVITE_OTHER_RAW_MATCH_CANDIDATE]", msg);
+
+      // Capture inviter + party leader (both ranks optional)
+      const inviteOtherMatch = msg.match(
+        /^(?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16}) has invited you to join (?:\[[^\]]+\]\s*)?([A-Za-z0-9_]{3,16})'s party!/
+      );
+
+      if (inviteOtherMatch) {
+        const inviter = cleanName(inviteOtherMatch[1]);
+        const leader = cleanName(inviteOtherMatch[2]);
+
+        console.log(
+          "[DBG:PARTY_INVITE_OTHER_MATCH]",
+          inviteOtherMatch,
+          "inviter=",
+          inviter,
+          "leader=",
+          leader
+        );
+
+        if (inviter) {
+          // You can keep same event name, or use a dedicated one
+          this.emit("partyInvite", inviter, leader);
+          this.awaitingInviteContinuation = true;
+        }
+        return;
+      } else {
+        console.log("[DBG:PARTY_INVITE_OTHER_NO_REGEX_MATCH]");
+      }
+
+      // Fallback parsing (no regex)
+      // Pattern: "<inviter> has invited you to join <leader>'s party!"
+      const cutIdx = msg.indexOf(" has invited you to join ");
+      const partyIdx = msg.indexOf("'s party!");
+      if (cutIdx > 0 && partyIdx > cutIdx) {
+        const inviterRaw = msg.substring(0, cutIdx).trim();
+        const leaderRaw = msg.substring(cutIdx + " has invited you to join ".length, partyIdx).trim();
+
+        const inviter = cleanName(inviterRaw.includes("]") ? inviterRaw.substring(inviterRaw.lastIndexOf("]") + 1).trim() : inviterRaw);
+        const leader = cleanName(leaderRaw.includes("]") ? leaderRaw.substring(leaderRaw.lastIndexOf("]") + 1).trim() : leaderRaw);
+
+        console.log("[DBG:PARTY_INVITE_OTHER_FALLBACK]", { inviterRaw, leaderRaw, inviter, leader });
+
+        if (inviter) {
+          this.emit("partyInvite", inviter, leader);
+          this.awaitingInviteContinuation = true;
+        }
+        return;
+      } else {
+        console.log("[DBG:PARTY_INVITE_OTHER_FALLBACK_NOT_APPLIED]");
+      }
+    }
+
+    // Party invite (outgoing): 
     // [VIP] wisdomVII invited [MVP+] Zorbas05 to the party! They have 60 seconds to accept.
     if (msg.indexOf(' invited ') !== -1 && msg.indexOf(' to the party!') !== -1 && msg.indexOf(':') === -1) {
       console.log('[DBG:PARTY_INVITE_OUT_RAW_MATCH_CANDIDATE]', msg);
@@ -379,7 +434,7 @@ export class MinecraftChatLogger extends EventEmitter {
       }
     }
 
-    // Party invite expiration: Beispiel:
+    // Party invite expiration:
     // The party invite from [MVP+] Zorbas05 has expired.
     // The party invite to [MVP+] Zorbas05 has expired.
     if (msg.indexOf('party invite') !== -1 && msg.indexOf('has expired') !== -1 && msg.indexOf(':') === -1) {
@@ -492,10 +547,7 @@ export class MinecraftChatLogger extends EventEmitter {
     }
 
     // Detect: "<RANK> Name has been removed from the party."
-    if (
-      msg.indexOf("has been removed from the party") !== -1 &&
-      msg.indexOf(":") === -1
-    ) {
+    if (msg.indexOf("has been removed from the party") !== -1 && msg.indexOf(":") === -1) {
       let pkick = msg.split(" ")[0]; 
       if (pkick.startsWith("[")) {
         pkick = msg.split(" ")[1];
@@ -513,11 +565,7 @@ export class MinecraftChatLogger extends EventEmitter {
     }
 
     // Detect: "Kicked <RANK?> Name because they were offline."
-    if (
-      msg.indexOf("because they were offline") !== -1 &&
-      msg.indexOf("Kicked ") === 0 &&      // starts with "Kicked "
-      msg.indexOf(":") === -1             // avoid chat prefix
-    ) {
+    if (msg.indexOf("because they were offline") !== -1 && msg.indexOf("Kicked ") === 0 && msg.indexOf(":") === -1) {
       const parts = msg.split(" ");
       let kicked = parts[1];
       if (kicked.startsWith("[")) {
@@ -543,8 +591,7 @@ export class MinecraftChatLogger extends EventEmitter {
     }
 
     // Guild list parsing
-  // Start: "Guild Name: ..." or category headers like "-- Guards --" / "--- Guards ---"
-  if (msg.indexOf('Guild Name: ') === 0 || msg.trim().match(/^-{2,}\s+\w+\s+-{2,}$/)) {
+    if (msg.indexOf('Guild Name: ') === 0 || msg.trim().match(/^-{2,}\s+\w+\s+-{2,}$/)) {
       if (!this.inGuildList) {
         console.log('Starting guild list parsing with trigger:', msg.trim());
         this.inGuildList = true;
@@ -576,9 +623,6 @@ export class MinecraftChatLogger extends EventEmitter {
       if (cleanLine === '' ||
           /^-{2,}\s+.+\s+-{2,}$/.test(cleanLine) || // -- Wardens -- or --- Wardens ---
           /^Guild Name:/i.test(cleanLine)) {
-  // Important: Do NOT consume summary lines (Total/Online/Offline Members) here.
-  // We allow the finish logic below to see them; previously a /Members:\s*\d+$/ guard
-  // swallowed them and the list never completed -> timeout race.
         this.emit('message', { name: '', text: msg });
         return;
       }
@@ -674,9 +718,7 @@ export class MinecraftChatLogger extends EventEmitter {
     }
 
     // Guild list end: "Total Members:", "Online Members:", "Offline Members:"
-    if (msg.indexOf('Total Members:') === 0 || 
-        msg.indexOf('Online Members:') === 0 || 
-        msg.indexOf('Offline Members:') === 0) {
+    if (msg.indexOf('Total Members:') === 0 || msg.indexOf('Online Members:') === 0 || msg.indexOf('Offline Members:') === 0) {
       console.log('Guild list end detected:', msg.trim(), 'Found', this.guildMembers.size, 'members');
       this.finishGuildList();
       this.emit('message', { name: '', text: msg });
