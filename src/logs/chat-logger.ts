@@ -434,6 +434,37 @@ export class MinecraftChatLogger extends EventEmitter {
       }
     }
 
+    // Party invite (outgoing):
+    if (msg.indexOf(" invited ") !== -1 && msg.indexOf(" to the party! They have 60 seconds to accept.") !== -1 && msg.indexOf(":") === -1) {
+      const parts = msg.split(" ");
+
+      // Extract inviter
+      let inviter = parts[0];
+      let idx = 1;
+      if (inviter.startsWith("[")) {
+        inviter = parts[1];
+        idx = 2;
+      }
+
+      // Expect "invited" at parts[idx]
+      if (parts[idx] !== "invited") return;
+
+      // Extract invitee (the person being invited)
+      let invitee = parts[idx + 1];
+      if (invitee && invitee.startsWith("[")) {
+        invitee = parts[idx + 2];
+      }
+
+      const inviterName = cleanName(inviter || "");
+      const inviteeName = cleanName(invitee || "");
+
+      if (inviterName && inviteeName) {
+        this.emit("partyInvite", inviteeName);
+      }
+
+      return;
+    }
+
     // Party invite expiration:
     // The party invite from [MVP+] Zorbas05 has expired.
     // The party invite to [MVP+] Zorbas05 has expired.
